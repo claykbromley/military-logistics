@@ -1,0 +1,107 @@
+.menu {
+    z-index: 2;
+    position: absolute;
+    background-color: rgb(232, 232, 232);
+    padding: 5px;
+    border: 1px solid black;
+    border-radius: 5px;
+    width:100%;
+}
+
+.menu-container {
+    position: relative;
+    display: inline-block;
+    width: max-content;
+}
+
+.menu-container:hover .menu-dropdown{
+    transform: rotate(90deg);
+}
+
+.menu-container + .menu-container{
+    border-left: 2px solid white;
+}
+
+.menu-dropdown {
+    transition: transform 0.5s ease;
+}
+
+.menu-item {
+    padding: 5px;
+    text-align: center;
+    border-radius: 5px;
+}
+
+.menu-item a {
+    color: black;
+    text-decoration: none;
+}
+
+.menu-item-container + .menu-item-container {
+    border-top: 1px solid black;
+}
+
+.menu-item:hover {
+    background-color: rgb(186, 186, 186);
+}
+
+.navbar {
+    background-color: rgb(0, 0, 76);
+}
+
+.navbar-header {
+    justify-content: center;
+    display:flex;
+    padding: 20px;
+}
+
+.profile {
+    background-color: white;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    margin-right: 30px;
+}
+
+.profile img {
+    width: 50px;
+    height: 50px;
+}
+
+.settings {
+    color: white;
+    width: 50px;
+    height: 50px;
+    margin-right: 20px;
+    transition: transform 0.5s ease;
+}
+
+.settings:hover {
+    color: grey;
+    transform: rotate(120deg);
+}
+
+.settings-bar {
+    justify-content: right;
+    padding: 16px;
+    display: flex;
+}
+
+.tab {
+    background-color: rgb(0, 0, 76);
+    border: none;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: large;
+}
+
+.tab a {
+    color: white;
+    text-decoration: none;
+    padding-left:50px;
+    padding-right:50px;
+}
+
+.tab a:hover {
+    color: grey;
+}
