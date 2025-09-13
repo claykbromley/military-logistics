@@ -1,3 +1,9 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
 .App {
   text-align: center;
 }
@@ -35,4 +41,69 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.financial-page {
+  display: flex;
+  margin: 16px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.news {
+  flex: 1;
+  overflow-y: auto;
+  padding-left: 20px;
+}
+
+.page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.services {
+  background-color: lightgray;
+  text-align: center;
+  width: 20%;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.services-option {
+  margin: 5px;
+  background-color: white;
+  padding: 10px;
+  text-align: center;
+  border: black solid 1px;
+  border-radius: 15px;
+}
+
+.services-option:hover {
+  border: black solid 2px;
+  padding: 9px;
+  background-color: rgb(230, 229, 229);
+}
+
+.stocks {
+  margin-left: 20px;
+  margin-top: 20px;
+  background-color: lightgray;
+  border-radius: 5px;
+  display: flex;
+  padding: 8px;
+  justify-content: space-evenly;
+}
+
+.stock-option {
+  padding: 8px;
+  border-radius: 10px;
 }

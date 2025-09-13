@@ -11,11 +11,13 @@ import Marketplace from "./pages/Marketplace";
 import Scheduler from "./pages/Scheduler";
 import Services from "./pages/Services";
 import Transitions from "./pages/Transitions";
+import DiscountDatabase from "./pages/DiscountDatabase";
+import ContactUs from "./pages/ContactUs";
 
 export default function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="page">
         <Navbar />
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="/marketplace" element={<Marketplace />} />
           <Route path="/scheduler" element={<Scheduler />} />
           <Route path="/transitions" element={<Transitions />} />
+          <Route path="/discount_database" element={<DiscountDatabase />} />
+          <Route path="/contact_us" element={<ContactUs />} />
         </Routes>
       </div>
     </Router>
