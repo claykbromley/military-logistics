@@ -35,3 +35,15 @@ export function MilTaxConsultation({setModal}) {
     </div>
   );
 }
+
+export function NMCRS({setModal}) {
+  return (
+    <div className='modal-background'
+        onClick={() => setModal(null)}>
+      <div className='modal'
+        onClick={(e) => e.stopPropagation()}>
+       
+      </div>
+    </div>
+  );
+}

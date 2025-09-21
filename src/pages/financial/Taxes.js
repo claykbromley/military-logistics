@@ -34,39 +34,6 @@ export default function Taxes() {
 
         <div className='benefit'>
           <div className='benefit-collapsed'
-            onClick={() => handleClick(0)}>
-            <h4>Free Tax Filing through TurboTax {<FaChevronDown style={{marginLeft:'10px'}}/>}</h4>
-          </div>
-          {showBenefit===0 &&
-            <div className='benefit-expanded'>
-              <ul>
-                <li>Intuit TurboTax provides free tax filing to all Enlisted active duty or reserve personnel.</li>
-                <li>Simply enter your military W-2, verify your rank and your TurboTax Military discount will be applied when you file.</li>
-              </ul>
-              <table>
-                <thead>
-                  <tr><th style={{width:'40%'}}>Eligible</th><th style={{width:'40%'}}>Ineligible</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>Active Duty</td><td>Veterans</td></tr>
-                  <tr><td>Reservists</td><td>National Guard</td></tr>
-                  <tr><td>E1 - E9</td><td>Commissioned Officers</td></tr>
-                  <tr><td></td><td>Warrant Officers</td></tr>
-                </tbody>
-              </table>
-              <div className='benefit-links'>
-                <button onClick={() => setModal(0)}>File Taxes</button>
-                <a href="https://turbotax.intuit.com/personal-taxes/online/military-edition.jsp" target="_blank" rel="noopener noreferrer">
-                  {<button>Visit Website</button>}
-                </a>
-              </div>
-              {modal===0 && <TurboTax setModal={setModal} />}
-            </div>
-          }
-        </div>
-
-        <div className='benefit'>
-          <div className='benefit-collapsed'
             onClick={() => handleClick(1)}>
             <h4>Free Tax Filing through MilTax {<FaChevronDown style={{marginLeft:'10px'}}/>}</h4>
           </div>
@@ -104,6 +71,39 @@ export default function Taxes() {
               </div>
               {modal===1 && <MilTax setModal={setModal} />}
               {modal===2 && <MilTaxConsultation setModal={setModal} />}
+            </div>
+          }
+        </div>
+        
+        <div className='benefit'>
+          <div className='benefit-collapsed'
+            onClick={() => handleClick(0)}>
+            <h4>Free Tax Filing through TurboTax {<FaChevronDown style={{marginLeft:'10px'}}/>}</h4>
+          </div>
+          {showBenefit===0 &&
+            <div className='benefit-expanded'>
+              <ul>
+                <li>Intuit TurboTax provides free tax filing to all Enlisted active duty or reserve personnel.</li>
+                <li>Simply enter your military W-2, verify your rank and your TurboTax Military discount will be applied when you file.</li>
+              </ul>
+              <table>
+                <thead>
+                  <tr><th style={{width:'40%'}}>Eligible</th><th style={{width:'40%'}}>Ineligible</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Active Duty</td><td>Veterans</td></tr>
+                  <tr><td>Reservists</td><td>National Guard</td></tr>
+                  <tr><td>E1 - E9</td><td>Commissioned Officers</td></tr>
+                  <tr><td></td><td>Warrant Officers</td></tr>
+                </tbody>
+              </table>
+              <div className='benefit-links'>
+                <button onClick={() => setModal(0)}>File Taxes</button>
+                <a href="https://turbotax.intuit.com/personal-taxes/online/military-edition.jsp" target="_blank" rel="noopener noreferrer">
+                  {<button>Visit Website</button>}
+                </a>
+              </div>
+              {modal===0 && <TurboTax setModal={setModal} />}
             </div>
           }
         </div>
