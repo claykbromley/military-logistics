@@ -47,3 +47,15 @@ export function NMCRS({setModal}) {
     </div>
   );
 }
+
+export function FinAdvisor({setModal}) {
+  return (
+    <div className='modal-background'
+        onClick={() => setModal(null)}>
+      <div className='modal'
+        onClick={(e) => e.stopPropagation()}>
+       
+      </div>
+    </div>
+  );
+}

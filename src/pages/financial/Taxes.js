@@ -53,13 +53,13 @@ export default function Taxes() {
               <table style={{width:'50%'}}>
                 <thead><tr><th>Who is Eligible?</th></tr></thead>
                 <tbody>
-                  <tr><td style={{border:'1px solid'}}>Active Duty Service Members</td></tr>
-                  <tr><td style={{border:'1px solid'}}>National Guard</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Dependents</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Medically Discharged Service Members and Caretakers</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Survivors of Deseased Service Members</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Military Academy Cadets/Midshipmen</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Foreign Service Members on US Bases</td></tr>
+                  <tr><td>Active Duty Service Members</td></tr>
+                  <tr><td>National Guard</td></tr>
+                  <tr><td>Dependents</td></tr>
+                  <tr><td>Medically Discharged Service Members and Caretakers</td></tr>
+                  <tr><td>Survivors of Deseased Service Members</td></tr>
+                  <tr><td>Military Academy Cadets/Midshipmen</td></tr>
+                  <tr><td>Foreign Service Members on US Bases</td></tr>
                 </tbody>
               </table>
               <div className='benefit-links'>

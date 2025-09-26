@@ -56,10 +56,10 @@ export default function Loans() {
               <table style={{width:'50%'}}>
                 <thead><tr><th>Who is Eligible?</th></tr></thead>
                 <tbody>
-                  <tr><td style={{border:'1px solid'}}>Active Duty Service Members</td></tr>
-                  <tr><td style={{border:'1px solid'}}>National Guard on Federal Orders {'>'} 30 days</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Dependents</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Commissioned Officers of the PHS and NOAA</td></tr>
+                  <tr><td>Active Duty Service Members</td></tr>
+                  <tr><td>National Guard on Federal Orders {'>'} 30 days</td></tr>
+                  <tr><td>Dependents</td></tr>
+                  <tr><td>Commissioned Officers of the PHS and NOAA</td></tr>
                 </tbody>
               </table>
               <div className='benefit-links'>
@@ -95,49 +95,49 @@ export default function Loans() {
                 </tr></thead>
                 <tbody>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.usaa.com/banking/loans/auto/" target="_blank" rel="noopener noreferrer">
                         {<button>Auto Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Loans to buy new or used vehicles</td>
-                    <td style={{border:'1px solid'}}>USAA offers financing terms up to 84 months on new and used auto loans (for certain model years) under good credit.</td>
+                    <td>Loans to buy new or used vehicles</td>
+                    <td>USAA offers financing terms up to 84 months on new and used auto loans (for certain model years) under good credit.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.usaa.com/banking/loans/personal/" target="_blank" rel="noopener noreferrer">
                         {<button>Personal Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Unsecured loans for general use</td>
-                    <td style={{border:'1px solid'}}>USAA has fixed‐rate personal loans. Rates depend on creditworthiness. No application or early repayment (prepayment) fees.</td>
+                    <td>Unsecured loans for general use</td>
+                    <td>USAA has fixed‐rate personal loans. Rates depend on creditworthiness. No application or early repayment (prepayment) fees.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.usaa.com/banking/home-mortgages/purchase/" target="_blank" rel="noopener noreferrer">
                         {<button>Home Mortgages</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Purchase, refinance, etc.</td>
-                    <td style={{border:'1px solid'}}>USAA offers many mortgage types: conventional, FHA, VA, jumbo, etc. They also help with VA home loans (no down payment required when eligible).</td>
+                    <td>Purchase, refinance, etc.</td>
+                    <td>USAA offers many mortgage types: conventional, FHA, VA, jumbo, etc. They also help with VA home loans (no down payment required when eligible).</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.usaa.com/banking/home-mortgages/refinance/" target="_blank" rel="noopener noreferrer">
                         {<button>Refinancing Options</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Lowering your rate or changing the structure of an existing mortgage</td>
-                    <td style={{border:'1px solid'}}>USAA handles conventional refi, VA cash-out, etc.</td>
+                    <td>Lowering your rate or changing the structure of an existing mortgage</td>
+                    <td>USAA handles conventional refi, VA cash-out, etc.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.usaa.com/inet/wc/career-starter-loan/" target="_blank" rel="noopener noreferrer">
                         {<button>Career Starter Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>For early career members / when beginning service or training</td>
-                    <td style={{border:'1px solid'}}>USAA has “Career Starter Loan” targeted at personnel starting out to provide access to funds at reasonable rates.</td>
+                    <td>For early career members / when beginning service or training</td>
+                    <td>USAA has “Career Starter Loan” targeted at personnel starting out to provide access to funds at reasonable rates.</td>
                   </tr>
                 </tbody>
               </table>
@@ -160,67 +160,67 @@ export default function Loans() {
                 </tr></thead>
                 <tbody>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/loans-cards/personal-loans.html" target="_blank" rel="noopener noreferrer">
                         {<button>Personal Expense Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Unsecured funds for things like moving expenses, auto repairs, etc.</td>
-                    <td style={{border:'1px solid'}}>Loan amounts from $250 to $50,000. Fixed rate. No origination or prepayment fees. APRs “as low as ~8.99%” for shorter terms.</td>
+                    <td>Unsecured funds for things like moving expenses, auto repairs, etc.</td>
+                    <td>Loan amounts from $250 to $50,000. Fixed rate. No origination or prepayment fees. APRs “as low as ~8.99%” for shorter terms.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/loans-cards/personal-loans.html" target="_blank" rel="noopener noreferrer">
                         {<button>Home Improvement Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Funds for remodeling, repairs, upgrades</td>
-                    <td style={{border:'1px solid'}}>Available for longer terms depending on amount. Some require minimum loan amounts.</td>
+                    <td>Funds for remodeling, repairs, upgrades</td>
+                    <td>Available for longer terms depending on amount. Some require minimum loan amounts.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/loans-cards/personal-loans.html" target="_blank" rel="noopener noreferrer">
                         {<button>Debt Consolidation Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Combine multiple high-interest debts into one loan</td>
-                    <td style={{border:'1px solid'}}>Helps simplify payments; offers fixed payment and competitive rate.</td>
+                    <td>Combine multiple high-interest debts into one loan</td>
+                    <td>Helps simplify payments; offers fixed payment and competitive rate.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/loans-cards/personal-loans.html" target="_blank" rel="noopener noreferrer">
                         {<button>Savings-Secured / Certificate-Secured Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Use your savings or certificates as collateral to get lower rates</td>
-                    <td style={{border:'1px solid'}}>Because it's secured, interest rate is lower (share rate + small margin) and your collateral still earns dividends.</td>
+                    <td>Use your savings or certificates as collateral to get lower rates</td>
+                    <td>Because it's secured, interest rate is lower (share rate + small margin) and your collateral still earns dividends.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/membership/offers-discounts/military-loan-discounts.html" target="_blank" rel="noopener noreferrer">
                         {<button>Auto Loans</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>For buying vehicles or refinancing existing auto loans</td>
-                    <td style={{border:'1px solid'}}>Military members and retirees get APR discounts on select vehicle loans.</td>
+                    <td>For buying vehicles or refinancing existing auto loans</td>
+                    <td>Military members and retirees get APR discounts on select vehicle loans.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/makingcents/home-ownership/mortgage-options-military-members.html" target="_blank" rel="noopener noreferrer">
                         {<button>Home Mortgages</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>Mortgages with features suited to military service, and alternative options if VA eligibility/utilization is limited</td>
-                    <td style={{border:'1px solid'}}>VA Loans, or Military Choice Loans when VA benefit is used up or ineligible, similar benefits.</td>
+                    <td>Mortgages with features suited to military service, and alternative options if VA eligibility/utilization is limited</td>
+                    <td>VA Loans, or Military Choice Loans when VA benefit is used up or ineligible, similar benefits.</td>
                   </tr>
                   <tr>
-                    <td style={{border:'1px solid'}}>
+                    <td>
                       <a href="https://www.navyfederal.org/membership/rotc-ocs.html" target="_blank" rel="noopener noreferrer">
                         {<button>Career Kickoff Loan</button>}
                       </a>
                     </td>
-                    <td style={{border:'1px solid'}}>For pre-commissioning people (ROTC, OCS, Academies, etc.)</td>
-                    <td style={{border:'1px solid'}}>Up to $25,000, low APR (~2.99%) for 60 months. Also deferred payment options until after commissioning or a set period. Helps with uniforms, housing setup, etc.</td>
+                    <td>For pre-commissioning people (ROTC, OCS, Academies, etc.)</td>
+                    <td>Up to $25,000, low APR (~2.99%) for 60 months. Also deferred payment options until after commissioning or a set period. Helps with uniforms, housing setup, etc.</td>
                   </tr>
                 </tbody>
               </table>
@@ -259,10 +259,10 @@ export default function Loans() {
               <table style={{width:'50%'}}>
                 <thead><tr><th>Who is Eligible?</th></tr></thead>
                 <tbody>
-                  <tr><td style={{border:'1px solid'}}>Active-duty service members {'>'} 181 days</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Veterans with qualifying service</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Certain members of the National Guard and Reserves</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Surviving spouses of service members who died in service or from a service-connected disability</td></tr>
+                  <tr><td>Active-duty service members {'>'} 181 days</td></tr>
+                  <tr><td>Veterans with qualifying service</td></tr>
+                  <tr><td>Certain members of the National Guard and Reserves</td></tr>
+                  <tr><td>Surviving spouses of service members who died in service or from a service-connected disability</td></tr>
                 </tbody>
               </table>
               <div className='benefit-links'>
@@ -295,10 +295,10 @@ export default function Loans() {
               <table style={{width:'50%'}}>
                 <thead><tr><th>Who is Eligible?</th></tr></thead>
                 <tbody>
-                  <tr><td style={{border:'1px solid'}}>Active-duty Navy and Marine Corps members and their dependents</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Retired Navy and Marine Corps members and their dependents</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Reservists on active duty</td></tr>
-                  <tr><td style={{border:'1px solid'}}>Eligible widows, widowers, and surviving family members</td></tr>
+                  <tr><td>Active-duty Navy and Marine Corps members and their dependents</td></tr>
+                  <tr><td>Retired Navy and Marine Corps members and their dependents</td></tr>
+                  <tr><td>Reservists on active duty</td></tr>
+                  <tr><td>Eligible widows, widowers, and surviving family members</td></tr>
                 </tbody>
               </table>
               <div className='benefit-links'>

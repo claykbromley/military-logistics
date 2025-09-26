@@ -29,7 +29,7 @@ th {
 }
 
 td {
-    border-left: 1px solid;
+    border: 1px solid;
 }
 
 .benefit {
@@ -81,6 +81,13 @@ td {
 .calculator-input input, select {
     padding: 5px;
     border-radius: 10px;
+}
+
+.center {
+  justify-content: center;
+  align-items: center;
+  display: flex;
+  gap: 20px;
 }
 
 .financial-page {
@@ -176,4 +183,15 @@ td {
 .stock-option {
   padding: 8px;
   border-radius: 10px;
+}
+
+.tsp-pred {
+  justify-content: center;
+  display: flex;
+  padding: 20px;
+  margin: 20px;
+  width: 50%;
+  background-color: rgb(123, 123, 123);
+  border: solid 2px;
+  border-radius: 20px;
 }

@@ -59,27 +59,14 @@ export default function IncomeCalculator() {
   }
 
   function bucketYears(yrs) {
-    if (yrs < 2) return "2 or less";
-    if (yrs < 3) return "Over 2";
-    if (yrs < 4) return "Over 3";
-    if (yrs < 6) return "Over 4";
-    if (yrs < 8) return "Over 6";
-    if (yrs < 10) return "Over 8";
-    if (yrs < 12) return "Over 10";
-    if (yrs < 14) return "Over 12";
-    if (yrs < 16) return "Over 14";
-    if (yrs < 18) return "Over 16";
-    if (yrs < 20) return "Over 18";
-    if (yrs < 22) return "Over 20";
-    if (yrs < 24) return "Over 22";
-    if (yrs < 26) return "Over 24";
-    if (yrs < 28) return "Over 26";
-    if (yrs < 30) return "Over 28";
-    if (yrs < 32) return "Over 30";
-    if (yrs < 34) return "Over 32";
-    if (yrs < 36) return "Over 34";
-    if (yrs < 38) return "Over 36";
-    if (yrs < 40) return "Over 38";
+    const thresholds = [2, 3, 4, 6, 8, 10, 12, 14, 16, 18,
+                        20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40];
+
+    for (const t of thresholds) {
+      if (yrs < t) {
+        return t === 2 ? "2 or less" : `Over ${t - (t <= 4 ? 1 : 2)}`;
+      }
+    }
     return "Over 40";
   }
 
