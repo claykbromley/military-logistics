@@ -150,6 +150,40 @@ export default function Retirement() {
             </div>
           }
         </div>
+
+        <div className='benefit'>
+          <div className='benefit-collapsed'
+            onClick={() => handleClick(3)}>
+            <h4>Roth IRA {<FaChevronDown style={{marginLeft:'10px'}}/>}</h4>
+          </div>
+          {showBenefit===3 &&
+            <div className='benefit-expanded'>
+              <p style={{marginTop:0}}>Roth Indivual Retirement Accounts (IRA) take after-tax contributions, so withdrawals in retirement are tax-free.</p>
+              <ul>
+                <li><strong>Limit:</strong> $7,000/yr (2025) under 50</li>
+                <li><strong>Best for:</strong> junior enlisted/officers in low tax brackets, anyone expecting higher taxes later</li>
+                <li><strong>Combat Zone Tax Exclusion:</strong> income counts as tax-free contributions, so you can withdraw tax-free forever.</li>
+              </ul>
+              <div className='benefit-links'>
+                <a href="https://investor.vanguard.com/accounts-plans/iras" target="_blank" rel="noopener noreferrer">
+                  {<button>Vanguard</button>}
+                </a>
+                <a href="https://www.fidelity.com/retirement-ira/roth-ira" target="_blank" rel="noopener noreferrer">
+                  {<button>Fidelity</button>}
+                </a>
+                <a href="https://www.schwab.com/ira/roth-ira" target="_blank" rel="noopener noreferrer">
+                  {<button>Schwab</button>}
+                </a>
+                <a href="https://www.usaa.com/investing/iras-and-rollovers/" target="_blank" rel="noopener noreferrer">
+                  {<button>USAA</button>}
+                </a>
+                <a href="https://www.navyfederal.org/checking-savings/savings/retirement-savings/savings-accounts.html" target="_blank" rel="noopener noreferrer">
+                  {<button>NFCU</button>}
+                </a>
+              </div>
+            </div>
+          }
+        </div>
       </div>
     </div>
   );

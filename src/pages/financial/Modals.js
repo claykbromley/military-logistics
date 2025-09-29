@@ -59,3 +59,15 @@ export function FinAdvisor({setModal}) {
     </div>
   );
 }
+
+export function HouseFinder({setModal}) {
+  return (
+    <div className='modal-background'
+        onClick={() => setModal(null)}>
+      <div className='modal'
+        onClick={(e) => e.stopPropagation()}>
+       
+      </div>
+    </div>
+  );
+}
