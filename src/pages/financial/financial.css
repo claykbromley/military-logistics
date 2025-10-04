@@ -71,6 +71,13 @@ td {
     margin-top: 20px;
 }
 
+.business-structures {
+  width: 20%;
+  background-color: grey;
+  padding: 10px;
+  border-radius: 10px;
+}
+
 .calculator-input {
     display: flex;
     justify-content: center;

@@ -130,7 +130,8 @@ export default function Financial() {
             {data.map(stock => (
               <div className="stock-option" style={{
                 color: stock.percentChange >= 0 ? "#00bf00ff" : "#c70000ff",
-                backgroundColor: stock.percentChange >= 0 ? "#e0f9e0" : "#f9e0e0" }}>
+                backgroundColor: stock.percentChange >= 0 ? "#e0f9e0" : "#f9e0e0",
+                border: stock.percentChange >= 0 ? "solid 2px #00bf00ff" : "solid 2px #c70000ff", }}>
                 {stock.symbol}: {stock.price?.toFixed(2)}
                 ({stock.percentChange >= 0 ? "+" : ""}
                 {stock.percentChange?.toFixed(2)}%)
