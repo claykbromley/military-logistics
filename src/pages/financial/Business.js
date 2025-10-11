@@ -187,9 +187,124 @@ export default function Business() {
           </div>
           {showBenefit===3 &&
             <div className='benefit-expanded'>
-              
-              <div className='benefit-links'>
-              </div>
+              <p style={{margin:0}}>The marketing strategy and fundraising option you employ depends on the consumer type. Here are some commong business types and recommended marketing strategies:</p>
+              <h4 style={{marginBottom:0}}>Direct-to-Consumer (D2C / B2C)</h4>
+              Selling directly to individual customers (e-commerce, coaching, apps, handmade products)
+              <ul>
+                <li><strong>Social Media Marketing:</strong> TikTok/Instagram for lifestyle/fitness, LinkedIn for professional services</li>
+                <li><strong>Content Creation:</strong> blog, YouTube, or podcast around your expertise</li>
+                <li><strong>Email Lists:</strong> collect emails early, even before launch</li>
+                <li><strong>Partnerships:</strong> collaborate with veteran-owned brands to cross-promote</li>
+                <li>Sharing your service story can be a great way to gain attention, but be aware of regulations regarding what you are allows to post online</li>
+              </ul>
+              <h4 style={{marginBottom:0}}>Business-to-Business (B2B)</h4>
+              Selling to companies (consulting, IT services, logistics, marketing agencies)
+              <ul>
+                <li><strong>Networking:</strong> LinkedIn + local Chamber of Commerce</li>
+                <li><strong>Cold Outreach:</strong> email + LinkedIn messaging campaigns</li>
+                <li><strong>Proof of Expertise:</strong> case studies, white papers, portfolio work</li>
+                <li><strong>Partnerships:</strong> team up with larger firms as subcontractors</li>
+                <li>Leverage credibility of military discipline and project management skills</li>
+              </ul>
+              <h4 style={{marginBottom:0}}>Business-to-Government (B2G)</h4>
+              Selling to government agencies (IT support, training, equipment, software)
+              <ul>
+                <li><strong>SAM.gov Registration:</strong> register for a CAGE Code + DUNS Number to bid on federal contracts</li>
+                <li><strong>Veteran-Owned Small Business (VOSB) / Service-Disabled Veteran-Owned (SDVOSB):</strong> special preference in federal procurement</li>
+                <li><strong>Teaming/Subcontracting:</strong> partner with larger defense primes (Lockheed, Raytheon) as a subcontractor</li>
+                <li><strong>Networking:</strong> attend DoD industry days, AFWERX/NSIN events</li>
+                <li>Service members have an inside perspective on defense problems which is a huge selling point</li>
+              </ul>
+              <h3 style={{textAlign:'center'}}>Fundraising Options</h3>
+              <table style={{width:'90%'}}>
+                <thead><tr>
+                  <th>Method</th>
+                  <th>Typical Amount</th>
+                  <th>Pros</th>
+                  <th>Cons</th>
+                  <th>Best For</th>
+                  <th>Examples</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td>Bootstrapping</td>
+                    <td>$0-$20K</td>
+                    <td>Full control, low risk</td>
+                    <td>Slow growth</td>
+                    <td>Small side business</td>
+                  </tr>
+                  <tr>
+                    <td>Grants</td>
+                    <td>$5K-$100K</td>
+                    <td>Free money, no equity</td>
+                    <td>Highly competitive</td>
+                    <td>Early-stage, vet-focused</td>
+                    <td>
+                      <div><a href="https://www.sba.gov/sba-learning-platform/boots-business" target="_blank" rel="noopener noreferrer">
+                        {<button>SBA Boots to Business</button>}
+                      </a></div>
+                      <div><a href="https://www.sba.gov/local-assistance/resource-partners/veterans-business-outreach-centers-vboc" target="_blank" rel="noopener noreferrer">
+                        {<button>Veterans Business Outreach Centers</button>}
+                      </a></div>
+                      <div><a href="https://www.warriorrising.org/" target="_blank" rel="noopener noreferrer">
+                        {<button>Warrior Rising</button>}
+                      </a></div>
+                      <div><a href="https://secondservicefoundation.org/" target="_blank" rel="noopener noreferrer">
+                        {<button>Second Service Foundation</button>}
+                      </a></div>
+                      <div><a href="https://patriotbootcamp.org/" target="_blank" rel="noopener noreferrer">
+                        {<button>Patriot Boot Camp</button>}
+                      </a></div>
+                      <div><a href="https://nsin.mil/" target="_blank" rel="noopener noreferrer">
+                        {<button>National Security Innovation Network</button>}
+                      </a></div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Angel Investors</td>
+                    <td>$25K-$250K</td>
+                    <td>Veteran-focused networks</td>
+                    <td>Equity given</td>
+                    <td>Startup w/ traction</td>
+                    <td>
+                      <div><a href="https://hiversandstrivers.com/" target="_blank" rel="noopener noreferrer">
+                        {<button>Hivers & Strivers</button>}
+                      </a></div>
+                      <div><a href="https://www.veteranventures.us/" target="_blank" rel="noopener noreferrer">
+                        {<button>Veteran Ventures Capital</button>}
+                      </a></div>
+                      <div><a href="https://www.ainventures.com/" target="_blank" rel="noopener noreferrer">
+                        {<button>AIN Ventures</button>}
+                      </a></div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Venture Capital</td>
+                    <td>$500K-$10M+</td>
+                    <td>Big growth capital</td>
+                    <td>Lose control, hard to manage while AD</td>
+                    <td>Scalable tech (post-service)</td>
+                    <td>
+                      <div><a href="https://www.scout.vc/" target="_blank" rel="noopener noreferrer">
+                        {<button>Scout Ventures</button>}
+                      </a></div>
+                      <div><a href="https://tfxcap.com/" target="_blank" rel="noopener noreferrer">
+                        {<button>TFX Capital</button>}
+                      </a></div>
+                      <div><a href="http://govtechfund.com/" target="_blank" rel="noopener noreferrer">
+                        {<button>GovTech Fund</button>}
+                      </a></div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Loans</td>
+                    <td>$10K-$500K</td>
+                    <td>Retain ownership</td>
+                    <td>Risky debt load</td>
+                    <td>Stable, proven businesses</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           }
         </div>
