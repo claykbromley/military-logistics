@@ -15,7 +15,7 @@ export default function Loans() {
   return (
     <div className='financial-page'>
       <div className='services'>
-        <h3>Financial Services</h3>
+        <div className='option-header'><Link key={"../financial"} to={"../financial"}>Financial Services</Link></div>
         <hr />
         <div className='services-option'><Link key={"../financial/investments"} to={"../financial/investments"}>Investments</Link></div>
         <div className='services-option'><Link key={"../financial/taxes"} to={"../financial/taxes"}>Taxes and Income</Link></div>

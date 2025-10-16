@@ -71,25 +71,6 @@ td {
     margin-top: 20px;
 }
 
-.business-structures {
-  width: 20%;
-  background-color: grey;
-  padding: 10px;
-  border-radius: 10px;
-}
-
-.calculator-input {
-    display: flex;
-    justify-content: center;
-    margin: 5px;
-    align-items: center;
-}
-
-.calculator-input input, select {
-    padding: 5px;
-    border-radius: 10px;
-}
-
 .center {
   justify-content: center;
   align-items: center;
@@ -97,7 +78,7 @@ td {
   gap: 20px;
 }
 
-.financial-page {
+.automotive-page {
   display: flex;
   margin: 16px;
   flex: 1;
@@ -111,6 +92,14 @@ td {
   flex-direction: column;
   height: 100%;
   overflow: auto;
+}
+
+.map-container {
+  background-color: #f3f4f6;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
 }
 
 .modal {
@@ -148,11 +137,6 @@ td {
     color: #000;
     text-decoration: none;
     box-sizing: border-box;
-}
-
-.news {
-  flex: 1;
-  overflow-y: auto;
 }
 
 .page {
@@ -194,27 +178,31 @@ td {
   background-color: rgb(230, 229, 229);
 }
 
-.stocks {
-  margin-top: 20px;
-  background-color: lightgray;
-  border-radius: 5px;
-  display: flex;
-  padding: 8px;
-  justify-content: space-evenly;
+.state {
+  fill: lightgrey;
+  stroke: #fff;
+  stroke-width: 1;
+  transition: fill 0.2s ease;
+  cursor: pointer;
 }
 
-.stock-option {
-  padding: 8px;
-  border-radius: 10px;
+.state:hover {
+  fill:  rgb(0, 0, 76);
 }
 
-.tsp-pred {
-  justify-content: center;
-  display: flex;
-  padding: 20px;
-  margin: 20px;
-  width: 50%;
-  background-color: rgb(123, 123, 123);
-  border: solid 2px;
-  border-radius: 20px;
+.tooltip {
+  position: fixed;
+  background-color: #1e3a8a;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.us-map {
+  width: 80%;
+  max-width: 900px;
+  height: auto;
 }

@@ -2,7 +2,15 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./Navbar";
 
 import LandingPage from "./pages/LandingPage";
-import Automotive from "./pages/Automotive";
+
+import Automotive from "./pages/automotive/Automotive";
+import Liscense from "./pages/automotive/Liscense";
+import Registration from "./pages/automotive/Registration";
+import AutoLoans from "./pages/automotive/Loans";
+import Insurance from "./pages/automotive/Insurance";
+import BuySell from "./pages/automotive/Buy-Sell";
+import AutoDeployment from "./pages/automotive/Deployment";
+
 import Medical from "./pages/Medical";
 
 import Financial from "./pages/financial/Financial";
@@ -29,7 +37,15 @@ export default function App() {
         <Navbar />
         <Routes>
           <Route path="/" element={<LandingPage />} />
+
           <Route path="/automotive" element={<Automotive />} />
+          <Route path="/automotive/liscense" element={<Liscense />} />
+          <Route path="/automotive/registration" element={<Registration />} />
+          <Route path="/automotive/loans" element={<AutoLoans />} />
+          <Route path="/automotive/insurance" element={<Insurance />} />
+          <Route path="/automotive/buy-sell" element={<BuySell />} />
+          <Route path="/automotive/deployment" element={<AutoDeployment />} />
+
           <Route path="/medical" element={<Medical />} />
 
           <Route path="/financial" element={<Financial />} />
