@@ -32,6 +32,24 @@ td {
     border: 1px solid;
 }
 
+.arrow {
+  background: rgba(0, 0, 0, 0.2);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  font-size: 28px;
+  width: 45px;
+  height: 45px;
+  cursor: pointer;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.arrow:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+
 .benefit {
     background-color: lightgrey;
     border: grey solid 1px;
@@ -69,6 +87,42 @@ td {
     display: flex;
     gap: 30px;
     margin-top: 20px;
+}
+
+.carousel-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+}
+
+.carousel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 700px;
+  height: 100%;
+}
+
+.carousel-item {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+  translate: -50% -50%;
+  width: 60%;
+  height: 80%;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .center {
