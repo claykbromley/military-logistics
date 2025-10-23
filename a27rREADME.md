@@ -2,7 +2,7 @@
 
 Overall the site looks great! Just putting my initial notes down in this readme and this branch, still pretty iffy with git but thought it was best to put stuff like visual notes here
 
-###Pages that seem missing
+### Pages that seem missing
 
 - http://localhost:3000/automotive/registration
 - http://localhost:3000/automotive/loans
@@ -18,7 +18,7 @@ For backend I see you link the transportation website to each state using the re
 
 Deploying this site to a web hosting servie would also be pretty easy, I use `vercel.com` since it has a good free version but you as github owner actually have to go through a bunch of steps to get that set up, if we switch to using Next.JS for the website that'll be like a 1 hour thing.
 
-##Future Ideas (For the Bigger Pages like Discount Database)
+## Future Ideas (For the Bigger Pages like Discount Database)
 
 I could probably start web scraping some stuff but I did find this site `id.me` seems like it shows a lot of the benefits avaialble
 
@@ -198,6 +198,9 @@ https://id.me/government?utm_campaign=B2C&utm_medium=web&utm_source=nav_menu_int
 #### Wyoming Department of Workforce Services (DWS)
 **Categories:** Unemployment, Individual
 - Access unemployment insurance benefits
+
+<img width="3024" height="1556" alt="image" src="https://github.com/user-attachments/assets/751d247f-4f59-425d-9160-fc70dc7ec36b" />
+
 
 ---
 
