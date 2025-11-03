@@ -1,20 +1,19 @@
-import './financial.css'
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 export default function Bills() {
 
   return (
     <div className='financial-page'>
       <div className='services'>
-        <div className='option-header'><Link key={"../financial"} to={"../financial"}>Financial Services</Link></div>
+        <div className='option-header'><Link href={"../financial"}>Financial Services</Link></div>
         <hr />
-        <div className='services-option'><Link key={"../financial/investments"} to={"../financial/investments"}>Investments</Link></div>
-        <div className='services-option'><Link key={"../financial/taxes"} to={"../financial/taxes"}>Taxes and Income</Link></div>
-        <div className='services-option'><Link key={"../financial/loans"} to={"../financial/loans"}>Loans</Link></div>
-        <div className='services-option'><Link key={"../financial/retirement"} to={"../financial/retirement"}>Retirement</Link></div>
-        <div className='services-option'><Link key={"../financial/business"} to={"../financial/business"}>Start a Business</Link></div>
-        <div className='services-option'><Link key={"../financial/credit"} to={"../financial/credit"}>Credit</Link></div>
-        <div className='services-option'><Link key={"../financial/bills"} to={"../financial/bills"}>Manage Bills</Link></div>
+        <div className='services-option'><Link href={"../financial/investments"}>Investments</Link></div>
+        <div className='services-option'><Link href={"../financial/taxes"}>Taxes and Income</Link></div>
+        <div className='services-option'><Link href={"../financial/loans"}>Loans</Link></div>
+        <div className='services-option'><Link href={"../financial/retirement"}>Retirement</Link></div>
+        <div className='services-option'><Link href={"../financial/business"}>Start a Business</Link></div>
+        <div className='services-option'><Link href={"../financial/credit"}>Credit</Link></div>
+        <div className='services-option'><Link href={"../financial/bills"}>Manage Bills</Link></div>
       </div>
       <div className='main'>
        

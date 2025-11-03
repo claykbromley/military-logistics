@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
-import './financial.css';
 import { taxRatesSingle, taxRatesMaried } from "./tax_rates";
 
 export default function IncomeCalculator() {

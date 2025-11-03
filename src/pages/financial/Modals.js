@@ -1,4 +1,3 @@
-import './financial.css'
 
 export function TurboTax({setModal}) {
   return (

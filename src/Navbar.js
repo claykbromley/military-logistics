@@ -1,8 +1,7 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaCog, FaChevronRight } from "react-icons/fa";
-import './Navbar.css';
 
 const pages = {
   Services: [
@@ -25,9 +24,8 @@ export default function Navbar() {
     <nav className="navbar">
       <div className="settings-bar">
         <div>
-          <Link key={"/"} to={"/"}
-            className="logo">
-            {"LOGO"}
+          <Link href="/" className="logo">
+            LOGO
           </Link>
         </div>
 
@@ -41,8 +39,8 @@ export default function Navbar() {
           >
 
             <div className="tab">
-              <Link key={"/" + tab} to={"/" + tab}>
-              {tab.replace("_"," ")} {items.length?<FaChevronRight className="menu-dropdown"/>:null}
+              <Link href={"/" + tab.toLowerCase()}>
+                {tab.replace("_"," ")} {items.length?<FaChevronRight className="menu-dropdown"/>:null}
               </Link>
             </div>
 
@@ -55,13 +53,10 @@ export default function Navbar() {
                 className="menu"
                 >
                 {items.map((item) => (
-                  <div className="menu-item-container">
+                  <div className="menu-item-container" key={item.path}>
                     <div className="menu-item">
-                      <Link
-                      key={item.path}
-                      to={item.path}
-                      >
-                      {item.name}
+                      <Link href={item.path}>
+                        {item.name}
                       </Link>
                     </div>
                   </div>
