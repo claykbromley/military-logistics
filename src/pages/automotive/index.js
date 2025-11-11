@@ -81,14 +81,14 @@ export default function Overview() {
   return (
     <div className='automotive-page'>
       <div className='services'>
-        <div className='option-header'><Link href={"../automotive"}>Automotive Services</Link></div>
+        <div className='option-header'><Link href="/automotive">Automotive Services</Link></div>
         <hr />
-        <div className='services-option'><Link href={"./liscense"}>Driver's Liscense</Link></div>
-        <div className='services-option'><Link href={"./registration"}>Vehicle Registration</Link></div>
-        <div className='services-option'><Link href={"./loans"}>Auto Loans</Link></div>
-        <div className='services-option'><Link href={"./insurance"}>Insurance</Link></div>
-        <div className='services-option'><Link href={"./buy-sell"}>Buying/Selling</Link></div>
-        <div className='services-option'><Link href={"./deployment"}>Deployment</Link></div>
+        <div className='services-option'><Link href="/automotive/liscense">Driver's Liscense</Link></div>
+        <div className='services-option'><Link href="/automotive/registration">Vehicle Registration</Link></div>
+        <div className='services-option'><Link href="/automotive/loans">Auto Loans</Link></div>
+        <div className='services-option'><Link href="/automotive/insurance">Insurance</Link></div>
+        <div className='services-option'><Link href="/automotive/buy-sell">Buying/Selling</Link></div>
+        <div className='services-option'><Link href="/automotive/deployment">Deployment</Link></div>
       </div>
       <div className='main'>
         <div style={{textAlign:'center'}}>

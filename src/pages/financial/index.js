@@ -80,7 +80,7 @@ export default function Financial() {
   return (
     <div className='financial-page'>
       <div className='services'>
-        <div className='option-header'><Link href={"../financial"}>Financial Services</Link></div>
+        <div className='option-header'><Link href={"/financial"}>Financial Services</Link></div>
         <hr />
         <div className='services-option'><Link href={"./investments"}>Investments</Link></div>
         <div className='services-option'><Link href={"./taxes"}>Taxes and Income</Link></div>
