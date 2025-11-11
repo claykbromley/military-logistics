@@ -4,17 +4,32 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaCog, FaChevronRight } from "react-icons/fa";
 
 const pages = {
-  Services: [
-    { name: "Automotive", path: "/automotive" },
-    { name: "Financial", path: "/financial" },
-    { name: "Legal", path: "/legal" },
-    { name: "Medical", path: "/medical" },
-    { name: "Transitions", path: "/transitions" },
-  ],
-  Discount_Database: [],
-  Scheduler: [],
-  Marketplace: [],
-  Contact_US: []
+  Services: {
+    path: "/services",
+    items: [
+      { name: "Automotive", path: "/automotive" },
+      { name: "Financial", path: "/financial" },
+      { name: "Legal", path: "/legal" },
+      { name: "Medical", path: "/medical" },
+      { name: "Transitions", path: "/transitions" },
+    ]
+  },
+  Discount_Database: {
+    path: "/discount-database",
+    items: []
+  },
+  Scheduler: {
+    path: "/scheduler",
+    items: []
+  },
+  Marketplace: {
+    path: "/marketplace",
+    items: []
+  },
+  Contact_US: {
+    path: "/contact-us",
+    items: []
+  }
 };
 
 export default function Navbar() {
@@ -30,7 +45,7 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-header">
-          {Object.entries(pages).map(([tab, items]) => (
+          {Object.entries(pages).map(([tab, config]) => (
           <div
           className="menu-container"
             key={tab}
@@ -39,20 +54,20 @@ export default function Navbar() {
           >
 
             <div className="tab">
-              <Link href={"/" + tab.toLowerCase()}>
-                {tab.replace("_"," ")} {items.length?<FaChevronRight className="menu-dropdown"/>:null}
+              <Link href={config.path}>
+                {tab.replace("_"," ")} {config.items.length?<FaChevronRight className="menu-dropdown"/>:null}
               </Link>
             </div>
 
             <AnimatePresence>
-              {activeTab === tab && items.length && (
+              {activeTab === tab && config.items.length && (
                 <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 className="menu"
                 >
-                {items.map((item) => (
+                {config.items.map((item) => (
                   <div className="menu-item-container" key={item.path}>
                     <div className="menu-item">
                       <Link href={item.path}>
