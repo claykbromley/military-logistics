@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import "./automotive.css";
 
 const ComponentCarousel = ({ items }) => {
   const [index, setIndex] = useState(0);

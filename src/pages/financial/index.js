@@ -1,7 +1,6 @@
-import './financial.css'
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 const API_KEY = "d32tt99r01qtm631kfi0d32tt99r01qtm631kfig";
 const FIXED_STOCKS = ["QQQ", "SPY", "DIA"];
@@ -81,15 +80,15 @@ export default function Financial() {
   return (
     <div className='financial-page'>
       <div className='services'>
-        <div className='option-header'><Link key={"../financial"} to={"../financial"}>Financial Services</Link></div>
+        <div className='option-header'><Link href="/financial">Financial Services</Link></div>
         <hr />
-        <div className='services-option'><Link key={"./investments"} to={"./investments"}>Investments</Link></div>
-        <div className='services-option'><Link key={"./taxes"} to={"./taxes"}>Taxes and Income</Link></div>
-        <div className='services-option'><Link key={"./loans"} to={"./loans"}>Loans</Link></div>
-        <div className='services-option'><Link key={"./retirement"} to={"./retirement"}>Retirement</Link></div>
-        <div className='services-option'><Link key={"./business"} to={"./business"}>Start a Business</Link></div>
-        <div className='services-option'><Link key={"./credit"} to={"./credit"}>Credit</Link></div>
-        <div className='services-option'><Link key={"./bills"} to={"./bills"}>Manage Bills</Link></div>
+        <div className='services-option'><Link href="/financial/investments">Investments</Link></div>
+        <div className='services-option'><Link href="/financial/taxes">Taxes and Income</Link></div>
+        <div className='services-option'><Link href="/financial/loans">Loans</Link></div>
+        <div className='services-option'><Link href="/financial/retirement">Retirement</Link></div>
+        <div className='services-option'><Link href="/financial/business">Start a Business</Link></div>
+        <div className='services-option'><Link href="/financial/credit">Credit</Link></div>
+        <div className='services-option'><Link href="/financial/bills">Manage Bills</Link></div>
       </div>
       <div className='main'>
         <div className='news'>

@@ -1,5 +1,4 @@
-import './automotive.css'
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { useState } from "react";
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 
@@ -82,14 +81,14 @@ export default function Overview() {
   return (
     <div className='automotive-page'>
       <div className='services'>
-        <div className='option-header'><Link key={"../automotive"} to={"../automotive"}>Automotive Services</Link></div>
+        <div className='option-header'><Link href="/automotive">Automotive Services</Link></div>
         <hr />
-        <div className='services-option'><Link key={"./liscense"} to={"./liscense"}>Driver's Liscense</Link></div>
-        <div className='services-option'><Link key={"./registration"} to={"./registration"}>Vehicle Registration</Link></div>
-        <div className='services-option'><Link key={"./loans"} to={"./loans"}>Auto Loans</Link></div>
-        <div className='services-option'><Link key={"./insurance"} to={"./insurance"}>Insurance</Link></div>
-        <div className='services-option'><Link key={"./buy-sell"} to={"./buy-sell"}>Buying/Selling</Link></div>
-        <div className='services-option'><Link key={"./deployment"} to={"./deployment"}>Deployment</Link></div>
+        <div className='services-option'><Link href="/automotive/liscense">Driver's Liscense</Link></div>
+        <div className='services-option'><Link href="/automotive/registration">Vehicle Registration</Link></div>
+        <div className='services-option'><Link href="/automotive/loans">Auto Loans</Link></div>
+        <div className='services-option'><Link href="/automotive/insurance">Insurance</Link></div>
+        <div className='services-option'><Link href="/automotive/buy-sell">Buying/Selling</Link></div>
+        <div className='services-option'><Link href="/automotive/deployment">Deployment</Link></div>
       </div>
       <div className='main'>
         <div style={{textAlign:'center'}}>

@@ -1,6 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
 import Papa from "papaparse";
-import "./financial.css"
 
 export function TSPCalculator() {
   const [years, setYears] = useState(20);
