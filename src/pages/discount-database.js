@@ -14,7 +14,7 @@ export default function Overview() {
       <p className="text-gray-600">Welcome to the Discount Database.</p>
       <div style={{ height: '100vh', width: '80%' }}>
       <GoogleMapReact
-        bootstrapURLKeys={{ key: "" }}
+        bootstrapURLKeys={{ key: "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI" }}
         defaultCenter={defaultProps.center}
         defaultZoom={defaultProps.zoom}
         yesIWantToUseGoogleMapApiInternals
