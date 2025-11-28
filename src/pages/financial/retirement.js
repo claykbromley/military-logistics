@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FaChevronDown } from "react-icons/fa";
 import { useState } from "react";
 import { TSPCalculator } from "./TSP-Calculator"
-import { FinAdvisor } from './Modals';
+import { FinAdvisor } from './find-advisor';
 
 export default function Retirement() {
   const [showBenefit, setShowBenefit] = useState(null);

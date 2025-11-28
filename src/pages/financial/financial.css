@@ -16,6 +16,12 @@ button:hover{
     background-color: rgb(44, 145, 44);
 }
 
+input {
+    padding: 10px;
+    border: 2px solid;
+    border-radius: 20px;
+}
+
 table {
     border: 1px solid;
     border-collapse: collapse;
@@ -30,6 +36,31 @@ th {
 
 td {
     border: 1px solid;
+}
+
+.advisor-card {
+  border:1px solid;
+  border-radius: 15px;
+  margin: 10px;
+  padding: 15px;
+  background-color: lightgray;
+  cursor: pointer;
+}
+
+.advisor-card:hover {
+  border: 2px solid;
+}
+
+.advisor-card.highlight-card {
+   border: 2px solid;
+}
+
+.advisor-card h3 {
+  margin:0;
+}
+
+.advisor-card p {
+  margin:0;
 }
 
 .benefit {
@@ -97,6 +128,16 @@ td {
   gap: 20px;
 }
 
+.exit-button{
+  position: fixed;
+  z-index: 1001;
+  margin: 10px;
+  margin-top: 0;
+  cursor: pointer;
+  font-size: x-large;
+  color: grey;
+}
+
 .financial-page {
   display: flex;
   margin: 16px;
@@ -113,12 +154,39 @@ td {
   overflow: auto;
 }
 
+.map {
+  width: 100vh;
+  height: 90vh;
+}
+
 .modal {
     background-color: white;
     position: relative;
     height: 90%;
-    width: 50%;
     border-radius: 30px;
+    overflow: auto;
+}
+
+.modal-wrapper-top {
+  position: sticky;
+  top: 0;
+  background: lightgray;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid;
+}
+
+.modal-wrapper-bottom {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+  align-items: center;
+  overflow-y: auto;
+  padding-bottom: 20px;
 }
 
 .modal-background {
