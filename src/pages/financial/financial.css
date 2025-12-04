@@ -22,6 +22,15 @@ input {
     border-radius: 20px;
 }
 
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  margin: 10px;
+  flex-shrink: 0;
+}
+
 table {
     border: 1px solid;
     border-collapse: collapse;
@@ -126,6 +135,15 @@ td {
   align-items: center;
   display: flex;
   gap: 20px;
+}
+
+.checklist {
+  display: flex;
+  align-items: center;
+}
+
+.checklist h4 {
+  margin: 10px;
 }
 
 .exit-button{

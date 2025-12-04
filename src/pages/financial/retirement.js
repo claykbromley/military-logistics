@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { FaChevronDown } from "react-icons/fa";
 import { useState } from "react";
-import { TSPCalculator } from "./TSP-Calculator"
+import { TSPCalculator } from "./tsp-calculator"
 import { FinAdvisor } from './find-advisor';
 
 export default function Retirement() {
@@ -127,7 +127,7 @@ export default function Retirement() {
                 <li>Best for investors who want a “set it and forget it” strategy.</li>
               </ul>
               <div className='benefit-links'>
-                <a href="./Investments">
+                <a href="./investments">
                   {<button>Investment Options</button>}
                 </a>
                 <a href="https://www.tsp.gov/" target="_blank" rel="noopener noreferrer">
