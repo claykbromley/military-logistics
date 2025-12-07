@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { FaChevronDown } from "react-icons/fa";
 import { useState } from "react";
-import { FinAdvisor, HouseFinder } from './Modals';
+import { HouseFinder } from './Modals';
+import { FinAdvisor } from './find-advisor';
 import HoverPie from './pie_chart';
 
 export default function Investments() {
@@ -138,7 +139,7 @@ export default function Investments() {
                 <li>Revisit allocation after promotions, PCS moves, or major life events</li>
               </ul>
               <div className='benefit-links'>
-                <a href="./Retirement">
+                <a href="./retirement">
                   {<button>TSP Calculator</button>}
                 </a>
                 <a href="https://www.tsp.gov/" target="_blank" rel="noopener noreferrer">

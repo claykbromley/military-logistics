@@ -2,7 +2,7 @@ import Link from "next/link";
 import { FaChevronDown } from "react-icons/fa";
 import { useState } from "react";
 import { TurboTax, MilTax, MilTaxConsultation } from './Modals';
-import IncomeCalculator from './Income-Calculator';
+import IncomeCalculator from './income-calculator';
 
 export default function Taxes() {
   const [showBenefit, setShowBenefit] = useState(null);
