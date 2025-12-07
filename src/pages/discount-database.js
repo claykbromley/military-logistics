@@ -1,4 +1,9 @@
 import GoogleMapReact from 'google-map-react';
+import LocationForm from '../components/LocationForm';
+import Container from "react-bootstrap/Container";
+import Row from "react-bootstrap/Row";
+import Col from "react-bootstrap/Col";
+
 export default function Overview() {
   const defaultProps = {
     center: {
@@ -9,18 +14,29 @@ export default function Overview() {
   };
 
   return (
-    <div className="p-8 text-center">
-      <h1 className="text-3xl font-bold mb-4">Discount Database</h1>
-      <p className="text-gray-600">Welcome to the Discount Database.</p>
-      <div style={{ height: '100vh', width: '80%' }}>
-      <GoogleMapReact
-        bootstrapURLKeys={{ key: "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI" }}
-        defaultCenter={defaultProps.center}
-        defaultZoom={defaultProps.zoom}
-        yesIWantToUseGoogleMapApiInternals
-      >
-      </GoogleMapReact>
-    </div>
-    </div>
+    <Container fluid>
+      <Row>
+        <h1 className="text-3xl font-bold mb-4" style={{ textAlign: "center" }}>Discount Database</h1>
+      </Row>
+      <Row>
+        <p className="text-gray-600" style={{ textAlign: "center" }}>Welcome to the Discount Database.</p>
+      </Row>
+      <Row style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 25, marginBottom:25 }}>
+        <div style={{ height: '40vh', width: '60%', margin: '0 auto', border: '2.5px solid navy' }}>
+          <GoogleMapReact
+            bootstrapURLKeys={{ key: "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI" }}
+            defaultCenter={defaultProps.center}
+            defaultZoom={defaultProps.zoom}
+            yesIWantToUseGoogleMapApiInternals
+          >
+          </GoogleMapReact>
+        </div>
+      </Row>
+      <Row style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 25, marginBottom:25 }}>
+        
+          <LocationForm onSubmit={(data) => console.log("Location submitted:", data)} />
+    
+      </Row>
+    </Container>
   );
 }
