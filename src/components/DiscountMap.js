@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import Papa from "papaparse";
 
 export function DiscountMap() {
   const [status, setStatus] = useState(null);
@@ -8,14 +7,82 @@ export function DiscountMap() {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [locations, setLocations] = useState([]);
-  const [onlineLocations, setOnlineLocations] = useState([]);
-  const [online, setOnline] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(null);
+  const [category, setCategory] = useState("all");
 
   const mapRef = useRef(null);
   const googleMap = useRef(null);
   const markers = useRef([]);
+  const placesService = useRef(null);
+
+  // List of major chains known to offer military discounts
+  const KNOWN_MILITARY_DISCOUNTS = {
+    // Restaurants
+    "applebee's": { discount: "10% off", category: "restaurant" },
+    "chili's": { discount: "10% off", category: "restaurant" },
+    "outback steakhouse": { discount: "10% off", category: "restaurant" },
+    "outback": { discount: "10% off", category: "restaurant" },
+    "buffalo wild wings": { discount: "10% off", category: "restaurant" },
+    "denny's": { discount: "10-20% off varies by location", category: "restaurant" },
+    "ihop": { discount: "10-20% off varies by location", category: "restaurant" },
+    "golden corral": { discount: "10% off", category: "restaurant" },
+    "texas roadhouse": { discount: "10% off", category: "restaurant" },
+    "subway": { discount: "10% off", category: "restaurant" },
+    "arby's": { discount: "10% off", category: "restaurant" },
+    
+    // Retail
+    "home depot": { discount: "10% off year-round", category: "retail" },
+    "lowe's": { discount: "10% off year-round", category: "retail" },
+    "lowes": { discount: "10% off year-round", category: "retail" },
+    "target": { discount: "10% off select days", category: "retail" },
+    "old navy": { discount: "10% off", category: "retail" },
+    "gap": { discount: "10% off", category: "retail" },
+    "under armour": { discount: "20% off", category: "retail" },
+    "nike": { discount: "10% off", category: "retail" },
+    "dick's sporting goods": { discount: "10% off", category: "retail" },
+    "dicks sporting goods": { discount: "10% off", category: "retail" },
+    "best buy": { discount: "Varies", category: "retail" },
+    "foot locker": { discount: "10% off", category: "retail" },
+    "walmart": { discount: "Military discount available", category: "retail" },
+    "kohls": { discount: "15% off Mondays", category: "retail" },
+    "kohl's": { discount: "15% off Mondays", category: "retail" },
+    
+    // Automotive
+    "jiffy lube": { discount: "15% off", category: "automotive" },
+    "goodyear": { discount: "10% off", category: "automotive" },
+    "valvoline": { discount: "Varies by location", category: "automotive" },
+    "meineke": { discount: "10% off", category: "automotive" },
+    "firestone": { discount: "10% off", category: "automotive" },
+    
+    // Hotels
+    "hampton inn": { discount: "Up to 15% off", category: "hotel" },
+    "hampton": { discount: "Up to 15% off", category: "hotel" },
+    "marriott": { discount: "Government rate", category: "hotel" },
+    "hilton": { discount: "Government rate", category: "hotel" },
+    "holiday inn": { discount: "Government rate", category: "hotel" },
+    "best western": { discount: "10-20% off", category: "hotel" },
+    "la quinta": { discount: "Military rate", category: "hotel" },
+    "motel 6": { discount: "10% off", category: "hotel" },
+    
+    // Entertainment
+    "amc": { discount: "$1 off tickets", category: "entertainment" },
+    "amc theatres": { discount: "$1 off tickets", category: "entertainment" },
+    "regal": { discount: "Discount varies", category: "entertainment" },
+    "regal cinemas": { discount: "Discount varies", category: "entertainment" },
+    "24 hour fitness": { discount: "$0 initiation", category: "entertainment" },
+    "la fitness": { discount: "Varies by location", category: "entertainment" },
+    "anytime fitness": { discount: "Varies by location", category: "entertainment" },
+  };
+
+  // Category to search type mapping for Google Places API
+  const CATEGORY_TYPES = {
+    restaurant: ['restaurant', 'cafe', 'food'],
+    retail: ['store', 'shopping_mall', 'clothing_store', 'department_store'],
+    automotive: ['car_repair', 'car_dealer', 'gas_station'],
+    hotel: ['lodging', 'hotel', 'motel'],
+    entertainment: ['movie_theater', 'gym', 'amusement_park', 'tourist_attraction'],
+    all: ['restaurant', 'cafe', 'store', 'shopping_mall', 'lodging', 'movie_theater', 'gym', 'car_repair']
+  };
 
   function distance(a, b) {
     const toRad = (d) => (d * Math.PI) / 180;
@@ -71,11 +138,21 @@ export function DiscountMap() {
       }
 
       googleMap.current = new window.google.maps.Map(mapRef.current, {
-        center: coords || { lat: 38.8895, lng: -77.0353 },
-        zoom: 13,
+        center: { lat: 32.7765, lng: -79.9311 },
+        zoom: 12,
       });
 
-      // Call getCurrentLocation after map is initialized
+      placesService.current = new window.google.maps.places.PlacesService(googleMap.current);
+
+      // Add listener for when user stops moving/zooming the map
+      googleMap.current.addListener('idle', () => {
+        const center = googleMap.current.getCenter();
+        const newCoords = { lat: center.lat(), lon: center.lng() };
+        
+        // Search for the new visible area
+        searchBusinesses(newCoords);
+      });
+
       getCurrentLocation();
     } catch (err) {
       console.error("Map initialization error:", err);
@@ -89,9 +166,12 @@ export function DiscountMap() {
 
     businesses.forEach((b, index) => {
       const marker = new window.google.maps.Marker({
-        position: { lat: Number(b.lat), lng: Number(b.long) },
+        position: { lat: Number(b.lat), lng: Number(b.lng) },
         map: googleMap.current,
         title: b.name,
+        icon: {
+          url: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+        }
       });
 
       marker.addListener("mouseover", () => {
@@ -104,7 +184,7 @@ export function DiscountMap() {
       marker.addListener("click", () => {
         const position = marker.getPosition();
         googleMap.current.setCenter(position);
-        searchBusinesses({ lat: position.lat(), lon: position.lng() });
+        googleMap.current.setZoom(15);
       });
       markers.current.push(marker);
     });
@@ -112,47 +192,21 @@ export function DiscountMap() {
 
   const highlightMarker = (index) => {
     markers.current.forEach((m, i) => {
-      m.setIcon(null);
-      m.setAnimation(null);
       if (i === index) {
         m.setIcon("http://maps.google.com/mapfiles/ms/icons/blue-dot.png");
-        setTimeout(() => m.setAnimation(null), 1200);
+      } else {
+        m.setIcon("http://maps.google.com/mapfiles/ms/icons/green-dot.png");
       }
     });
   };
 
   useEffect(() => {
-    // Initialize map immediately
     initMap();
-    
-    // Then load CSV data
-    Papa.parse("/data/military_discounts.csv", {
-      download: true,
-      header: true,
-      complete: (results) => {setLocations(results.data)},
-      error: (err) => {
-        console.error("CSV parsing error:", err);
-        // Set empty array if CSV doesn't exist
-        setLocations([]);
-      },
-    });
-    Papa.parse("/data/military_discounts_online.csv", {
-      download: true,
-      header: true,
-      complete: (results) => {setOnlineLocations(results.data)},
-      error: (err) => {
-        console.error("CSV parsing error:", err);
-        // Set empty array if CSV doesn't exist
-        setOnlineLocations([]);
-      },
-    });
   }, []);
 
   useEffect(() => {
-    if (coords) {
-      if (googleMap.current) {
-        googleMap.current.setCenter({ lat: Number(coords.lat), lng: Number(coords.lon) });
-      }
+    if (coords && googleMap.current && placesService.current) {
+      googleMap.current.setCenter({ lat: Number(coords.lat), lng: Number(coords.lon) });
     }
   }, [coords]);
 
@@ -160,10 +214,20 @@ export function DiscountMap() {
     updateMarkers();
   }, [businesses]);
 
+  useEffect(() => {
+    // Re-search when category changes, but only if we already have a location
+    if (coords && businesses.length > 0) {
+      searchBusinesses(coords);
+    }
+  }, [category]);
+
   const getCurrentLocation = () => {
     setError(null);
     if (!navigator.geolocation) {
       setError("Geolocation not supported");
+      const c = { lat: 32.7765, lon: -79.9311 };
+      setCoords(c);
+      searchBusinesses(c);
       return;
     }
     setLoading(true);
@@ -180,6 +244,9 @@ export function DiscountMap() {
       (err) => {
         setError("Unable to retrieve location: " + err.message);
         setLoading(false);
+        const c = { lat: 32.7765, lon: -79.9311 };
+        setCoords(c);
+        searchBusinesses(c);
       }
     );
   };
@@ -213,19 +280,85 @@ export function DiscountMap() {
     setLoading(false);
   };
 
-  const searchBusinesses = (center) => {
+  const searchBusinesses = async (center) => {
+    if (!placesService.current) return;
+    
     setStatus("Searching for military discounts...");
+    setLoading(true);
+    
+    const allResults = [];
+    const searchTypes = CATEGORY_TYPES[category] || CATEGORY_TYPES.all;
 
-    const enriched = locations.map((b) => ({
-      ...b,
-      distance: distance(center, { lat: Number(b.lat), lon: Number(b.long) }),
-    }));
+    // Search for each type of business
+    for (const type of searchTypes) {
+      try {
+        const request = {
+          location: new window.google.maps.LatLng(center.lat, center.lon),
+          radius: 8000, // ~5 miles
+          type: type,
+        };
 
-    enriched.sort((x, y) => x.distance - y.distance); 
-    const nearest = enriched.slice(0, 100);
+        await new Promise((resolve) => {
+          placesService.current.nearbySearch(request, (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              results.forEach(place => {
+                // Check if this business is known to offer military discounts
+                const nameLower = place.name.toLowerCase();
+                let discountInfo = null;
+                
+                // Check for exact match or partial match in known discounts
+                for (const [businessName, info] of Object.entries(KNOWN_MILITARY_DISCOUNTS)) {
+                  if (nameLower.includes(businessName) || businessName.includes(nameLower.split(' ')[0])) {
+                    discountInfo = info;
+                    break;
+                  }
+                }
+                
+                // Only include businesses with known military discounts
+                if (discountInfo) {
+                  const lat = place.geometry.location.lat();
+                  const lng = place.geometry.location.lng();
+                  const dist = distance(center, { lat, lon: lng });
+                  
+                  allResults.push({
+                    id: place.place_id,
+                    name: place.name,
+                    lat: lat,
+                    lng: lng,
+                    address: place.vicinity,
+                    distance: dist,
+                    category: discountInfo.category,
+                    discount: discountInfo.discount,
+                    rating: place.rating,
+                  });
+                }
+              });
+            }
+            resolve();
+          });
+        });
 
-    setBusinesses(nearest);
-    setStatus(`Showing ${nearest.length} businesses with military discounts`);
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 200));
+      } catch (err) {
+        console.error(`Error searching for ${type}:`, err);
+      }
+    }
+
+    // Remove duplicates based on place_id
+    const uniqueResults = Array.from(
+      new Map(allResults.map(item => [item.id, item])).values()
+    );
+
+    // Sort by distance
+    uniqueResults.sort((a, b) => a.distance - b.distance);
+
+    // Limit to top 100 results
+    const topResults = uniqueResults.slice(0, 100);
+
+    setBusinesses(topResults);
+    setStatus(`Found ${topResults.length} businesses with military discounts nearby`);
+    setLoading(false);
   };
 
   return (
@@ -261,23 +394,23 @@ export function DiscountMap() {
 
           <hr style={{ margin: '15px 0' }} />
 
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            <button 
-              onClick={() => setOnline(!online)}
-              style={{ padding: '8px 16px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <label style={{ fontWeight: 'bold' }}>Filter by Category:</label>
+            <select 
+              value={category} 
+              onChange={(e) => setCategory(e.target.value)}
+              style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', minWidth: '200px' }}
             >
-              {online ? "Show In-Person Locations" : "Show Online Discounts"}
-            </button>
-            <a 
-              href="https://installations.militaryonesource.mil/search?program-service=26/view-by=ALL" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ textDecoration: 'none' }}
-            >
-              <button style={{ padding: '8px 16px', backgroundColor: '#6f42c1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                Find Local Military Support Center
-              </button>
-            </a>
+              <option value="all">All Categories</option>
+              <option value="restaurant">Restaurants</option>
+              <option value="retail">Retail</option>
+              <option value="automotive">Automotive</option>
+              <option value="hotel">Hotels</option>
+              <option value="entertainment">Entertainment</option>
+            </select>
+            <p style={{ fontSize: '0.85rem', color: '#666', margin: 0, textAlign: 'center' }}>
+              💡 Move or zoom the map to search a new area
+            </p>
           </div>
           
           {status && <p style={{ textAlign: 'center', color: '#0066cc', marginTop: '10px', marginBottom: 0 }}>{status}</p>}
@@ -285,87 +418,59 @@ export function DiscountMap() {
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '15px', backgroundColor: '#fff' }}>
-          {loading && <p style={{ textAlign: 'center' }}>Loading...</p>}
+          {loading && <p style={{ textAlign: 'center' }}>Searching for nearby military discounts...</p>}
 
-          {!loading && businesses.length === 0 && !online && <p style={{ textAlign: 'center', color: '#666' }}>No discounts found yet. Try searching for a location.</p>}
+          {!loading && businesses.length === 0 && <p style={{ textAlign: 'center', color: '#666' }}>No known military discounts found in this area. Try a different location or category.</p>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-            {online ? (
-              <div>
-                {onlineLocations.map((b) => (
-                  <div key={b.id} style={{ backgroundColor: 'white', padding: '15px', border: '1px solid #ddd', borderRadius: '4px', marginBottom: '10px' }}>
-                    <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>{b.name}</h3>
-                    {b.discount && <p style={{ color: '#666', margin: '5px 0', fontSize: '0.95rem' }}>
-                      <strong>Discount:</strong> {b.discount}
-                    </p>}
-                    <div>
-                      {b.website && (
-                        <a href={b.website} target="_blank" rel="noopener noreferrer">
-                          <button style={{ padding: '6px 12px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                            Visit Website
-                          </button>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                {businesses.map((b, i) => (
-                  <div 
-                    key={b.id}
-                    style={{ 
-                      backgroundColor: 'white', 
-                      padding: '15px', 
-                      border: highlightedIndex === i ? '2px solid #0066cc' : '1px solid #ddd', 
-                      borderRadius: '4px', 
-                      marginBottom: '10px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
+            {businesses.map((b, i) => (
+              <div 
+                key={b.id}
+                style={{ 
+                  backgroundColor: 'white', 
+                  padding: '15px', 
+                  border: highlightedIndex === i ? '2px solid #0066cc' : '1px solid #ddd', 
+                  borderRadius: '4px', 
+                  marginBottom: '10px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={() => highlightMarker(i)}
+                onMouseLeave={() => {
+                  markers.current.forEach((m) => {
+                    m.setIcon("http://maps.google.com/mapfiles/ms/icons/green-dot.png");
+                  });
+                }}
+                onClick={() => {
+                  if (googleMap.current) {
+                    googleMap.current.setCenter({ lat: Number(b.lat), lng: Number(b.lng) });
+                    googleMap.current.setZoom(15);
+                  }
+                }}
+              >
+                <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>{b.name}</h3>
+                <p style={{ color: '#666', margin: '5px 0', fontSize: '0.95rem' }}>
+                  <strong>Discount:</strong> {b.discount}
+                </p>
+                <p style={{ color: '#666', margin: '5px 0' }}>{b.address}</p>
+                <p style={{ color: '#888', fontSize: '0.9rem', margin: '5px 0' }}>
+                  {b.distance.toFixed(1)} miles away
+                  {b.rating && ` • ⭐ ${b.rating}`}
+                </p>
+                <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const maps = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.lng}`;
+                      window.open(maps, "_blank");
                     }}
-                    onMouseEnter={() => highlightMarker(i)}
-                    onMouseLeave={() => {
-                      markers.current.forEach((m) => {
-                        m.setIcon(null);
-                        m.setAnimation(null);
-                      });
-                    }}
-                    onClick={() => {
-                      if (googleMap.current) {
-                        googleMap.current.setCenter({ lat: Number(b.lat), lng: Number(b.long) });
-                      }
-                    }}
+                    style={{ padding: '6px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}
                   >
-                    <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>{b.name}</h3>
-                    {b.discount && <p style={{ color: '#666', margin: '5px 0', fontSize: '0.95rem' }}>
-                      <strong>Discount:</strong> {b.discount}
-                    </p>}
-                    <p style={{ color: '#666', margin: '5px 0' }}>{b.address}</p>
-                    <p style={{ color: '#888', fontSize: '0.9rem', margin: '5px 0' }}>{b.distance.toFixed(1)} miles away</p>
-                    <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
-                      {b.website && (
-                        <a href={b.website} target="_blank" rel="noopener noreferrer">
-                          <button style={{ padding: '6px 12px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}>
-                            Visit Website
-                          </button>
-                        </a>
-                      )}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const maps = `https://www.google.com/maps/dir/?api=1&destination=${b.lat},${b.long}`;
-                          window.open(maps, "_blank");
-                        }}
-                        style={{ padding: '6px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}
-                      >
-                        Directions
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                    Directions
+                  </button>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         </div>
       </div>
