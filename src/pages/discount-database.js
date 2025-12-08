@@ -3,6 +3,7 @@ import LocationForm from '../components/LocationForm';
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
+import { DiscountMap } from '../components/DiscountMap';
 
 export default function Overview() {
   const defaultProps = {
@@ -22,7 +23,7 @@ export default function Overview() {
         <p className="text-gray-600" style={{ textAlign: "center" }}>Welcome to the Discount Database.</p>
       </Row>
       <Row style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 25, marginBottom:25 }}>
-        <div style={{ height: '40vh', width: '60%', margin: '0 auto', border: '2.5px solid navy' }}>
+        {/*<div style={{ height: '40vh', width: '60%', margin: '0 auto', border: '2.5px solid navy' }}>
           <GoogleMapReact
             bootstrapURLKeys={{ key: "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI" }}
             defaultCenter={defaultProps.center}
@@ -30,7 +31,8 @@ export default function Overview() {
             yesIWantToUseGoogleMapApiInternals
           >
           </GoogleMapReact>
-        </div>
+        </div>*/}
+        <DiscountMap />
       </Row>
       <Row style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: 25, marginBottom:25 }}>
         
