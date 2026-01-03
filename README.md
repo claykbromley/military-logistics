@@ -1,107 +1,30 @@
-# Military Logistics
+# Service member website design
 
-A comprehensive Next.js application providing military service members with resources and tools for financial planning, automotive services, legal assistance, medical information, and transition support.
+*Automatically synced with your [v0.app](https://v0.app) deployments*
 
-## Tech Stack
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/briannacyang-gmailcoms-projects/v0-service-member-website-design)
+[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/r0OFHvBpIa2)
 
-- **Framework**: Next.js 16 (Pages Router)
-- **React**: 18.3.1
-- **Styling**: Tailwind CSS 4 + Custom CSS
-- **UI Libraries**:
-  - Framer Motion (animations)
-  - React Icons
-  - FontAwesome
-- **Data Visualization**: Recharts, React Simple Maps
-- **API Integration**: Axios
+## Overview
 
-## Getting Started
+This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
+Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
 
-### Prerequisites
+## Deployment
 
-- Node.js 20.x or higher
-- npm 10.x or higher
+Your project is live at:
 
-### Installation
+**[https://vercel.com/briannacyang-gmailcoms-projects/v0-service-member-website-design](https://vercel.com/briannacyang-gmailcoms-projects/v0-service-member-website-design)**
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd military-logistics
-```
+## Build your app
 
-2. Install dependencies:
-```bash
-npm install --legacy-peer-deps
-```
+Continue building your app on:
 
-### Development
+**[https://v0.app/chat/r0OFHvBpIa2](https://v0.app/chat/r0OFHvBpIa2)**
 
-Run the development server:
-```bash
-npm run dev
-```
+## How It Works
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
-
-### Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-## Available Scripts
-
-- `npm run dev` - Starts the development server with hot-reload
-- `npm run build` - Builds the app for production
-- `npm start` - Runs the built app in production mode
-- `npm run lint` - Runs Next.js linter
-
-## Features
-
-### Financial Services
-- Investment tracking with real-time stock data
-- Financial news feed
-- Tax calculators and income planning
-- Retirement planning (TSP calculator)
-- Loan management
-- Business startup resources
-- Credit management
-- Bill tracking
-
-### Automotive Services
-- Vehicle buying/selling guidance
-- Insurance information
-- Registration assistance
-- Driver's license resources
-- Deployment vehicle storage
-- Auto loans
-
-### Additional Services
-- Legal resources
-- Medical information
-- Transition assistance
-- Service marketplace
-- Appointment scheduler
-- Military discount database
-
-## Project Structure
-
-```
-military-logistics/
-├── pages/              # Next.js pages (routing)
-├── src/
-│   ├── components/     # Reusable React components
-│   ├── pages/         # Page components
-│   │   ├── financial/ # Financial service pages
-│   │   └── automotive/ # Automotive service pages
-│   └── Navbar.js      # Main navigation
-├── public/            # Static assets
-└── next.config.js     # Next.js configuration
-```
-
-## Learn More
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [React Documentation](https://react.dev)
-- [Tailwind CSS](https://tailwindcss.com/docs)
+1. Create and modify your project using [v0.app](https://v0.app)
+2. Deploy your chats from the v0 interface
+3. Changes are automatically pushed to this repository
+4. Vercel deploys the latest version from this repository
