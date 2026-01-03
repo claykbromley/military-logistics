@@ -1,0 +1,1 @@
+const suggestionItems = Array.from(document.querySelectorAll('[data-suggestion]'));
