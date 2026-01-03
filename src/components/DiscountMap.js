@@ -9,72 +9,58 @@ export function DiscountMap() {
   const [error, setError] = useState(null);
   const [highlightedIndex, setHighlightedIndex] = useState(null);
   const [category, setCategory] = useState("all");
+  const [cachedZipCodes, setCachedZipCodes] = useState(new Set());
 
   const mapRef = useRef(null);
   const googleMap = useRef(null);
   const markers = useRef([]);
   const placesService = useRef(null);
+  const geocoder = useRef(null);
 
-  // List of major chains known to offer military discounts
-  const KNOWN_MILITARY_DISCOUNTS = {
-    // Restaurants
+  // Verified national chains with precise matching
+  const KNOWN_CHAINS = {
     "applebee's": { discount: "10% off", category: "restaurant" },
     "chili's": { discount: "10% off", category: "restaurant" },
     "outback steakhouse": { discount: "10% off", category: "restaurant" },
-    "outback": { discount: "10% off", category: "restaurant" },
     "buffalo wild wings": { discount: "10% off", category: "restaurant" },
-    "denny's": { discount: "10-20% off varies by location", category: "restaurant" },
-    "ihop": { discount: "10-20% off varies by location", category: "restaurant" },
+    "denny's": { discount: "10-20% off", category: "restaurant" },
+    "ihop": { discount: "10-20% off", category: "restaurant" },
     "golden corral": { discount: "10% off", category: "restaurant" },
     "texas roadhouse": { discount: "10% off", category: "restaurant" },
     "subway": { discount: "10% off", category: "restaurant" },
     "arby's": { discount: "10% off", category: "restaurant" },
-    
-    // Retail
+    "the home depot": { discount: "10% off year-round", category: "retail" },
     "home depot": { discount: "10% off year-round", category: "retail" },
     "lowe's": { discount: "10% off year-round", category: "retail" },
-    "lowes": { discount: "10% off year-round", category: "retail" },
     "target": { discount: "10% off select days", category: "retail" },
     "old navy": { discount: "10% off", category: "retail" },
     "gap": { discount: "10% off", category: "retail" },
     "under armour": { discount: "20% off", category: "retail" },
     "nike": { discount: "10% off", category: "retail" },
     "dick's sporting goods": { discount: "10% off", category: "retail" },
-    "dicks sporting goods": { discount: "10% off", category: "retail" },
     "best buy": { discount: "Varies", category: "retail" },
     "foot locker": { discount: "10% off", category: "retail" },
     "walmart": { discount: "Military discount available", category: "retail" },
-    "kohls": { discount: "15% off Mondays", category: "retail" },
     "kohl's": { discount: "15% off Mondays", category: "retail" },
-    
-    // Automotive
     "jiffy lube": { discount: "15% off", category: "automotive" },
     "goodyear": { discount: "10% off", category: "automotive" },
-    "valvoline": { discount: "Varies by location", category: "automotive" },
+    "valvoline": { discount: "Varies", category: "automotive" },
     "meineke": { discount: "10% off", category: "automotive" },
     "firestone": { discount: "10% off", category: "automotive" },
-    
-    // Hotels
     "hampton inn": { discount: "Up to 15% off", category: "hotel" },
-    "hampton": { discount: "Up to 15% off", category: "hotel" },
     "marriott": { discount: "Government rate", category: "hotel" },
     "hilton": { discount: "Government rate", category: "hotel" },
     "holiday inn": { discount: "Government rate", category: "hotel" },
     "best western": { discount: "10-20% off", category: "hotel" },
-    "la quinta": { discount: "Military rate", category: "hotel" },
+    "la quinta inn": { discount: "Military rate", category: "hotel" },
     "motel 6": { discount: "10% off", category: "hotel" },
-    
-    // Entertainment
     "amc": { discount: "$1 off tickets", category: "entertainment" },
-    "amc theatres": { discount: "$1 off tickets", category: "entertainment" },
-    "regal": { discount: "Discount varies", category: "entertainment" },
     "regal cinemas": { discount: "Discount varies", category: "entertainment" },
     "24 hour fitness": { discount: "$0 initiation", category: "entertainment" },
-    "la fitness": { discount: "Varies by location", category: "entertainment" },
-    "anytime fitness": { discount: "Varies by location", category: "entertainment" },
+    "la fitness": { discount: "Varies", category: "entertainment" },
+    "anytime fitness": { discount: "Varies", category: "entertainment" }
   };
 
-  // Category to search type mapping for Google Places API
   const CATEGORY_TYPES = {
     restaurant: ['restaurant', 'cafe', 'food'],
     retail: ['store', 'shopping_mall', 'clothing_store', 'department_store'],
@@ -96,6 +82,98 @@ export function DiscountMap() {
     const h = sinDLat * sinDLat + sinDLon * sinDLon * Math.cos(lat1) * Math.cos(lat2);
     return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
+
+  const matchKnownChain = (businessName) => {
+    const nameLower = businessName.toLowerCase().trim();
+    
+    if (KNOWN_CHAINS[nameLower]) {
+      return KNOWN_CHAINS[nameLower];
+    }
+    
+    for (const [chainName, info] of Object.entries(KNOWN_CHAINS)) {
+      if (nameLower === chainName || 
+          nameLower.startsWith(chainName + " ") || 
+          nameLower.endsWith(" " + chainName) ||
+          nameLower.includes(" " + chainName + " ")) {
+        return info;
+      }
+    }
+    
+    return null;
+  };
+
+  const getZipCodeFromCoords = async (lat, lng) => {
+    try {
+      if (!geocoder.current) {
+        geocoder.current = new window.google.maps.Geocoder();
+      }
+
+      return new Promise((resolve) => {
+        geocoder.current.geocode(
+          { location: { lat, lng } },
+          (results, status) => {
+            if (status === 'OK' && results && results.length > 0) {
+              for (const result of results) {
+                const zipComponent = result.address_components.find(
+                  comp => comp.types.includes('postal_code')
+                );
+                if (zipComponent) {
+                  resolve(zipComponent.short_name);
+                  return;
+                }
+              }
+            }
+            resolve(null);
+          }
+        );
+      });
+    } catch (err) {
+      console.error('Error getting zip code:', err);
+      return null;
+    }
+  };
+
+  const loadCachedBusinesses = (zipCode) => {
+    try {
+      const data = localStorage.getItem(`military_discount_zip_${zipCode}`);
+      if (data) {
+        return JSON.parse(data);
+      }
+    } catch (err) {
+      console.log(`No cached data for zip ${zipCode}`);
+    }
+    return null;
+  };
+
+  const saveCachedBusinesses = (zipCode, businesses) => {
+    try {
+      localStorage.setItem(`military_discount_zip_${zipCode}`, JSON.stringify(businesses));
+      
+      const cachedList = getCachedZipCodeList();
+      if (!cachedList.includes(zipCode)) {
+        cachedList.push(zipCode);
+        localStorage.setItem('military_discount_cached_zips', JSON.stringify(cachedList));
+      }
+      
+      setCachedZipCodes(new Set(cachedList));
+    } catch (err) {
+      console.error('Error saving cached data:', err);
+    }
+  };
+
+  const getCachedZipCodeList = () => {
+    try {
+      const data = localStorage.getItem('military_discount_cached_zips');
+      return data ? JSON.parse(data) : [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const loadCachedZipCodeList = () => {
+    const zips = getCachedZipCodeList();
+    setCachedZipCodes(new Set(zips));
+  };
 
   const loadGoogleMaps = () => {
     return new Promise((resolve, reject) => {
@@ -132,6 +210,8 @@ export function DiscountMap() {
   const initMap = async () => {
     try {
       await loadGoogleMaps();
+      loadCachedZipCodeList();
+      
       if (!mapRef.current) {
         console.error("mapRef is not ready yet.");
         return;
@@ -143,13 +223,11 @@ export function DiscountMap() {
       });
 
       placesService.current = new window.google.maps.places.PlacesService(googleMap.current);
+      geocoder.current = new window.google.maps.Geocoder();
 
-      // Add listener for when user stops moving/zooming the map
       googleMap.current.addListener('idle', () => {
         const center = googleMap.current.getCenter();
         const newCoords = { lat: center.lat(), lon: center.lng() };
-        
-        // Search for the new visible area
         searchBusinesses(newCoords);
       });
 
@@ -215,7 +293,6 @@ export function DiscountMap() {
   }, [businesses]);
 
   useEffect(() => {
-    // Re-search when category changes, but only if we already have a location
     if (coords && businesses.length > 0) {
       searchBusinesses(coords);
     }
@@ -281,20 +358,49 @@ export function DiscountMap() {
   };
 
   const searchBusinesses = async (center) => {
-    if (!placesService.current) return;
+    if (!placesService.current || !geocoder.current) return;
     
-    setStatus("Searching for military discounts...");
     setLoading(true);
+    setStatus("Checking for cached data...");
+    
+    const zipCode = await getZipCodeFromCoords(center.lat, center.lon);
+    
+    if (!zipCode) {
+      setError("Could not determine zip code for this location");
+      setLoading(false);
+      return;
+    }
+
+    const cachedData = loadCachedBusinesses(zipCode);
+    
+    if (cachedData) {
+      setStatus(`Loading cached data for ${zipCode}...`);
+      
+      const filteredBusinesses = cachedData
+        .filter(b => category === 'all' || b.category === category)
+        .map(b => ({
+          ...b,
+          distance: distance(center, { lat: b.lat, lon: b.lng })
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 100);
+      
+      setBusinesses(filteredBusinesses);
+      setStatus(`Loaded ${filteredBusinesses.length} businesses from cache (ZIP: ${zipCode})`);
+      setLoading(false);
+      return;
+    }
+
+    setStatus(`Searching ${zipCode} for military discounts (first time)...`);
     
     const allResults = [];
-    const searchTypes = CATEGORY_TYPES[category] || CATEGORY_TYPES.all;
+    const searchTypes = CATEGORY_TYPES.all;
 
-    // Search for each type of business
     for (const type of searchTypes) {
       try {
         const request = {
           location: new window.google.maps.LatLng(center.lat, center.lon),
-          radius: 8000, // ~5 miles
+          radius: 8000,
           type: type,
         };
 
@@ -302,20 +408,9 @@ export function DiscountMap() {
           placesService.current.nearbySearch(request, (results, status) => {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               results.forEach(place => {
-                // Check if this business is known to offer military discounts
-                const nameLower = place.name.toLowerCase();
-                let discountInfo = null;
+                const chainInfo = matchKnownChain(place.name);
                 
-                // Check for exact match or partial match in known discounts
-                for (const [businessName, info] of Object.entries(KNOWN_MILITARY_DISCOUNTS)) {
-                  if (nameLower.includes(businessName) || businessName.includes(nameLower.split(' ')[0])) {
-                    discountInfo = info;
-                    break;
-                  }
-                }
-                
-                // Only include businesses with known military discounts
-                if (discountInfo) {
+                if (chainInfo) {
                   const lat = place.geometry.location.lat();
                   const lng = place.geometry.location.lng();
                   const dist = distance(center, { lat, lon: lng });
@@ -327,9 +422,9 @@ export function DiscountMap() {
                     lng: lng,
                     address: place.vicinity,
                     distance: dist,
-                    category: discountInfo.category,
-                    discount: discountInfo.discount,
-                    rating: place.rating,
+                    category: chainInfo.category,
+                    discount: chainInfo.discount,
+                    rating: place.rating
                   });
                 }
               });
@@ -338,31 +433,30 @@ export function DiscountMap() {
           });
         });
 
-        // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 200));
       } catch (err) {
         console.error(`Error searching for ${type}:`, err);
       }
     }
 
-    // Remove duplicates based on place_id
     const uniqueResults = Array.from(
       new Map(allResults.map(item => [item.id, item])).values()
     );
 
-    // Sort by distance
-    uniqueResults.sort((a, b) => a.distance - b.distance);
+    saveCachedBusinesses(zipCode, uniqueResults);
 
-    // Limit to top 100 results
-    const topResults = uniqueResults.slice(0, 100);
+    const filteredResults = uniqueResults
+      .filter(b => category === 'all' || b.category === category)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 100);
 
-    setBusinesses(topResults);
-    setStatus(`Found ${topResults.length} businesses with military discounts nearby`);
+    setBusinesses(filteredResults);
+    setStatus(`Found ${filteredResults.length} businesses with military discounts (ZIP: ${zipCode})`);
     setLoading(false);
   };
 
   return (
-    <div style={{ display: 'flex', width: '90%', margin: '0 auto', border: '2px solid #ccc', borderRadius: '8px', overflow: 'hidden', height: '600px' }}>
+    <div style={{ display: 'flex', width: '70%', margin: '0 auto', border: '2px solid #ccc', borderRadius: '8px', overflow: 'hidden', height: '600px' }}>
       <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderRight: '1px solid #ccc' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid #ccc', backgroundColor: '#f8f9fa' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '15px', marginTop: 0 }}>Find Military Discounts</h2>
@@ -409,11 +503,16 @@ export function DiscountMap() {
               <option value="entertainment">Entertainment</option>
             </select>
             <p style={{ fontSize: '0.85rem', color: '#666', margin: 0, textAlign: 'center' }}>
-              💡 Move or zoom the map to search a new area
+              💡 Move or zoom map to search new areas
             </p>
+            {cachedZipCodes.size > 0 && (
+              <p style={{ fontSize: '0.8rem', color: '#28a745', margin: 0, textAlign: 'center' }}>
+                📦 {cachedZipCodes.size} ZIP codes cached locally
+              </p>
+            )}
           </div>
           
-          {status && <p style={{ textAlign: 'center', color: '#0066cc', marginTop: '10px', marginBottom: 0 }}>{status}</p>}
+          {status && <p style={{ textAlign: 'center', color: '#0066cc', marginTop: '10px', marginBottom: 0, fontSize: '0.9rem' }}>{status}</p>}
           {error && <p style={{ textAlign: 'center', color: '#dc3545', marginTop: '10px', marginBottom: 0 }}>{error}</p>}
         </div>
 
