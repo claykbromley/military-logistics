@@ -7,7 +7,7 @@ export function Hero() {
       {/* Hero Background */}
       <div className="absolute inset-0 z-0">
         <img
-          src="/military-flag-waving-against-sky-silhouette.jpg"
+          src="/images/military-flag-waving-against-sky-silhouette.jpg"
           alt="Military background"
           className="w-full h-full object-cover"
         />
