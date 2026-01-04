@@ -32,7 +32,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
         <div
           className="absolute inset-0 -z-10 opacity-5"
           style={{
-            backgroundImage: "url(/placeholder.svg?height=600&width=600&query=military+eagle+stars+emblem)",
+            backgroundImage: "url(/images/placeholder.svg?height=600&width=600&query=military+eagle+stars+emblem)",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
