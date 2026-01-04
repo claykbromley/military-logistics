@@ -70,12 +70,7 @@ const paygradeOptions = [
 export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps) {
   const [service, setService] = useState("")
   const [status, setStatus] = useState("")
-  const [securityClearance, setSecurityClearance] = useState("")
-  const [militaryJobCode, setMilitaryJobCode] = useState("")
   const [paygrade, setPaygrade] = useState("")
-  const [rank, setRank] = useState("")
-  const [separationDate, setSeparationDate] = useState("")
-  const [ssn, setSsn] = useState("")
   const [zipCode, setZipCode] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
@@ -95,7 +90,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
         <div
           className="absolute inset-0 -z-10 opacity-5"
           style={{
-            backgroundImage: "url(/placeholder.svg?height=800&width=600&query=american+flag+stars+stripes+pattern)",
+            backgroundImage: "url(/images/placeholder.svg?height=800&width=600&query=american+flag+stars+stripes+pattern)",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}

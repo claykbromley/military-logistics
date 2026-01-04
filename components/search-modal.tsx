@@ -29,7 +29,7 @@ export function SearchModal({ open, onClose }: SearchModalProps) {
         <div
           className="absolute inset-0 -z-10 opacity-10"
           style={{
-            backgroundImage: "url(/placeholder.svg?height=600&width=800&query=military+tactical+map)",
+            backgroundImage: "url(/images/placeholder.svg?height=600&width=800&query=military+tactical+map)",
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
