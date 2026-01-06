@@ -5,6 +5,7 @@ import LocationForm from "@/components/location-form"
 import Container from "react-bootstrap/Container"
 import Row from "react-bootstrap/Row"
 import { DiscountMap } from "@/components/discount-map"
+import { JSX } from "react"
 
 type MapCenter = {
   lat: number
