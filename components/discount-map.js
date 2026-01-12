@@ -21,7 +21,7 @@ export function DiscountMap() {
 
   // Verified national chains with precise matching
   const KNOWN_CHAINS = {
-    "applebee's": { discount: "10% off", category: "restaurant" },
+    /*"applebee's": { discount: "10% off", category: "restaurant" },
     "chili's": { discount: "10% off", category: "restaurant" },
     "outback steakhouse": { discount: "10% off", category: "restaurant" },
     "buffalo wild wings": { discount: "10% off", category: "restaurant" },
@@ -42,7 +42,7 @@ export function DiscountMap() {
     "dick's sporting goods": { discount: "10% off", category: "retail" },
     "best buy": { discount: "Varies", category: "retail" },
     "foot locker": { discount: "10% off", category: "retail" },
-    "walmart": { discount: "Military discount available", category: "retail" },
+    //"walmart": { discount: "Military discount available", category: "retail" },
     "kohl's": { discount: "15% off Mondays", category: "retail" },
     "jiffy lube": { discount: "15% off", category: "automotive" },
     "goodyear": { discount: "10% off", category: "automotive" },
@@ -60,7 +60,44 @@ export function DiscountMap() {
     "regal cinemas": { discount: "Discount varies", category: "entertainment" },
     "24 hour fitness": { discount: "$0 initiation", category: "entertainment" },
     "la fitness": { discount: "Varies", category: "entertainment" },
-    "anytime fitness": { discount: "Varies", category: "entertainment" }
+    "anytime fitness": { discount: "Varies", category: "entertainment" }*/
+    // RESTAURANTS - Only verified with current corporate policies
+    "applebee's": { discount: "Free Veterans Day meal", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+    "chili's": { discount: "Free Veterans Day meal", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+    "outback steakhouse": { discount: "10% off year-round", category: "restaurant", verification: "verified", note: "Plus Veterans Day free meal" },
+    "buffalo wild wings": { discount: "10% off at participating locations", category: "restaurant", verification: "verified", note: "Location-dependent" },
+    "denny's": { discount: "Free Grand Slam on Veterans Day", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+    "ihop": { discount: "Free pancake combo on Veterans Day", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+    "golden corral": { discount: "Free Veterans Day buffet", category: "restaurant", verification: "verified", note: "Plus year-round 10-20% at participating locations" },
+    "texas roadhouse": { discount: "Free Veterans Day meal voucher", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+
+    // RETAIL - Only verified with current corporate policies  
+    "the home depot": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Excludes appliances" },
+    "home depot": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Excludes appliances" },
+    "lowe's": { discount: "10% off year-round", category: "retail", verification: "verified" },
+    "target": { discount: "10% off during military events", category: "retail", verification: "verified", note: "Limited time events only" },
+    "gap": { discount: "10% off factory stores only", category: "retail", verification: "verified", note: "Factory stores only" },
+    "under armour": { discount: "20% off year-round", category: "retail", verification: "verified", note: "ID.me verification required" },
+    "nike": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Online verification required" },
+    "foot locker": { discount: "10% off most purchases", category: "retail", verification: "verified", note: "Restrictions apply" },
+
+    // AUTOMOTIVE - Only verified with current corporate policies
+    "jiffy lube": { discount: "15% off year-round", category: "automotive", verification: "verified", note: "Participating Team Car Care locations only" },
+    "valvoline": { discount: "15% off year-round", category: "automotive", verification: "verified", note: "Excludes battery replacement/state inspection" },
+    "meineke": { discount: "Free Veterans Day oil change", category: "automotive", verification: "verified", note: "Veterans Day only" },
+    "firestone": { discount: "10% off year-round", category: "automotive", verification: "verified", note: "Tax-free advantages available" },
+
+    // HOTELS - Only verified with current corporate policies
+    "hampton inn": { discount: "10% off government rate", category: "hotel", verification: "verified", note: "Military ID required" },
+    "marriott": { discount: "15% off flexible rates", category: "hotel", verification: "verified", note: "Participating resorts, code XYD" },
+    "hilton": { discount: "Military family rate", category: "hotel", verification: "verified", note: "Varies by hotel, military ID required" },
+    "holiday inn": { discount: "5%+ off best flexible rate", category: "hotel", verification: "verified", note: "Minimum 5% discount" },
+    "best western": { discount: "10% off + per diem rates", category: "hotel", verification: "verified", note: "Military/government personnel" },
+    "la quinta inn": { discount: "12% off standard rate", category: "hotel", verification: "verified", note: "Military ID required" },
+    "motel 6": { discount: "10% off year-round", category: "hotel", verification: "verified", note: "All 1,400+ locations" },
+
+    // ENTERTAINMENT/FITNESS - Only verified with current corporate policies
+    "24 hour fitness": { discount: "$0 initiation + $5 off monthly", category: "entertainment", verification: "verified", note: "Select memberships, military ID required" }
   };
 
   const CATEGORY_TYPES = {
@@ -87,20 +124,20 @@ export function DiscountMap() {
 
   const matchKnownChain = (businessName) => {
     const nameLower = businessName.toLowerCase().trim();
-    
+
     if (KNOWN_CHAINS[nameLower]) {
       return KNOWN_CHAINS[nameLower];
     }
-    
+
     for (const [chainName, info] of Object.entries(KNOWN_CHAINS)) {
-      if (nameLower === chainName || 
-          nameLower.startsWith(chainName + " ") || 
-          nameLower.endsWith(" " + chainName) ||
-          nameLower.includes(" " + chainName + " ")) {
+      if (nameLower === chainName ||
+        nameLower.startsWith(chainName + " ") ||
+        nameLower.endsWith(" " + chainName) ||
+        nameLower.includes(" " + chainName + " ")) {
         return info;
       }
     }
-    
+
     return null;
   };
 
@@ -150,13 +187,13 @@ export function DiscountMap() {
   const saveCachedBusinesses = (zipCode, businesses) => {
     try {
       localStorage.setItem(`military_discount_zip_${zipCode}`, JSON.stringify(businesses));
-      
+
       const cachedList = getCachedZipCodeList();
       if (!cachedList.includes(zipCode)) {
         cachedList.push(zipCode);
         localStorage.setItem('military_discount_cached_zips', JSON.stringify(cachedList));
       }
-      
+
       setCachedZipCodes(new Set(cachedList));
     } catch (err) {
       console.error('Error saving cached data:', err);
@@ -175,6 +212,34 @@ export function DiscountMap() {
   const loadCachedZipCodeList = () => {
     const zips = getCachedZipCodeList();
     setCachedZipCodes(new Set(zips));
+  };
+
+  const clearCache = () => {
+    try {
+      const cachedList = getCachedZipCodeList();
+
+      // Remove all cached zip code data
+      cachedList.forEach(zipCode => {
+        localStorage.removeItem(`military_discount_zip_${zipCode}`);
+      });
+
+      // Remove the cached zip codes list
+      localStorage.removeItem('military_discount_cached_zips');
+
+      // Update state
+      setCachedZipCodes(new Set());
+      setStatus('Cache cleared successfully');
+
+      // Clear the success message after 3 seconds
+      setTimeout(() => {
+        if (coords) {
+          searchBusinesses(coords);
+        }
+      }, 1000);
+    } catch (err) {
+      console.error('Error clearing cache:', err);
+      setError('Failed to clear cache');
+    }
   };
 
   const loadGoogleMaps = () => {
@@ -213,7 +278,7 @@ export function DiscountMap() {
     try {
       await loadGoogleMaps();
       loadCachedZipCodeList();
-      
+
       if (!mapRef.current) {
         console.error("mapRef is not ready yet.");
         return;
@@ -256,7 +321,7 @@ export function DiscountMap() {
 
       marker.addListener("mouseover", () => {
         highlightMarker(index);
-        setHighlightedIndex(index); 
+        setHighlightedIndex(index);
       });
       marker.addListener("mouseout", () => {
         setHighlightedIndex(null);
@@ -361,12 +426,12 @@ export function DiscountMap() {
 
   const searchBusinesses = async (center) => {
     if (!placesService.current || !geocoder.current) return;
-    
+
     setLoading(true);
     setStatus("Checking for cached data...");
-    
+
     const zipCode = await getZipCodeFromCoords(center.lat, center.lon);
-    
+
     if (!zipCode) {
       setError("Could not determine zip code for this location");
       setLoading(false);
@@ -374,10 +439,10 @@ export function DiscountMap() {
     }
 
     const cachedData = loadCachedBusinesses(zipCode);
-    
+
     if (cachedData) {
       setStatus(`Loading cached data for ${zipCode}...`);
-      
+
       const filteredBusinesses = cachedData
         .filter(b => category === 'all' || b.category === category)
         .map(b => ({
@@ -386,7 +451,7 @@ export function DiscountMap() {
         }))
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 100);
-      
+
       setBusinesses(filteredBusinesses);
       setStatus(`Loaded ${filteredBusinesses.length} businesses from cache (ZIP: ${zipCode})`);
       setLoading(false);
@@ -394,7 +459,7 @@ export function DiscountMap() {
     }
 
     setStatus(`Searching ${zipCode} for military discounts (first time)...`);
-    
+
     const allResults = [];
     const searchTypes = CATEGORY_TYPES.all;
 
@@ -411,12 +476,12 @@ export function DiscountMap() {
             if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
               results.forEach(place => {
                 const chainInfo = matchKnownChain(place.name);
-                
+
                 if (chainInfo) {
                   const lat = place.geometry.location.lat();
                   const lng = place.geometry.location.lng();
                   const dist = distance(center, { lat, lon: lng });
-                  
+
                   allResults.push({
                     id: place.place_id,
                     name: place.name,
@@ -458,21 +523,21 @@ export function DiscountMap() {
   };
 
   return (
-    <div style={{ display: 'flex', width: '70%', margin: '0 auto', border: '2px solid #ccc', borderRadius: '8px', overflow: 'hidden', height: '600px' }}>
+    <div style={{ display: 'flex', width: '100%', margin: '0 auto', border: '2px solid #ccc', borderRadius: '8px', overflow: 'hidden', height: '600px' }}>
       <div style={{ width: '50%', display: 'flex', flexDirection: 'column', borderRight: '1px solid #ccc' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid #ccc', backgroundColor: '#f8f9fa' }}>
           <h2 style={{ textAlign: 'center', marginBottom: '15px', marginTop: 0 }}>Find Military Discounts</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
             <div style={{ display: 'flex', gap: '5px', width: '100%', maxWidth: '400px' }}>
-              <input 
+              <input
                 value={addressInput}
                 onChange={(e) => setAddressInput(e.target.value)}
-                onKeyDown={(e) => {if (e.key === "Enter") geocodeAddress()}}
+                onKeyDown={(e) => { if (e.key === "Enter") geocodeAddress() }}
                 placeholder="Enter Address or ZIP Code"
                 style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
               />
-              <button 
+              <button
                 onClick={geocodeAddress}
                 style={{ padding: '8px 16px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
               >
@@ -480,7 +545,7 @@ export function DiscountMap() {
               </button>
             </div>
             <div style={{ color: '#666' }}>OR</div>
-            <button 
+            <button
               onClick={getCurrentLocation}
               style={{ padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
             >
@@ -492,8 +557,8 @@ export function DiscountMap() {
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
             <label style={{ fontWeight: 'bold' }}>Filter by Category:</label>
-            <select 
-              value={category} 
+            <select
+              value={category}
               onChange={(e) => setCategory(e.target.value)}
               style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', minWidth: '200px' }}
             >
@@ -508,12 +573,29 @@ export function DiscountMap() {
               💡 Move or zoom map to search new areas
             </p>
             {cachedZipCodes.size > 0 && (
-              <p style={{ fontSize: '0.8rem', color: '#28a745', margin: 0, textAlign: 'center' }}>
-                📦 {cachedZipCodes.size} ZIP codes cached locally
-              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <p style={{ fontSize: '0.8rem', color: '#28a745', margin: 0, textAlign: 'center' }}>
+                  📦 {cachedZipCodes.size} ZIP codes cached locally
+                </p>
+                <button
+                  onClick={clearCache}
+                  style={{
+                    padding: '4px 10px',
+                    backgroundColor: '#dc3545',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  Clear Cache
+                </button>
+              </div>
             )}
           </div>
-          
+
           {status && <p style={{ textAlign: 'center', color: '#0066cc', marginTop: '10px', marginBottom: 0, fontSize: '0.9rem' }}>{status}</p>}
           {error && <p style={{ textAlign: 'center', color: '#dc3545', marginTop: '10px', marginBottom: 0 }}>{error}</p>}
         </div>
@@ -525,13 +607,13 @@ export function DiscountMap() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {businesses.map((b, i) => (
-              <div 
+              <div
                 key={b.id}
-                style={{ 
-                  backgroundColor: 'white', 
-                  padding: '15px', 
-                  border: highlightedIndex === i ? '2px solid #0066cc' : '1px solid #ddd', 
-                  borderRadius: '4px', 
+                style={{
+                  backgroundColor: 'white',
+                  padding: '15px',
+                  border: highlightedIndex === i ? '2px solid #0066cc' : '1px solid #ddd',
+                  borderRadius: '4px',
                   marginBottom: '10px',
                   cursor: 'pointer',
                   transition: 'all 0.2s'
