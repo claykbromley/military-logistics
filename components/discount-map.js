@@ -21,83 +21,43 @@ export function DiscountMap() {
 
   // Verified national chains with precise matching
   const KNOWN_CHAINS = {
-    /*"applebee's": { discount: "10% off", category: "restaurant" },
-    "chili's": { discount: "10% off", category: "restaurant" },
-    "outback steakhouse": { discount: "10% off", category: "restaurant" },
-    "buffalo wild wings": { discount: "10% off", category: "restaurant" },
-    "denny's": { discount: "10-20% off", category: "restaurant" },
-    "ihop": { discount: "10-20% off", category: "restaurant" },
-    "golden corral": { discount: "10% off", category: "restaurant" },
-    "texas roadhouse": { discount: "10% off", category: "restaurant" },
-    "subway": { discount: "10% off", category: "restaurant" },
-    "arby's": { discount: "10% off", category: "restaurant" },
-    "the home depot": { discount: "10% off year-round", category: "retail" },
-    "home depot": { discount: "10% off year-round", category: "retail" },
-    "lowe's": { discount: "10% off year-round", category: "retail" },
-    "target": { discount: "10% off select days", category: "retail" },
-    "old navy": { discount: "10% off", category: "retail" },
-    "gap": { discount: "10% off", category: "retail" },
-    "under armour": { discount: "20% off", category: "retail" },
-    "nike": { discount: "10% off", category: "retail" },
-    "dick's sporting goods": { discount: "10% off", category: "retail" },
-    "best buy": { discount: "Varies", category: "retail" },
-    "foot locker": { discount: "10% off", category: "retail" },
-    //"walmart": { discount: "Military discount available", category: "retail" },
-    "kohl's": { discount: "15% off Mondays", category: "retail" },
-    "jiffy lube": { discount: "15% off", category: "automotive" },
-    "goodyear": { discount: "10% off", category: "automotive" },
-    "valvoline": { discount: "Varies", category: "automotive" },
-    "meineke": { discount: "10% off", category: "automotive" },
-    "firestone": { discount: "10% off", category: "automotive" },
-    "hampton inn": { discount: "Up to 15% off", category: "hotel" },
-    "marriott": { discount: "Government rate", category: "hotel" },
-    "hilton": { discount: "Government rate", category: "hotel" },
-    "holiday inn": { discount: "Government rate", category: "hotel" },
-    "best western": { discount: "10-20% off", category: "hotel" },
-    "la quinta inn": { discount: "Military rate", category: "hotel" },
-    "motel 6": { discount: "10% off", category: "hotel" },
-    "amc": { discount: "$1 off tickets", category: "entertainment" },
-    "regal cinemas": { discount: "Discount varies", category: "entertainment" },
-    "24 hour fitness": { discount: "$0 initiation", category: "entertainment" },
-    "la fitness": { discount: "Varies", category: "entertainment" },
-    "anytime fitness": { discount: "Varies", category: "entertainment" }*/
     // RESTAURANTS - Only verified with current corporate policies
-    "applebee's": { discount: "Free Veterans Day meal", category: "restaurant", verification: "verified", note: "Veterans Day only" },
-    "chili's": { discount: "Free Veterans Day meal", category: "restaurant", verification: "verified", note: "Veterans Day only" },
-    "outback steakhouse": { discount: "10% off year-round", category: "restaurant", verification: "verified", note: "Plus Veterans Day free meal" },
-    "buffalo wild wings": { discount: "10% off at participating locations", category: "restaurant", verification: "verified", note: "Location-dependent" },
-    "denny's": { discount: "Free Grand Slam on Veterans Day", category: "restaurant", verification: "verified", note: "Veterans Day only" },
-    "ihop": { discount: "Free pancake combo on Veterans Day", category: "restaurant", verification: "verified", note: "Veterans Day only" },
-    "golden corral": { discount: "Free Veterans Day buffet", category: "restaurant", verification: "verified", note: "Plus year-round 10-20% at participating locations" },
-    "texas roadhouse": { discount: "Free Veterans Day meal voucher", category: "restaurant", verification: "verified", note: "Veterans Day only" },
+    "applebee's": { discount: "Free Veterans Day meal", category: "restaurant", note: "Veterans Day only" },
+    "chili's": { discount: "Free Veterans Day meal", category: "restaurant", note: "Veterans Day only" },
+    "outback steakhouse": { discount: "10% off year-round", category: "restaurant", note: "Plus Veterans Day free meal" },
+    "buffalo wild wings": { discount: "10% off at participating locations", category: "restaurant", note: "Location-dependent" },
+    "denny's": { discount: "Free Grand Slam on Veterans Day", category: "restaurant", note: "Veterans Day only" },
+    "ihop": { discount: "Free pancake combo on Veterans Day", category: "restaurant", note: "Veterans Day only" },
+    "golden corral": { discount: "Free Veterans Day buffet", category: "restaurant", note: "Plus year-round 10-20% at participating locations" },
+    "texas roadhouse": { discount: "Free Veterans Day meal voucher", category: "restaurant", note: "Veterans Day only" },
 
     // RETAIL - Only verified with current corporate policies  
-    "the home depot": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Excludes appliances" },
-    "home depot": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Excludes appliances" },
-    "lowe's": { discount: "10% off year-round", category: "retail", verification: "verified" },
-    "target": { discount: "10% off during military events", category: "retail", verification: "verified", note: "Limited time events only" },
-    "gap": { discount: "10% off factory stores only", category: "retail", verification: "verified", note: "Factory stores only" },
-    "under armour": { discount: "20% off year-round", category: "retail", verification: "verified", note: "ID.me verification required" },
-    "nike": { discount: "10% off year-round", category: "retail", verification: "verified", note: "Online verification required" },
-    "foot locker": { discount: "10% off most purchases", category: "retail", verification: "verified", note: "Restrictions apply" },
+    "the home depot": { discount: "10% off year-round", category: "retail", note: "Excludes appliances" },
+    "home depot": { discount: "10% off year-round", category: "retail", note: "Excludes appliances" },
+    "lowe's": { discount: "10% off year-round", category: "retail", note: "Year-round discount" },
+    "target": { discount: "10% off during military events", category: "retail", note: "Limited time events only" },
+    "gap": { discount: "10% off factory stores only", category: "retail", note: "Factory stores only" },
+    "under armour": { discount: "20% off year-round", category: "retail", note: "ID.me verification required" },
+    "nike": { discount: "10% off year-round", category: "retail", note: "Online verification required" },
+    "foot locker": { discount: "10% off most purchases", category: "retail", note: "Restrictions apply" },
 
     // AUTOMOTIVE - Only verified with current corporate policies
-    "jiffy lube": { discount: "15% off year-round", category: "automotive", verification: "verified", note: "Participating Team Car Care locations only" },
-    "valvoline": { discount: "15% off year-round", category: "automotive", verification: "verified", note: "Excludes battery replacement/state inspection" },
-    "meineke": { discount: "Free Veterans Day oil change", category: "automotive", verification: "verified", note: "Veterans Day only" },
-    "firestone": { discount: "10% off year-round", category: "automotive", verification: "verified", note: "Tax-free advantages available" },
+    "jiffy lube": { discount: "15% off year-round", category: "automotive", note: "Participating Team Car Care locations only" },
+    "valvoline": { discount: "15% off year-round", category: "automotive", note: "Excludes battery replacement/state inspection" },
+    "meineke": { discount: "Free Veterans Day oil change", category: "automotive", note: "Veterans Day only" },
+    "firestone": { discount: "10% off year-round", category: "automotive", note: "Tax-free advantages available" },
 
     // HOTELS - Only verified with current corporate policies
-    "hampton inn": { discount: "10% off government rate", category: "hotel", verification: "verified", note: "Military ID required" },
-    "marriott": { discount: "15% off flexible rates", category: "hotel", verification: "verified", note: "Participating resorts, code XYD" },
-    "hilton": { discount: "Military family rate", category: "hotel", verification: "verified", note: "Varies by hotel, military ID required" },
-    "holiday inn": { discount: "5%+ off best flexible rate", category: "hotel", verification: "verified", note: "Minimum 5% discount" },
-    "best western": { discount: "10% off + per diem rates", category: "hotel", verification: "verified", note: "Military/government personnel" },
-    "la quinta inn": { discount: "12% off standard rate", category: "hotel", verification: "verified", note: "Military ID required" },
-    "motel 6": { discount: "10% off year-round", category: "hotel", verification: "verified", note: "All 1,400+ locations" },
+    "hampton inn": { discount: "10% off government rate", category: "hotel", note: "Military ID required" },
+    "marriott": { discount: "15% off flexible rates", category: "hotel", note: "Participating resorts, code XYD" },
+    "hilton": { discount: "Military family rate", category: "hotel", note: "Varies by hotel, military ID required" },
+    "holiday inn": { discount: "5%+ off best flexible rate", category: "hotel", note: "Minimum 5% discount" },
+    "best western": { discount: "10% off + per diem rates", category: "hotel", note: "Military/government personnel" },
+    "la quinta inn": { discount: "12% off standard rate", category: "hotel", note: "Military ID required" },
+    "motel 6": { discount: "10% off year-round", category: "hotel", note: "All 1,400+ locations" },
 
     // ENTERTAINMENT/FITNESS - Only verified with current corporate policies
-    "24 hour fitness": { discount: "$0 initiation + $5 off monthly", category: "entertainment", verification: "verified", note: "Select memberships, military ID required" }
+    "24 hour fitness": { discount: "$0 initiation + $5 off monthly", category: "entertainment", note: "Select memberships, military ID required" }
   };
 
   const CATEGORY_TYPES = {
@@ -445,10 +405,15 @@ export function DiscountMap() {
 
       const filteredBusinesses = cachedData
         .filter(b => category === 'all' || b.category === category)
-        .map(b => ({
-          ...b,
-          distance: distance(center, { lat: b.lat, lon: b.lng })
-        }))
+        .map(b => {
+          // Re-match chain info to ensure we have the latest note data
+          const chainInfo = matchKnownChain(b.name);
+          return {
+            ...b,
+            distance: distance(center, { lat: b.lat, lon: b.lng }),
+            note: chainInfo ? chainInfo.note : undefined
+          };
+        })
         .sort((a, b) => a.distance - b.distance)
         .slice(0, 100);
 
@@ -491,7 +456,8 @@ export function DiscountMap() {
                     distance: dist,
                     category: chainInfo.category,
                     discount: chainInfo.discount,
-                    rating: place.rating
+                    rating: place.rating,
+                    note: chainInfo.note
                   });
                 }
               });
@@ -634,6 +600,11 @@ export function DiscountMap() {
                 <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>{b.name}</h3>
                 <p style={{ color: '#666', margin: '5px 0', fontSize: '0.95rem' }}>
                   <strong>Discount:</strong> {b.discount}
+                  {b.note && (
+                    <span style={{ color: '#999', fontSize: '0.85rem', marginLeft: '6px' }}>
+                      ({b.note})
+                    </span>
+                  )}
                 </p>
                 <p style={{ color: '#666', margin: '5px 0' }}>{b.address}</p>
                 <p style={{ color: '#888', fontSize: '0.9rem', margin: '5px 0' }}>
