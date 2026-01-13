@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { useState, useEffect } from "react"
 import axios from "axios"
 
-const API_KEY = "d32tt99r01qtm631kfi0d32tt99r01qtm631kfig";
+const API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
 const FIXED_STOCKS = ["QQQ", "SPY", "DIA"];
 const CYCLING_STOCKS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN", "NVDA", "META"];
 

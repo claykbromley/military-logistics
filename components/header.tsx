@@ -5,8 +5,8 @@ import { Menu, Search, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { LoginModal } from "./login-modal"
-import { SignupModal } from "./signup-modal"
+import { LoginModal } from "../app/auth/login-modal"
+import { SignupModal } from "../app/auth/signup-modal"
 import { SearchModal } from "./search-modal"
 
 const branches = [
@@ -36,8 +36,8 @@ const navItems = [
     items: ["Appointments", "Tasks", "Reminders", "Calendar"],
   },
   {
-    name: "Marketplace",
-    items: ["Buy", "Sell", "Trade", "Services"],
+    name: "Community",
+    items: ["Marketplace", "Forum"],
   },
   {
     name: "Contact Us",

@@ -73,7 +73,7 @@ export default function DeploymentPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+        <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex-1">
           <h1 className="text-4xl font-bold text-foreground text-center p-4">Financially Preparing for Deployment</h1>
           <div className="flex container mx-auto p-4">
             <div className="flex-1 border-r border-[darkgrey]">
