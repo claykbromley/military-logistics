@@ -7,6 +7,8 @@ export function DiscountMap() {
   const [coords, setCoords] = useState(null);
   const [currentAddress, setCurrentAddress] = useState("Charleston, SC");
   const [addressInput, setAddressInput] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -21,6 +23,7 @@ export function DiscountMap() {
   const placesService = useRef(null);
   const geocoder = useRef(null);
   const initialLoadComplete = useRef(false);
+  const autocompleteService = useRef(null);
 
   // Verified national chains with precise matching
   const KNOWN_CHAINS = {
@@ -326,6 +329,7 @@ export function DiscountMap() {
 
       placesService.current = new window.google.maps.places.PlacesService(googleMap.current);
       geocoder.current = new window.google.maps.Geocoder();
+      autocompleteService.current = new window.google.maps.places.AutocompleteService();
 
       googleMap.current.addListener('idle', async () => {
         // Skip the initial idle event that fires when map first loads
@@ -447,11 +451,56 @@ export function DiscountMap() {
     );
   };
 
+  const handleAddressInputChange = (e) => {
+    const value = e.target.value;
+    setAddressInput(value);
+    
+    if (value.length > 2 && autocompleteService.current) {
+      autocompleteService.current.getPlacePredictions(
+        { input: value },
+        (predictions, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+            setAddressSuggestions(predictions);
+            setShowSuggestions(true);
+          } else {
+            setAddressSuggestions([]);
+            setShowSuggestions(false);
+          }
+        }
+      );
+    } else {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const selectSuggestion = (suggestion) => {
+    setAddressInput(suggestion.description);
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+    
+    // Geocode the selected suggestion
+    geocoder.current.geocode(
+      { placeId: suggestion.place_id },
+      (results, status) => {
+        if (status === 'OK' && results && results.length > 0) {
+          const loc = results[0].geometry.location;
+          const c = { lat: loc.lat(), lon: loc.lng() };
+          setCoords(c);
+          setCurrentAddress(results[0].formatted_address);
+          updateCenterMarker(c.lat, c.lon);
+          searchBusinesses(c);
+        }
+      }
+    );
+  };
+
   const geocodeAddress = async () => {
     setError(null);
     if (!addressInput) return;
     setLoading(true);
     setStatus("Geocoding address...");
+    setShowSuggestions(false);
 
     try {
       const q = encodeURIComponent(addressInput);
@@ -482,46 +531,70 @@ export function DiscountMap() {
     const allResults = [];
     const searchTypes = CATEGORY_TYPES.all;
 
-    for (const type of searchTypes) {
-      try {
-        const request = {
-          location: new window.google.maps.LatLng(center.lat, center.lon),
-          radius: 40000,
-          type: type,
-        };
+    // Search from multiple points to get better coverage
+    // Create a grid of 5 search points within the area
+    const searchPoints = [
+      { lat: center.lat, lon: center.lon }, // center
+      { lat: center.lat + 0.05, lon: center.lon }, // north
+      { lat: center.lat - 0.05, lon: center.lon }, // south
+      { lat: center.lat, lon: center.lon + 0.05 }, // east
+      { lat: center.lat, lon: center.lon - 0.05 }, // west
+    ];
 
-        await new Promise((resolve) => {
-          placesService.current.nearbySearch(request, (results, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              results.forEach(place => {
-                const chainInfo = matchKnownChain(place.name);
+    for (const searchPoint of searchPoints) {
+      for (const type of searchTypes) {
+        try {
+          const request = {
+            location: new window.google.maps.LatLng(searchPoint.lat, searchPoint.lon),
+            radius: 25000, // 25km radius from each search point
+            type: type,
+          };
 
-                if (chainInfo) {
-                  const lat = place.geometry.location.lat();
-                  const lng = place.geometry.location.lng();
+          await new Promise((resolve) => {
+            placesService.current.nearbySearch(request, (results, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+                results.forEach(place => {
+                  const chainInfo = matchKnownChain(place.name);
 
-                  allResults.push({
-                    id: place.place_id,
-                    name: place.name,
-                    lat: lat,
-                    lng: lng,
-                    address: place.vicinity,
-                    category: chainInfo.category,
-                    discount: chainInfo.discount,
-                    rating: place.rating,
-                    note: chainInfo.note,
-                    zipCode: zipCode
-                  });
-                }
-              });
-            }
-            resolve();
+                  if (chainInfo) {
+                    const lat = place.geometry.location.lat();
+                    const lng = place.geometry.location.lng();
+                    
+                    // Debug: Log all Jiffy Lube locations found
+                    if (place.name.toLowerCase().includes('jiffy')) {
+                      console.log('API found Jiffy Lube:', {
+                        name: place.name,
+                        lat: lat,
+                        lng: lng,
+                        address: place.vicinity,
+                        placeId: place.place_id,
+                        searchPoint: searchPoint
+                      });
+                    }
+
+                    allResults.push({
+                      id: place.place_id,
+                      name: place.name,
+                      lat: lat,
+                      lng: lng,
+                      address: place.vicinity,
+                      category: chainInfo.category,
+                      discount: chainInfo.discount,
+                      rating: place.rating,
+                      note: chainInfo.note,
+                      zipCode: zipCode
+                    });
+                  }
+                });
+              }
+              resolve();
+            });
           });
-        });
 
-        await new Promise(resolve => setTimeout(resolve, 200));
-      } catch (err) {
-        console.error(`Error searching for ${type}:`, err);
+          await new Promise(resolve => setTimeout(resolve, 300)); // Increased delay to avoid rate limits
+        } catch (err) {
+          console.error(`Error searching for ${type}:`, err);
+        }
       }
     }
 
@@ -614,15 +687,48 @@ export function DiscountMap() {
       .map(b => {
         const chainInfo = matchKnownChain(b.name);
         const dist = distance(center, { lat: b.lat, lon: b.lng });
+        
+        // Debug logging for Jiffy Lube
+        if (b.name.toLowerCase().includes('jiffy')) {
+          console.log('Found Jiffy Lube:', {
+            name: b.name,
+            distance: dist,
+            lat: b.lat,
+            lng: b.lng,
+            centerLat: center.lat,
+            centerLon: center.lon
+          });
+        }
+        
         return {
           ...b,
           distance: dist,
           note: chainInfo ? chainInfo.note : undefined
         };
       })
-      .filter(b => b.distance <= 10) // Only within 10 miles of center address
-      .filter(b => category === 'all' || b.category === category)
+      .filter(b => {
+        const withinDistance = b.distance <= 10;
+        const matchesCategory = category === 'all' || b.category === category;
+        
+        // Debug logging for Jiffy Lube
+        if (b.name.toLowerCase().includes('jiffy')) {
+          console.log('Jiffy Lube filter check:', {
+            name: b.name,
+            distance: b.distance,
+            withinDistance,
+            category: b.category,
+            selectedCategory: category,
+            matchesCategory,
+            willShow: withinDistance && matchesCategory
+          });
+        }
+        
+        return withinDistance && matchesCategory;
+      })
       .sort((a, b) => a.distance - b.distance);
+
+    console.log('Total businesses found within 10 miles:', filteredResults.length);
+    console.log('Zip codes cached:', zipCodes.length);
 
     setBusinesses(filteredResults);
     setStatus(`Found ${filteredResults.length} businesses within 10 miles (${zipCodes.length} ZIP codes cached)`);
@@ -636,20 +742,74 @@ export function DiscountMap() {
           <h2 style={{ textAlign: 'center', marginBottom: '15px', marginTop: 0 }}>Find Military Discounts</h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-            <div style={{ display: 'flex', gap: '5px', width: '100%', maxWidth: '400px' }}>
-              <input
-                value={addressInput}
-                onChange={(e) => setAddressInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") geocodeAddress() }}
-                placeholder="Enter Address or ZIP Code"
-                style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
-              />
-              <button
-                onClick={geocodeAddress}
-                style={{ padding: '8px 16px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Search
-              </button>
+            <div style={{ position: 'relative', width: '100%', maxWidth: '400px' }}>
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <input
+                  value={addressInput}
+                  onChange={handleAddressInputChange}
+                  onKeyDown={(e) => { 
+                    if (e.key === "Enter") {
+                      geocodeAddress();
+                      setShowSuggestions(false);
+                    }
+                    if (e.key === "Escape") {
+                      setShowSuggestions(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  placeholder="Enter Address or ZIP Code"
+                  style={{ flex: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+                />
+                <button
+                  onClick={geocodeAddress}
+                  style={{ padding: '8px 16px', backgroundColor: '#0066cc', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                  Search
+                </button>
+              </div>
+              
+              {showSuggestions && addressSuggestions.length > 0 && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: 0,
+                  right: '80px',
+                  backgroundColor: 'white',
+                  border: '1px solid #ccc',
+                  borderRadius: '4px',
+                  marginTop: '4px',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  zIndex: 1000,
+                  boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+                }}>
+                  {addressSuggestions.map((suggestion, index) => (
+                    <div
+                      key={suggestion.place_id}
+                      onClick={() => selectSuggestion(suggestion)}
+                      style={{
+                        padding: '10px 12px',
+                        cursor: 'pointer',
+                        borderBottom: index < addressSuggestions.length - 1 ? '1px solid #eee' : 'none',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                    >
+                      <div style={{ fontSize: '0.9rem', color: '#333' }}>
+                        {suggestion.structured_formatting.main_text}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#666', marginTop: '2px' }}>
+                        {suggestion.structured_formatting.secondary_text}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ color: '#666' }}>OR</div>
             <button
