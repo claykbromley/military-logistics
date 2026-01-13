@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 export function DiscountMap() {
   const [status, setStatus] = useState(null);
   const [coords, setCoords] = useState(null);
+  const [currentAddress, setCurrentAddress] = useState("Charleston, SC");
   const [addressInput, setAddressInput] = useState("");
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -16,8 +17,10 @@ export function DiscountMap() {
   const mapRef = useRef(null);
   const googleMap = useRef(null);
   const markers = useRef([]);
+  const centerMarker = useRef(null);
   const placesService = useRef(null);
   const geocoder = useRef(null);
+  const initialLoadComplete = useRef(false);
 
   // Verified national chains with precise matching
   const KNOWN_CHAINS = {
@@ -101,6 +104,30 @@ export function DiscountMap() {
     return null;
   };
 
+  const getAddressFromCoords = async (lat, lng) => {
+    try {
+      if (!geocoder.current) {
+        geocoder.current = new window.google.maps.Geocoder();
+      }
+
+      return new Promise((resolve) => {
+        geocoder.current.geocode(
+          { location: { lat, lng } },
+          (results, status) => {
+            if (status === 'OK' && results && results.length > 0) {
+              resolve(results[0].formatted_address);
+            } else {
+              resolve(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+            }
+          }
+        );
+      });
+    } catch (err) {
+      console.error('Error getting address:', err);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
   const getZipCodeFromCoords = async (lat, lng) => {
     try {
       if (!geocoder.current) {
@@ -130,6 +157,35 @@ export function DiscountMap() {
       console.error('Error getting zip code:', err);
       return null;
     }
+  };
+
+  // Get all zip codes within 25-mile radius for caching
+  const getZipCodesInRadius = async (centerLat, centerLng, radiusMiles = 25) => {
+    const zipCodes = new Set();
+    
+    const latDelta = radiusMiles / 69;
+    const lngDelta = radiusMiles / (69 * Math.cos(centerLat * Math.PI / 180));
+    
+    const samplePoints = [
+      { lat: centerLat, lng: centerLng },
+      { lat: centerLat + latDelta, lng: centerLng },
+      { lat: centerLat - latDelta, lng: centerLng },
+      { lat: centerLat, lng: centerLng + lngDelta },
+      { lat: centerLat, lng: centerLng - lngDelta },
+      { lat: centerLat + latDelta, lng: centerLng + lngDelta },
+      { lat: centerLat + latDelta, lng: centerLng - lngDelta },
+      { lat: centerLat - latDelta, lng: centerLng + lngDelta },
+      { lat: centerLat - latDelta, lng: centerLng - lngDelta },
+    ];
+    
+    for (const point of samplePoints) {
+      const zip = await getZipCodeFromCoords(point.lat, point.lng);
+      if (zip) {
+        zipCodes.add(zip);
+      }
+    }
+    
+    return Array.from(zipCodes);
   };
 
   const loadCachedBusinesses = (zipCode) => {
@@ -178,19 +234,15 @@ export function DiscountMap() {
     try {
       const cachedList = getCachedZipCodeList();
 
-      // Remove all cached zip code data
       cachedList.forEach(zipCode => {
         localStorage.removeItem(`military_discount_zip_${zipCode}`);
       });
 
-      // Remove the cached zip codes list
       localStorage.removeItem('military_discount_cached_zips');
 
-      // Update state
       setCachedZipCodes(new Set());
       setStatus('Cache cleared successfully');
 
-      // Clear the success message after 3 seconds
       setTimeout(() => {
         if (coords) {
           searchBusinesses(coords);
@@ -200,6 +252,29 @@ export function DiscountMap() {
       console.error('Error clearing cache:', err);
       setError('Failed to clear cache');
     }
+  };
+
+  const updateCenterMarker = (lat, lng) => {
+    if (!googleMap.current) return;
+
+    if (centerMarker.current) {
+      centerMarker.current.setMap(null);
+    }
+
+    centerMarker.current = new window.google.maps.Marker({
+      position: { lat, lng },
+      map: googleMap.current,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: "#FF0000",
+        fillOpacity: 1,
+        strokeColor: "#FFFFFF",
+        strokeWeight: 2,
+      },
+      zIndex: 1000,
+      title: "Current Search Center"
+    });
   };
 
   const loadGoogleMaps = () => {
@@ -252,9 +327,18 @@ export function DiscountMap() {
       placesService.current = new window.google.maps.places.PlacesService(googleMap.current);
       geocoder.current = new window.google.maps.Geocoder();
 
-      googleMap.current.addListener('idle', () => {
+      googleMap.current.addListener('idle', async () => {
+        // Skip the initial idle event that fires when map first loads
+        if (!initialLoadComplete.current) {
+          initialLoadComplete.current = true;
+          return;
+        }
+        
         const center = googleMap.current.getCenter();
         const newCoords = { lat: center.lat(), lon: center.lng() };
+        const address = await getAddressFromCoords(newCoords.lat, newCoords.lon);
+        setCurrentAddress(address);
+        updateCenterMarker(newCoords.lat, newCoords.lon);
         searchBusinesses(newCoords);
       });
 
@@ -320,7 +404,7 @@ export function DiscountMap() {
   }, [businesses]);
 
   useEffect(() => {
-    if (coords && businesses.length > 0) {
+    if (coords) {
       searchBusinesses(coords);
     }
   }, [category]);
@@ -331,6 +415,8 @@ export function DiscountMap() {
       setError("Geolocation not supported");
       const c = { lat: 32.7765, lon: -79.9311 };
       setCoords(c);
+      getAddressFromCoords(c.lat, c.lon).then(addr => setCurrentAddress(addr));
+      updateCenterMarker(c.lat, c.lon);
       searchBusinesses(c);
       return;
     }
@@ -338,18 +424,24 @@ export function DiscountMap() {
     setStatus("Requesting location...");
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const c = { lat: pos.coords.latitude, lon: pos.coords.longitude };
         setCoords(c);
+        const addr = await getAddressFromCoords(c.lat, c.lon);
+        setCurrentAddress(addr);
+        updateCenterMarker(c.lat, c.lon);
         setStatus("Got current location");
         searchBusinesses(c);
         setLoading(false);
       },
-      (err) => {
+      async (err) => {
         setError("Unable to retrieve location: " + err.message);
         setLoading(false);
         const c = { lat: 32.7765, lon: -79.9311 };
         setCoords(c);
+        const addr = await getAddressFromCoords(c.lat, c.lon);
+        setCurrentAddress(addr);
+        updateCenterMarker(c.lat, c.lon);
         searchBusinesses(c);
       }
     );
@@ -376,6 +468,8 @@ export function DiscountMap() {
       const loc = data.results[0].geometry.location;
       const c = { lat: loc.lat, lon: loc.lng };
       setCoords(c);
+      setCurrentAddress(data.results[0].formatted_address);
+      updateCenterMarker(c.lat, c.lon);
       searchBusinesses(c);
     } catch (err) {
       console.error(err);
@@ -384,47 +478,7 @@ export function DiscountMap() {
     setLoading(false);
   };
 
-  const searchBusinesses = async (center) => {
-    if (!placesService.current || !geocoder.current) return;
-
-    setLoading(true);
-    setStatus("Checking for cached data...");
-
-    const zipCode = await getZipCodeFromCoords(center.lat, center.lon);
-
-    if (!zipCode) {
-      setError("Could not determine zip code for this location");
-      setLoading(false);
-      return;
-    }
-
-    const cachedData = loadCachedBusinesses(zipCode);
-
-    if (cachedData) {
-      setStatus(`Loading cached data for ${zipCode}...`);
-
-      const filteredBusinesses = cachedData
-        .filter(b => category === 'all' || b.category === category)
-        .map(b => {
-          // Re-match chain info to ensure we have the latest note data
-          const chainInfo = matchKnownChain(b.name);
-          return {
-            ...b,
-            distance: distance(center, { lat: b.lat, lon: b.lng }),
-            note: chainInfo ? chainInfo.note : undefined
-          };
-        })
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 100);
-
-      setBusinesses(filteredBusinesses);
-      setStatus(`Loaded ${filteredBusinesses.length} businesses from cache (ZIP: ${zipCode})`);
-      setLoading(false);
-      return;
-    }
-
-    setStatus(`Searching ${zipCode} for military discounts (first time)...`);
-
+  const searchBusinessesInZipCode = async (center, zipCode) => {
     const allResults = [];
     const searchTypes = CATEGORY_TYPES.all;
 
@@ -432,7 +486,7 @@ export function DiscountMap() {
       try {
         const request = {
           location: new window.google.maps.LatLng(center.lat, center.lon),
-          radius: 8000,
+          radius: 40000,
           type: type,
         };
 
@@ -445,7 +499,6 @@ export function DiscountMap() {
                 if (chainInfo) {
                   const lat = place.geometry.location.lat();
                   const lng = place.geometry.location.lng();
-                  const dist = distance(center, { lat, lon: lng });
 
                   allResults.push({
                     id: place.place_id,
@@ -453,11 +506,11 @@ export function DiscountMap() {
                     lat: lat,
                     lng: lng,
                     address: place.vicinity,
-                    distance: dist,
                     category: chainInfo.category,
                     discount: chainInfo.discount,
                     rating: place.rating,
-                    note: chainInfo.note
+                    note: chainInfo.note,
+                    zipCode: zipCode
                   });
                 }
               });
@@ -472,19 +525,107 @@ export function DiscountMap() {
       }
     }
 
+    return allResults;
+  };
+
+  const searchBusinesses = async (center) => {
+    if (!placesService.current || !geocoder.current) return;
+
+    setLoading(true);
+    setStatus("Finding zip codes in 25-mile radius...");
+
+    const zipCodes = await getZipCodesInRadius(center.lat, center.lon, 25);
+
+    if (zipCodes.length === 0) {
+      setError("Could not determine zip codes for this location");
+      setLoading(false);
+      return;
+    }
+
+    setStatus(`Found ${zipCodes.length} zip codes. Checking cache...`);
+
+    const allBusinesses = [];
+    const zipCodesNeedingSearch = [];
+
+    for (const zipCode of zipCodes) {
+      const cachedData = loadCachedBusinesses(zipCode);
+      if (cachedData) {
+        allBusinesses.push(...cachedData);
+      } else {
+        zipCodesNeedingSearch.push(zipCode);
+      }
+    }
+
+    if (allBusinesses.length > 0) {
+      // Remove duplicates BEFORE filtering
+      const uniqueBusinesses = Array.from(
+        new Map(allBusinesses.map(item => [item.id, item])).values()
+      );
+      
+      const filteredBusinesses = uniqueBusinesses
+        .map(b => {
+          const chainInfo = matchKnownChain(b.name);
+          const dist = distance(center, { lat: b.lat, lon: b.lng });
+          return {
+            ...b,
+            distance: dist,
+            note: chainInfo ? chainInfo.note : undefined
+          };
+        })
+        .filter(b => b.distance <= 10) // Only within 10 miles of center
+        .filter(b => category === 'all' || b.category === category)
+        .sort((a, b) => a.distance - b.distance);
+
+      setBusinesses(filteredBusinesses);
+      
+      if (zipCodesNeedingSearch.length === 0) {
+        setStatus(`Loaded ${filteredBusinesses.length} businesses within 10 miles (${zipCodes.length} ZIP codes cached)`);
+        setLoading(false);
+        return;
+      }
+      
+      // Continue showing cached results while searching new zip codes
+      setStatus(`Showing ${filteredBusinesses.length} cached results, searching ${zipCodesNeedingSearch.length} new ZIP codes...`);
+    }
+
+    if (zipCodesNeedingSearch.length > 0) {
+      setStatus(`Searching ${zipCodesNeedingSearch.length} new ZIP codes...`);
+
+      for (let i = 0; i < zipCodesNeedingSearch.length; i++) {
+        const zipCode = zipCodesNeedingSearch[i];
+        setStatus(`Searching ZIP ${zipCode} (${i + 1}/${zipCodesNeedingSearch.length})...`);
+
+        const zipResults = await searchBusinessesInZipCode(center, zipCode);
+        
+        const uniqueZipResults = Array.from(
+          new Map(zipResults.map(item => [item.id, item])).values()
+        );
+
+        saveCachedBusinesses(zipCode, uniqueZipResults);
+        allBusinesses.push(...uniqueZipResults);
+      }
+    }
+
     const uniqueResults = Array.from(
-      new Map(allResults.map(item => [item.id, item])).values()
+      new Map(allBusinesses.map(item => [item.id, item])).values()
     );
 
-    saveCachedBusinesses(zipCode, uniqueResults);
-
     const filteredResults = uniqueResults
+      .map(b => {
+        const chainInfo = matchKnownChain(b.name);
+        const dist = distance(center, { lat: b.lat, lon: b.lng });
+        return {
+          ...b,
+          distance: dist,
+          note: chainInfo ? chainInfo.note : undefined
+        };
+      })
+      .filter(b => b.distance <= 10) // Only within 10 miles of center address
       .filter(b => category === 'all' || b.category === category)
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 100);
+      .sort((a, b) => a.distance - b.distance);
 
     setBusinesses(filteredResults);
-    setStatus(`Found ${filteredResults.length} businesses with military discounts (ZIP: ${zipCode})`);
+    setStatus(`Found ${filteredResults.length} businesses within 10 miles (${zipCodes.length} ZIP codes cached)`);
     setLoading(false);
   };
 
@@ -519,6 +660,13 @@ export function DiscountMap() {
             </button>
           </div>
 
+          <div style={{ margin: '15px 0', padding: '10px', backgroundColor: '#e9ecef', borderRadius: '4px' }}>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: '#495057', textAlign: 'center' }}>
+              <strong>Current Center:</strong><br />
+              {currentAddress}
+            </p>
+          </div>
+
           <hr style={{ margin: '15px 0' }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
@@ -536,7 +684,7 @@ export function DiscountMap() {
               <option value="entertainment">Entertainment</option>
             </select>
             <p style={{ fontSize: '0.85rem', color: '#666', margin: 0, textAlign: 'center' }}>
-              💡 Move or zoom map to search new areas
+              💡 Showing results within 10 miles
             </p>
             {cachedZipCodes.size > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -569,7 +717,7 @@ export function DiscountMap() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '15px', backgroundColor: '#fff' }}>
           {loading && <p style={{ textAlign: 'center' }}>Searching for nearby military discounts...</p>}
 
-          {!loading && businesses.length === 0 && <p style={{ textAlign: 'center', color: '#666' }}>No known military discounts found in this area. Try a different location or category.</p>}
+          {!loading && businesses.length === 0 && <p style={{ textAlign: 'center', color: '#666' }}>No known military discounts found within 10 miles. Try a different location or category.</p>}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {businesses.map((b, i) => (
@@ -634,4 +782,4 @@ export function DiscountMap() {
       </div>
     </div>
   );
-}
+} 
