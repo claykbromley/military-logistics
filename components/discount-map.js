@@ -559,18 +559,6 @@ export function DiscountMap() {
                   if (chainInfo) {
                     const lat = place.geometry.location.lat();
                     const lng = place.geometry.location.lng();
-                    
-                    // Debug: Log all Jiffy Lube locations found
-                    if (place.name.toLowerCase().includes('jiffy')) {
-                      console.log('API found Jiffy Lube:', {
-                        name: place.name,
-                        lat: lat,
-                        lng: lng,
-                        address: place.vicinity,
-                        placeId: place.place_id,
-                        searchPoint: searchPoint
-                      });
-                    }
 
                     allResults.push({
                       id: place.place_id,
@@ -687,48 +675,14 @@ export function DiscountMap() {
       .map(b => {
         const chainInfo = matchKnownChain(b.name);
         const dist = distance(center, { lat: b.lat, lon: b.lng });
-        
-        // Debug logging for Jiffy Lube
-        if (b.name.toLowerCase().includes('jiffy')) {
-          console.log('Found Jiffy Lube:', {
-            name: b.name,
-            distance: dist,
-            lat: b.lat,
-            lng: b.lng,
-            centerLat: center.lat,
-            centerLon: center.lon
-          });
-        }
-        
         return {
           ...b,
           distance: dist,
           note: chainInfo ? chainInfo.note : undefined
         };
       })
-      .filter(b => {
-        const withinDistance = b.distance <= 10;
-        const matchesCategory = category === 'all' || b.category === category;
-        
-        // Debug logging for Jiffy Lube
-        if (b.name.toLowerCase().includes('jiffy')) {
-          console.log('Jiffy Lube filter check:', {
-            name: b.name,
-            distance: b.distance,
-            withinDistance,
-            category: b.category,
-            selectedCategory: category,
-            matchesCategory,
-            willShow: withinDistance && matchesCategory
-          });
-        }
-        
-        return withinDistance && matchesCategory;
-      })
+      .filter(b => b.distance <= 10 && (category === 'all' || b.category === category))
       .sort((a, b) => a.distance - b.distance);
-
-    console.log('Total businesses found within 10 miles:', filteredResults.length);
-    console.log('Zip codes cached:', zipCodes.length);
 
     setBusinesses(filteredResults);
     setStatus(`Found ${filteredResults.length} businesses within 10 miles (${zipCodes.length} ZIP codes cached)`);
