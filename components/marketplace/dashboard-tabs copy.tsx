@@ -16,19 +16,19 @@ export function DashboardTabs({ activeTab }: DashboardTabsProps) {
     {
       id: "listings",
       label: "My Listings",
-      href: "/community/marketplace/dashboard",
+      href: "/dashboard",
       icon: Package,
     },
     {
       id: "saved",
       label: "Saved Items",
-      href: "/community/marketplace/dashboard/saved",
+      href: "/dashboard/saved",
       icon: Heart,
     },
     {
       id: "messages",
       label: "Messages",
-      href: "/community/marketplace/dashboard/messages",
+      href: "/dashboard/messages",
       icon: MessageSquare,
     },
   ]

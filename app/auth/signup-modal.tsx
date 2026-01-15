@@ -46,14 +46,16 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
     try {
       const { error } = await supabase.auth.signUp({
         email,
-        phone,
         password,
         options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             display_name: username,
+            phone,
             military_branch: service,
+            service_status: status,
+            paygrade,
+            zip_code: zipCode,
           },
         },
       })
@@ -78,11 +80,11 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             backgroundPosition: "center",
           }}
         />
-        {success && 
+        {success? 
         <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-blue-200/30">
           <div className="text-sm text-slate-600">
             <h3 className="text-2xl text-center font-bold">Check Your Email</h3>
-            <p className="pb-2">We&apos;ve sent you a confirmation link</p>
+            <p className="p-2">We&apos;ve sent you a confirmation link</p>
           </div>
           <div>
             <hr />
@@ -90,8 +92,16 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
               Please check your email and click the confirmation link to activate your account. Once confirmed, you
               can access Milify services.
             </p>
+            <div className="flex justify-center pt-3">
+              <Button
+                onClick={onClose}
+                className="font-bold transition-colors cursor-pointer"
+              >
+                Return to Home
+              </Button>
+            </div>
           </div>
-        </div> ||
+        </div> :
         <div>
           <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-blue-200/30">
             <div className="flex items-center gap-3 mb-3">
@@ -248,7 +258,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
                 id="phone"
                 type="tel"
                 inputMode="tel"
-                pattern="^\+?1?\s?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}$"
+                pattern="^\+?1?\s?\(?\d{3}\)?[\s.\-]?\d{3}[\s.\-]?\d{4}$"
                 placeholder="Enter your phone number"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}

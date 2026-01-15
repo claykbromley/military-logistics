@@ -29,10 +29,16 @@ export function ListingCard({ listing, isSaved: initialSaved = false, userId }: 
     const supabase = createClient()
 
     if (isSaved) {
-      await supabase.from("saved_listings").delete().eq("user_id", userId).eq("listing_id", listing.id)
+      await supabase
+        .from("marketplace_saved_listings")
+        .delete()
+        .eq("user_id", userId)
+        .eq("listing_id", listing.id)
       setIsSaved(false)
     } else {
-      await supabase.from("saved_listings").insert({ user_id: userId, listing_id: listing.id })
+      await supabase
+        .from("marketplace_saved_listings")
+        .insert({ user_id: userId, listing_id: listing.id })
       setIsSaved(true)
     }
 

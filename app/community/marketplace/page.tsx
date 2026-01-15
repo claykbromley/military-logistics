@@ -11,7 +11,7 @@ export default async function Marketplace() {
 
   // Fetch active listings
   const { data: listings } = await supabase
-    .from("listings")
+    .from("marketplace_listings")
     .select("*")
     .eq("status", "active")
     .order("created_at", { ascending: false })
@@ -19,7 +19,7 @@ export default async function Marketplace() {
   // Fetch saved listing IDs if user is logged in
   let savedListingIds: string[] = []
   if (user) {
-    const { data: savedListings } = await supabase.from("saved_listings").select("listing_id").eq("user_id", user.id)
+    const { data: savedListings } = await supabase.from("marketplace_saved_listings").select("listing_id").eq("user_id", user.id)
     savedListingIds = savedListings?.map((s: any) => s.listing_id) || []
   }
 

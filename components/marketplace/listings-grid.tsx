@@ -9,9 +9,12 @@ import { CategoryFilter } from "@/components/marketplace/category-filter"
 import { LocationSelector } from "@/components/marketplace/location-selector"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, SlidersHorizontal } from "lucide-react"
+import { Search, SlidersHorizontal, Plus } from "lucide-react"
 import type { Listing, Category } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import Link from "next/link"
+import { useUI } from "@/context/ui-context"
+import { useRouter } from "next/navigation"
 
 interface ListingsGridProps {
   initialListings: Listing[]
@@ -20,15 +23,38 @@ interface ListingsGridProps {
 }
 
 export function ListingsGrid({ initialListings, savedListingIds, userId }: ListingsGridProps) {
+  const [user, setUser] = useState<{email?: string}|null>(null)
   const [listings, setListings] = useState<Listing[]>(initialListings)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("newest")
   const [isLoading, setIsLoading] = useState(false)
+  const { setShowLogin } = useUI()
+  const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   useEffect(() => {
     fetchListings()
+    const supabase = createClient()
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
   }, [selectedCategory, selectedLocation, sortBy])
 
   const fetchListings = async () => {
@@ -101,19 +127,35 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
           <Button type="submit">Search</Button>
         </form>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <LocationSelector selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} />
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-40">
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="newest">Newest First</SelectItem>
-              <SelectItem value="price-low">Price: Low to High</SelectItem>
-              <SelectItem value="price-high">Price: High to Low</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center justify-between w-full">
+          <div className="flex flex-wrap items-center gap-4">
+            <LocationSelector selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} />
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-40 cursor-pointer">
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest First</SelectItem>
+                <SelectItem value="price-low">Price: Low to High</SelectItem>
+                <SelectItem value="price-high">Price: High to Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {user && 
+          <div className="flex flex-wrap items-center gap-4">
+            <Button asChild>
+              <Link href="/community/marketplace/listings/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Listing
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/community/marketplace/dashboard">
+                My Dashboard
+              </Link>
+            </Button>
+          </div>}
         </div>
 
         <CategoryFilter selectedCategory={selectedCategory} onCategoryChange={setSelectedCategory} />

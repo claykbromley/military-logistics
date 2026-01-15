@@ -3,11 +3,13 @@
 import type React from "react"
 
 import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { LogIn } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 interface LoginModalProps {
   open: boolean
@@ -16,13 +18,54 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps) {
-  const [emailOrPhone, setEmailOrPhone] = useState("")
+  const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log("[v0] Login submitted:", { emailOrPhone })
-    // Handle login logic here
+    const supabase = createClient()
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      let emailToLogin: string
+
+      const isEmail = identifier.includes("@")
+
+      if (isEmail) {
+        emailToLogin = identifier
+      } else {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("display_name", identifier)
+          .single()
+
+        if (error || !data) {
+          throw new Error("Invalid login credentials")
+        }
+
+        emailToLogin = data.email
+      }
+
+      const { error: authError } =
+        await supabase.auth.signInWithPassword({
+          email: emailToLogin,
+          password,
+        })
+
+      if (authError) throw authError
+      
+      onClose()
+      router.refresh()
+    } catch (error) {
+      setError("Invalid login credentials")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -58,14 +101,14 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
         <form onSubmit={handleSubmit} className="space-y-5 mt-4">
           <div className="space-y-2">
             <Label htmlFor="login-email-phone" className="text-slate-700 font-medium">
-              Email/Phone Number
+              Username or Email
             </Label>
             <Input
-              id="login-email-phone"
+              id="login-email-username"
               type="text"
-              placeholder="Enter your email or phone number"
-              value={emailOrPhone}
-              onChange={(e) => setEmailOrPhone(e.target.value)}
+              placeholder="Enter your username or email"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
               required
               className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
             />
@@ -84,13 +127,15 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
               className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
             />
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
             size="lg"
+            disabled={isLoading}
           >
             <LogIn className="mr-2 h-5 w-5" />
-            Enter
+            {isLoading ? "Signing in..." : "Sign In"}
           </Button>
           <div className="text-center pt-2">
             <button

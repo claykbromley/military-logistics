@@ -1,6 +1,6 @@
 "use client"
 
-import { ListingCard } from "@/components/listing-card"
+import { ListingCard } from "@/components/marketplace/listing-card"
 import { Heart } from "lucide-react"
 import type { Listing } from "@/lib/types"
 import Link from "next/link"
@@ -21,7 +21,7 @@ export function SavedListings({ listings, userId }: SavedListingsProps) {
         <h3 className="text-lg font-semibold">No saved items</h3>
         <p className="mt-1 text-muted-foreground">Items you save will appear here</p>
         <Button asChild className="mt-6">
-          <Link href="/">Browse Listings</Link>
+          <Link href="/community/marketplace">Browse Listings</Link>
         </Button>
       </div>
     )

@@ -71,7 +71,7 @@ export function LocationSelector({ selectedLocation, onLocationChange }: Locatio
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2 bg-transparent">
+        <Button variant="outline" className="gap-2 bg-transparent cursor-pointer">
           <MapPin className="h-4 w-4" />
           {selectedLocation || "All Locations"}
         </Button>

@@ -45,8 +45,6 @@ export default function NewListingPage() {
     const files = e.target.files
     if (!files) return
 
-    // For demo purposes, we'll use placeholder URLs
-    // In production, you'd upload to Supabase Storage
     Array.from(files).forEach((file) => {
       const reader = new FileReader()
       reader.onload = (e) => {
@@ -65,7 +63,7 @@ export default function NewListingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) {
-      router.push("/auth/login")
+      router.push("/community/marketplace")
       return
     }
 
@@ -77,7 +75,7 @@ export default function NewListingPage() {
     // Find coordinates for the selected location
     const selectedBase = MILITARY_BASES.find((base) => `${base.name}, ${base.state}` === formData.location)
 
-    const { error: insertError } = await supabase.from("listings").insert({
+    const { error: insertError } = await supabase.from("marketplace_listings").insert({
       user_id: user.id,
       title: formData.title,
       description: formData.description,
@@ -97,14 +95,14 @@ export default function NewListingPage() {
       return
     }
 
-    router.push("/dashboard")
+    router.push("/community/marketplace/dashboard")
     router.refresh()
   }
 
   if (userLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Header user={null} />
+        <Header />
         <main className="container py-8">
           <div className="mx-auto max-w-2xl">
             <div className="h-96 animate-pulse rounded-lg bg-muted" />
@@ -115,16 +113,16 @@ export default function NewListingPage() {
   }
 
   if (!user) {
-    router.push("/auth/login")
+    router.push("/community/marketplace")
     return null
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <Header user={user} />
+      <Header />
       <main className="container py-8">
         <div className="mx-auto max-w-2xl">
-          <Link href="/" className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <Link href="/community/marketplace" className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to listings
           </Link>

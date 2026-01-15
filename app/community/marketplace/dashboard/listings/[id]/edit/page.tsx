@@ -24,7 +24,6 @@ interface EditListingPageProps {
 export default function EditListingPage({ params }: EditListingPageProps) {
   const { id } = use(params)
   const router = useRouter()
-  const [user, setUser] = useState<any>(null)
   const [listing, setListing] = useState<Listing | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -50,16 +49,18 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       } = await supabase.auth.getUser()
 
       if (!user) {
-        router.push("/auth/login")
+        router.push("/community/marketplace")
         return
       }
 
-      setUser(user)
-
-      const { data: listing } = await supabase.from("listings").select("*").eq("id", id).single()
+      const { data: listing } = await supabase
+        .from("marketplace_listings")
+        .select("*")
+        .eq("id", id)
+        .single()
 
       if (!listing || listing.user_id !== user.id) {
-        router.push("/dashboard")
+        router.push("/community/marketplace/dashboard")
         return
       }
 
@@ -109,7 +110,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
     const selectedBase = MILITARY_BASES.find((base) => `${base.name}, ${base.state}` === formData.location)
 
     const { error: updateError } = await supabase
-      .from("listings")
+      .from("marketplace_listings")
       .update({
         title: formData.title,
         description: formData.description,
@@ -131,7 +132,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       return
     }
 
-    router.push("/dashboard")
+    router.push("/community/marketplace/dashboard")
     router.refresh()
   }
 
@@ -154,7 +155,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       <main className="container py-8">
         <div className="mx-auto max-w-2xl">
           <Link
-            href="/dashboard"
+            href="/community/marketplace/dashboard"
             className="mb-6 inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
