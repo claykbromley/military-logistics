@@ -23,7 +23,7 @@ export default function MilitaryDiscountMap() {
   const [activeTab, setActiveTab] = useState("map")
   const [selectedCategory, setSelectedCategory] = useState("all"); // Declare selectedCategory
 
-  const { isLoaded, isSearching, status, statusMessage, businesses, cacheStats, searchNearby, clearCache } =
+  const { isLoaded, isPlacesLoaded, isSearching, status, statusMessage, businesses, cacheStats, searchNearby, clearCache } =
     useGoogleMaps()
 
   // Filter businesses by selected categories
@@ -231,7 +231,7 @@ export default function MilitaryDiscountMap() {
 
         {/* Feedback Section */}
         <div className="mt-8">
-          <FeedbackSection />
+          <FeedbackSection isMapLoaded={isPlacesLoaded} />
         </div>
       </main>
 

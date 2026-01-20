@@ -9,13 +9,19 @@ import {
   clearCache as clearCacheUtil,
   getCacheStats,
 } from "@/lib/cache-utils"
-//import { google } from "@types/google-maps"
+
+declare global {
+  interface Window {
+    google: typeof google
+  }
+}
 
 const GOOGLE_MAPS_API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
 const SEARCH_RADIUS = 24140 // 15 miles in meters
 
 interface UseGoogleMapsReturn {
   isLoaded: boolean
+  isPlacesLoaded: boolean
   isSearching: boolean
   status: "idle" | "searching" | "cached" | "error"
   statusMessage: string
@@ -27,6 +33,7 @@ interface UseGoogleMapsReturn {
 
 export function useGoogleMaps(): UseGoogleMapsReturn {
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isPlacesLoaded, setIsPlacesLoaded] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [status, setStatus] = useState<"idle" | "searching" | "cached" | "error">("idle")
   const [statusMessage, setStatusMessage] = useState("")
@@ -35,6 +42,12 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
 
   // Load Google Maps script
   useEffect(() => {
+    // Check if places library is already loaded (for autocomplete)
+    if (window.google?.maps?.places) {
+      setIsPlacesLoaded(true)
+    }
+    
+    // Check if marker library is already loaded (for map markers)
     if (window.google?.maps?.marker?.AdvancedMarkerElement) {
       setIsLoaded(true)
       return
@@ -45,6 +58,9 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     if (existingScript) {
       // Wait for existing script to load
       const checkLoaded = setInterval(() => {
+        if (window.google?.maps?.places) {
+          setIsPlacesLoaded(true)
+        }
         if (window.google?.maps?.marker?.AdvancedMarkerElement) {
           setIsLoaded(true)
           clearInterval(checkLoaded)
@@ -58,15 +74,18 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     script.async = true
     script.defer = true
     script.onload = () => {
-      const checkMarkerLibrary = setInterval(() => {
+      const checkLibraries = setInterval(() => {
+        if (window.google?.maps?.places) {
+          setIsPlacesLoaded(true)
+        }
         if (window.google?.maps?.marker?.AdvancedMarkerElement) {
           setIsLoaded(true)
-          clearInterval(checkMarkerLibrary)
+          clearInterval(checkLibraries)
         }
       }, 50)
       // Timeout after 5 seconds
       setTimeout(() => {
-        clearInterval(checkMarkerLibrary)
+        clearInterval(checkLibraries)
         if (!window.google?.maps?.marker?.AdvancedMarkerElement) {
           setStatus("error")
           setStatusMessage("Failed to load marker library")
@@ -113,8 +132,8 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
 
       try {
         const mapDiv = document.createElement("div")
-        const map = new google.maps.Map(mapDiv)
-        const service = new google.maps.places.PlacesService(map)
+        const map = new window.google.maps.Map(mapDiv)
+        const service = new window.google.maps.places.PlacesService(map)
 
         const chainNames = Object.keys(KNOWN_CHAINS)
         const foundBusinesses: Business[] = []
@@ -207,6 +226,7 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
 
   return {
     isLoaded,
+    isPlacesLoaded,
     isSearching,
     status,
     statusMessage,
