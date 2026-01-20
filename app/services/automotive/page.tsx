@@ -1,7 +1,7 @@
 "use client"
 import { Header } from "@/components/header"
 import { useState } from "react"
-import { Car, FileText, DollarSign, Shield, Handshake, Plane, ChevronRight, Info } from "lucide-react"
+import { Car, FileText, Wrench, Shield, Package, Plane, ChevronRight, CreditCard, Scale, Tag, AlertCircle, Map } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { ComposableMap, Geographies, Geography } from "react-simple-maps"
 import { STATES } from "@/lib/types"
@@ -9,12 +9,16 @@ import { STATES } from "@/lib/types"
 const geoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
 
 const serviceCategories = [
-  { name: "Driver's License", icon: FileText, description: "Renew or obtain military driver's licenses" },
-  { name: "Vehicle Registration", icon: Car, description: "Register vehicles in your state or overseas" },
-  { name: "Auto Loans", icon: DollarSign, description: "Special military rates for vehicle financing" },
-  { name: "Insurance", icon: Shield, description: "USAA, GEICO Military & specialized coverage" },
-  { name: "Buying/Selling", icon: Handshake, description: "Tips and resources for vehicle transactions" },
-  { name: "Deployment", icon: Plane, description: "Vehicle storage and deployment preparation" },
+  { name: "Driver's License", icon: FileText, id: "drivers-license" },
+  { name: "Buying/Selling a Car", icon: Car, id: "buying-selling" },
+  { name: "Vehicle Maintenance", icon: Wrench, id: "maintenance" },
+  { name: "PCS & Vehicle Shipping", icon: Plane, id: "shipping" },
+  { name: "Deployment & Storage", icon: Package, id: "deployment" },
+  { name: "Car Insurance", icon: Shield, id: "insurance" },
+  { name: "Registrations / ID", icon: CreditCard, id: "registration" },
+  { name: "Legal Protections", icon: Scale, id: "legal" },
+  { name: "Military Discounts", icon: Tag, id: "discounts" },
+  { name: "Emergency & Roadside", icon: AlertCircle, id: "emergency" },
 ]
 
 export default function AutomotivePage() {
@@ -64,13 +68,15 @@ export default function AutomotivePage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-180px)]">
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] overflow-hidden">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r">
-          <div className="sticky top-20 p-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
-              Automotive Services
-            </h2>
+        <aside className="w-full lg:w-80 bg-slate-100 border-r overflow-y-auto">
+          <div className="top-20 p-6">
+            <a href="/services/automotive">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
+                Automotive Services
+              </h2>
+            </a>
             <div className="space-y-3">
               {serviceCategories.map((category) => {
                 const Icon = category.icon
@@ -79,71 +85,27 @@ export default function AutomotivePage() {
                     key={category.name}
                     className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                        <Icon className="h-5 w-5 text-primary" />
+                    <a key={category.name} href={`/services/automotive/${category.id}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                            {category.name}
+                          </h3>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
-                          {category.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">{category.description}</p>
-                      </div>
-                    </div>
+                    </a>
                   </Card>
                 )
               })}
             </div>
-
-            {/* More Info section */}
-            <Card className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-slate-900">More Information</h3>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Military Benefits</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Active duty members may be exempt from certain state requirements and fees.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Deployment Support</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Special provisions for vehicle storage, insurance, and registration during deployment.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Quick Links</h4>
-                  <ul className="space-y-1 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://www.usaa.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        USAA Resources
-                      </a>
-                    </li>
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://militaryautosource.com/home" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        Military AutoSource
-                      </a>
-                    </li>
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://www.navyfederal.org/loans-cards/auto-loans.html" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        Navy Federal Auto
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </Card>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 relative">
+        <main className="flex-1 relative overflow-auto">
           <div className="relative z-10 p-6 lg:p-12">
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-8">
