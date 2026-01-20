@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, use } from "react"
+import { useState, useEffect, use, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,11 +11,10 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Header } from "@/components/header"
-import { CATEGORIES, CONDITIONS, MILITARY_BASES } from "@/lib/types"
+import { CATEGORIES, CONDITIONS, MilitaryBase } from "@/lib/types"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ImagePlus, X } from "lucide-react"
+import { ArrowLeft, ImagePlus, X, MapPin, Building } from "lucide-react"
 import Link from "next/link"
-import type { Listing } from "@/lib/types"
 
 interface EditListingPageProps {
   params: Promise<{ id: string }>
@@ -24,11 +23,18 @@ interface EditListingPageProps {
 export default function EditListingPage({ params }: EditListingPageProps) {
   const { id } = use(params)
   const router = useRouter()
-  const [listing, setListing] = useState<Listing | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [images, setImages] = useState<string[]>([])
+  const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [locationType, setLocationType] = useState<"current" | "base">("current")
+  const [militaryBases, setMilitaryBases] = useState<MilitaryBase[]>([])
+  const [uniqueStates, setUniqueStates] = useState<string[]>([])
+  const [basesLoading, setBasesLoading] = useState(true)
+  const [stateSelected, setStateSelected] = useState<string>("")
+  const [baseSelectedId, setBaseSelectedId] = useState<number | null>(null)
+  const [initialLocationLoaded, setInitialLocationLoaded] = useState(false)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -36,11 +42,62 @@ export default function EditListingPage({ params }: EditListingPageProps) {
     price: "",
     category: "",
     condition: "",
-    location: "",
+    city: "",
+    state: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+    nearbyBase: "",
     status: "",
   })
 
+  const states = useMemo(
+    () => uniqueStates.map((s) => s.toUpperCase()),
+    [uniqueStates]
+  )
+
+  const basesByState = useMemo(() => {
+    const map = new Map<string, typeof militaryBases>()
+
+    for (const base of militaryBases) {
+      const state = base.state.toUpperCase()
+      if (!map.has(state)) map.set(state, [])
+      map.get(state)!.push(base)
+    }
+
+    for (const bases of map.values()) {
+      bases.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return map
+  }, [militaryBases])
+
+  // Load military bases first
   useEffect(() => {
+    const supabase = createClient()
+
+    const loadBases = async () => {
+      const { data, error } = await supabase
+        .from("military_bases")
+        .select("id, name, state, latitude, longitude")
+
+      if (error) {
+        console.error("Failed to load bases", error)
+        setBasesLoading(false)
+        return
+      }
+
+      setMilitaryBases(data || [])
+      setUniqueStates([...new Set((data || []).map((base) => base.state))].sort())
+      setBasesLoading(false)
+    }
+
+    loadBases()
+  }, [])
+
+  // Load listing data after bases are loaded
+  useEffect(() => {
+    if (basesLoading) return
+
     const fetchData = async () => {
       const supabase = createClient()
 
@@ -53,33 +110,99 @@ export default function EditListingPage({ params }: EditListingPageProps) {
         return
       }
 
-      const { data: listing } = await supabase
+      const { data: listing, error: listingError } = await supabase
         .from("marketplace_listings")
         .select("*")
         .eq("id", id)
         .single()
 
-      if (!listing || listing.user_id !== user.id) {
+      if (listingError || !listing || listing.user_id !== user.id) {
         router.push("/community/marketplace/dashboard")
         return
       }
 
-      setListing(listing)
+      // Detect location type based on existing data
+      const isBaseLocation = listing.state?.length === 2 && 
+                            militaryBases.some(base => base.name === listing.city)
+      
+      if (isBaseLocation) {
+        setLocationType("base")
+        setStateSelected(listing.state.toUpperCase())
+        
+        // Find and set the base
+        const matchingBase = militaryBases.find(
+          base => base.name === listing.city && 
+                  base.state.toUpperCase() === listing.state.toUpperCase()
+        )
+        
+        if (matchingBase) {
+          setBaseSelectedId(matchingBase.id)
+        }
+      } else {
+        setLocationType("current")
+      }
+
       setFormData({
         title: listing.title,
         description: listing.description || "",
         price: listing.price.toString(),
         category: listing.category,
         condition: listing.condition,
-        location: listing.location,
+        city: listing.city,
+        state: listing.state,
+        latitude: listing.latitude,
+        longitude: listing.longitude,
+        nearbyBase: listing.nearby_base || "",
         status: listing.status,
       })
+      
       setImages(listing.images || [])
+      setInitialLocationLoaded(true)
       setIsLoading(false)
     }
 
     fetchData()
-  }, [id, router])
+  }, [id, router, basesLoading, militaryBases])
+
+  // Update form data when base is selected
+  useEffect(() => {
+    if (!baseSelectedId) return
+    
+    const base = militaryBases.find((b) => b.id === baseSelectedId)
+    if (!base) return
+
+    setFormData((prev) => ({
+      ...prev,
+      city: base.name,
+      state: base.state.toUpperCase(),
+      latitude: base.latitude,
+      longitude: base.longitude,
+      nearbyBase: `${base.name}, ${base.state.toUpperCase()}`,
+    }))
+  }, [baseSelectedId, militaryBases])
+
+  const handleSelectState = (value: string) => {
+    setStateSelected(value)
+    setBaseSelectedId(null)
+  }
+
+  const findNearestBase = (lat: number, lng: number) => {
+    let nearest = null
+    let minDistance = Infinity
+    
+    for (const base of militaryBases) {
+      const dLat = lat - base.latitude
+      const dLng = lng - base.longitude
+      const distance = Math.sqrt(dLat * dLat + dLng * dLng) * 69
+
+      if (distance < minDistance) {
+        minDistance = distance
+        nearest = base
+      }
+    }
+
+    return { base: nearest, distance: minDistance }
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -100,15 +223,117 @@ export default function EditListingPage({ params }: EditListingPageProps) {
     setImages((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const getCurrentLocation = () => {
+    setIsGettingLocation(true)
+    setError(null)
+
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser")
+      setIsGettingLocation(false)
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+          )
+          const data = await response.json()
+
+          const city =
+            data.address?.city ||
+            data.address?.town ||
+            data.address?.village ||
+            data.address?.municipality ||
+            "Unknown City"
+          const state = data.address?.state || "Unknown State"
+
+          const { base: nearestBase, distance } = findNearestBase(latitude, longitude)
+          
+          setFormData((prev) => ({
+            ...prev,
+            city,
+            state,
+            latitude,
+            longitude,
+            nearbyBase: nearestBase && distance < 50 
+              ? `${nearestBase.name}, ${nearestBase.state.toUpperCase()}`
+              : "",
+          }))
+        } catch {
+          const { base: nearestBase } = findNearestBase(latitude, longitude)
+          
+          setFormData((prev) => ({
+            ...prev,
+            city: nearestBase ? "Near " + nearestBase.name : "Unknown City",
+            state: nearestBase ? nearestBase.state.toUpperCase() : "Unknown State",
+            latitude,
+            longitude,
+            nearbyBase: nearestBase 
+              ? `${nearestBase.name}, ${nearestBase.state.toUpperCase()}`
+              : "",
+          }))
+        }
+
+        setIsGettingLocation(false)
+      },
+      (error) => {
+        console.error("Geolocation error:", error)
+        setError("Unable to get your location. Please select a base instead.")
+        setIsGettingLocation(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const handleLocationTypeChange = (type: "current" | "base") => {
+    setLocationType(type)
+    
+    if (type === "current") {
+      // Clear base selection
+      setStateSelected("")
+      setBaseSelectedId(null)
+      // Get current location
+      getCurrentLocation()
+    } else {
+      // Clear current location data when switching to base
+      setFormData((prev) => ({
+        ...prev,
+        city: "",
+        state: "",
+        latitude: null,
+        longitude: null,
+        nearbyBase: "",
+      }))
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (locationType === 'current' && (!formData.city || !formData.state)) {
+      setError("Please set your location")
+      return
+    }
+    
+    if (locationType === 'base' && !baseSelectedId) {
+      setError("Please select a base")
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
     const supabase = createClient()
-
-    const selectedBase = MILITARY_BASES.find((base) => `${base.name}, ${base.state}` === formData.location)
-
+    
+    // Determine location string based on location type
+    const locationString = locationType === 'base' 
+      ? formData.nearbyBase  // For base: use base name
+      : `${formData.city}, ${formData.state}`  // For current: use actual city/state
+    
     const { error: updateError } = await supabase
       .from("marketplace_listings")
       .update({
@@ -117,9 +342,12 @@ export default function EditListingPage({ params }: EditListingPageProps) {
         price: Number.parseFloat(formData.price),
         category: formData.category,
         condition: formData.condition,
-        location: formData.location,
-        latitude: selectedBase?.lat || listing?.latitude,
-        longitude: selectedBase?.lng || listing?.longitude,
+        location: locationString,
+        city: formData.city,
+        state: formData.state,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        nearby_base: formData.nearbyBase || null,
         images: images,
         status: formData.status,
         updated_at: new Date().toISOString(),
@@ -272,23 +500,86 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                 </div>
 
                 {/* Location */}
-                <div className="grid gap-2">
+                <div className="grid gap-4">
                   <Label>Location</Label>
-                  <Select
-                    value={formData.location}
-                    onValueChange={(value) => setFormData({ ...formData, location: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MILITARY_BASES.map((base) => (
-                        <SelectItem key={base.name} value={`${base.name}, ${base.state}`}>
-                          {base.name}, {base.state}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant={locationType === "current" ? "default" : "outline"}
+                      onClick={() => handleLocationTypeChange("current")}
+                      disabled={isGettingLocation}
+                      className="flex-1"
+                    >
+                      <MapPin className="mr-2 h-4 w-4" />
+                      {isGettingLocation ? "Getting location..." : "Use My Location"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={locationType === "base" ? "default" : "outline"}
+                      onClick={() => handleLocationTypeChange("base")}
+                      className="flex-1"
+                    >
+                      <Building className="mr-2 h-4 w-4" />
+                      Select Base
+                    </Button>
+                  </div>
+
+                  {locationType === "current" && (
+                    <div className="space-y-3">
+                      {formData.city && formData.state && (
+                        <div className="rounded-lg border bg-muted/50 p-3">
+                          <p className="text-sm font-medium">
+                            {formData.city}, {formData.state}
+                          </p>
+                          {formData.nearbyBase && (
+                            <p className="text-xs text-muted-foreground">Near {formData.nearbyBase}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {locationType === "base" && (
+                    <div className="flex gap-4 rounded-lg border bg-muted/50 p-3">
+                      {/* State Select */}
+                      <Select
+                        value={stateSelected}
+                        onValueChange={handleSelectState}
+                        disabled={basesLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {states.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {/* Base Select */}
+                      {stateSelected && (
+                        <Select
+                          value={baseSelectedId?.toString() ?? ""}
+                          onValueChange={(value) => setBaseSelectedId(Number(value))}
+                          disabled={basesLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a military base" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(basesByState.get(stateSelected) ?? []).map((base) => (
+                              <SelectItem key={base.id} value={base.id.toString()}>
+                                {base.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Status */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -10,12 +10,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MapPin, Navigation, Globe } from "lucide-react"
-import { MILITARY_BASES } from "@/lib/types"
+import { MilitaryBase } from "@/lib/types"
+import { createClient } from "@/lib/supabase/client"
 
 interface LocationSelectorProps {
   selectedLocation: string | null
@@ -24,48 +24,89 @@ interface LocationSelectorProps {
 
 export function LocationSelector({ selectedLocation, onLocationChange }: LocationSelectorProps) {
   const [open, setOpen] = useState(false)
-  const [searchTerm, setSearchTerm] = useState("")
   const [locationType, setLocationType] = useState<"current" | "base" | "all">("all")
   const [isGettingLocation, setIsGettingLocation] = useState(false)
+  const [stateSelected, setStateSelected] = useState<string>("")
+  const [baseSelectedId, setBaseSelectedId] = useState<number | null>(null)
+  const [militaryBases, setMilitaryBases] = useState<MilitaryBase[]>([])
+  const [uniqueStates, setUniqueStates] = useState<string[]>([])
+  const [error, setError] = useState<string | null>(null)
 
-  const filteredBases = MILITARY_BASES.filter(
-    (base) =>
-      base.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      base.state.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  useEffect(() => {
+    const supabase = createClient()
+
+    const loadBases = async () => {
+      const { data, error } = await supabase
+        .from("military_bases")
+        .select("id, name, state, latitude, longitude")
+
+      if (error) {
+        console.error("Failed to load bases", error)
+        return
+      }
+
+      setMilitaryBases(data)
+      setUniqueStates([...new Set(data.map((base) => base.state))].sort())
+    }
+
+    loadBases()
+  }, [])
 
   const getCurrentLocation = () => {
+    if (!militaryBases.length) return
     setIsGettingLocation(true)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const { latitude, longitude } = position.coords
-          // Find nearest base or use coordinates
-          const nearestBase = MILITARY_BASES.reduce((prev, curr) => {
-            const prevDist = Math.sqrt(Math.pow(prev.lat - latitude, 2) + Math.pow(prev.lng - longitude, 2))
-            const currDist = Math.sqrt(Math.pow(curr.lat - latitude, 2) + Math.pow(curr.lng - longitude, 2))
-            return currDist < prevDist ? curr : prev
-          })
 
-          onLocationChange(`Near ${nearestBase.name}, ${nearestBase.state}`, { lat: latitude, lng: longitude })
-          setIsGettingLocation(false)
-          setOpen(false)
-        },
-        () => {
-          setIsGettingLocation(false)
-        },
-      )
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser")
+      setIsGettingLocation(false)
+      return
     }
-  }
 
-  const handleSelectBase = (base: (typeof MILITARY_BASES)[0]) => {
-    onLocationChange(`${base.name}, ${base.state}`, { lat: base.lat, lng: base.lng })
-    setOpen(false)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords
+
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+        )
+        const data = await response.json()
+
+        const city =
+          data.address?.city ||
+          data.address?.town ||
+          data.address?.village ||
+          data.address?.municipality ||
+          null
+        const state = data.address?.state || null
+
+        if (city && state) {
+          onLocationChange(
+            `${city}, ${state}`,
+            { lat: latitude, lng: longitude }
+          )
+        } else {
+          onLocationChange("Current location", { lat: latitude, lng: longitude })
+        }
+        setIsGettingLocation(false)
+        setOpen(false)
+      },
+      () => {
+        setError("Unable to get your location. Please select a base instead.")
+        setIsGettingLocation(false)
+      },
+      { enableHighAccuracy: true }
+    )
   }
 
   const handleShowAll = () => {
     onLocationChange(null)
     setOpen(false)
+  }
+
+  const handleLocationTypeChange = (value: "all" | "current" | "base") => {
+    setLocationType(value)
+    setStateSelected("")
+    setBaseSelectedId(null)
   }
 
   return (
@@ -82,7 +123,7 @@ export function LocationSelector({ selectedLocation, onLocationChange }: Locatio
           <DialogDescription>Choose a military base or use your current location</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-4">
-          <RadioGroup value={locationType} onValueChange={(v) => setLocationType(v as typeof locationType)}>
+          <RadioGroup value={locationType} onValueChange={(v) => handleLocationTypeChange(v as any)}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="all" id="all" />
               <Label htmlFor="all" className="flex items-center gap-2 cursor-pointer">
@@ -107,23 +148,62 @@ export function LocationSelector({ selectedLocation, onLocationChange }: Locatio
           </RadioGroup>
 
           {locationType === "base" && (
-            <>
-              <Input placeholder="Search bases..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              <ScrollArea className="h-48">
-                <div className="flex flex-col gap-1">
-                  {filteredBases.map((base) => (
-                    <Button
-                      key={base.name}
-                      variant="ghost"
-                      className="justify-start"
-                      onClick={() => handleSelectBase(base)}
-                    >
-                      {base.name}, {base.state}
-                    </Button>
+            <div className="flex gap-3 rounded-lg border bg-muted/50 p-3">
+              {/* State Select */}
+              <Select
+                value={stateSelected}
+                onValueChange={(value) => {
+                  setStateSelected(value)
+                  setBaseSelectedId(null)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a state" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueStates.map((state) => (
+                    <SelectItem key={state} value={state}>
+                      {state.toUpperCase()}
+                    </SelectItem>
                   ))}
-                </div>
-              </ScrollArea>
-            </>
+                </SelectContent>
+              </Select>
+
+              {/* Base Select */}
+              {stateSelected && (
+                <Select
+                  value={baseSelectedId ? baseSelectedId.toString() : ""}
+                  onValueChange={(value) => {
+                    const baseId = Number(value)
+                    setBaseSelectedId(baseId)
+
+                    const base = militaryBases.find((b) => b.id === baseId)
+                    if (!base) return
+
+                    onLocationChange(`${base.name}, ${base.state.toUpperCase()}`, {
+                      lat: base.latitude,
+                      lng: base.longitude,
+                    })
+
+                    setOpen(false)
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a military base" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {militaryBases
+                      .filter((b) => b.state === stateSelected)
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((base) => (
+                        <SelectItem key={base.id} value={base.id.toString()}>
+                          {base.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           )}
 
           <div className="flex gap-2">
@@ -138,6 +218,7 @@ export function LocationSelector({ selectedLocation, onLocationChange }: Locatio
               </Button>
             )}
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
       </DialogContent>
     </Dialog>

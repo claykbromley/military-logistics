@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { ListingCard } from "@/components/marketplace/listing-card"
 import { CategoryFilter } from "@/components/marketplace/category-filter"
@@ -13,8 +11,6 @@ import { Search, SlidersHorizontal, Plus } from "lucide-react"
 import type { Listing, Category } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
-import { useUI } from "@/context/ui-context"
-import { useRouter } from "next/navigation"
 
 interface ListingsGridProps {
   initialListings: Listing[]
@@ -22,16 +18,28 @@ interface ListingsGridProps {
   userId?: string
 }
 
+// Simple distance calculation using Haversine formula
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371 // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
 export function ListingsGrid({ initialListings, savedListingIds, userId }: ListingsGridProps) {
   const [user, setUser] = useState<{email?: string}|null>(null)
   const [listings, setListings] = useState<Listing[]>(initialListings)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [sortBy, setSortBy] = useState("newest")
   const [isLoading, setIsLoading] = useState(false)
-  const { setShowLogin } = useUI()
-  const router = useRouter()
 
   useEffect(() => {
     const supabase = createClient()
@@ -55,22 +63,49 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user)
     })
-  }, [selectedCategory, selectedLocation, sortBy])
+  }, [selectedCategory, selectedLocation, sortBy, locationCoords])
+
+  const sortListingsByDistance = (listingsToSort: Listing[]) => {
+    if (!locationCoords) {
+      return listingsToSort
+    }
+
+    return [...listingsToSort].sort((a, b) => {
+      // If listing doesn't have coordinates, put it at the end
+      if (!a.latitude || !a.longitude) return 1
+      if (!b.latitude || !b.longitude) return -1
+
+      const distA = calculateDistance(
+        locationCoords.lat,
+        locationCoords.lng,
+        a.latitude,
+        a.longitude
+      )
+      const distB = calculateDistance(
+        locationCoords.lat,
+        locationCoords.lng,
+        b.latitude,
+        b.longitude
+      )
+
+      return distA - distB
+    })
+  }
 
   const fetchListings = async () => {
     setIsLoading(true)
     const supabase = createClient()
 
-    let query = supabase.from("listings").select("*").eq("status", "active")
+    let query = supabase
+      .from("marketplace_listings")
+      .select("*")
+      .eq("status", "active")
 
     if (selectedCategory) {
       query = query.eq("category", selectedCategory)
     }
 
-    if (selectedLocation) {
-      query = query.ilike("location", `%${selectedLocation.split(",")[0]}%`)
-    }
-
+    // Apply database sorting for non-distance sorts
     if (sortBy === "newest") {
       query = query.order("created_at", { ascending: false })
     } else if (sortBy === "price-low") {
@@ -81,7 +116,10 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
 
     const { data } = await query
 
-    setListings(data || [])
+    // Apply distance sorting if location coords are available
+    const sortedData = locationCoords ? sortListingsByDistance(data || []) : (data || [])
+    
+    setListings(sortedData)
     setIsLoading(false)
   }
 
@@ -90,7 +128,7 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
     setIsLoading(true)
     const supabase = createClient()
 
-    let query = supabase.from("listings").select("*").eq("status", "active")
+    let query = supabase.from("marketplace_listings").select("*").eq("status", "active")
 
     if (searchTerm) {
       query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
@@ -100,14 +138,18 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
       query = query.eq("category", selectedCategory)
     }
 
-    if (selectedLocation) {
-      query = query.ilike("location", `%${selectedLocation.split(",")[0]}%`)
-    }
-
     const { data } = await query.order("created_at", { ascending: false })
 
-    setListings(data || [])
+    // Apply distance sorting if location coords are available
+    const sortedData = locationCoords ? sortListingsByDistance(data || []) : (data || [])
+
+    setListings(sortedData)
     setIsLoading(false)
+  }
+
+  const handleLocationChange = (location: string | null, coords?: { lat: number; lng: number }) => {
+    setSelectedLocation(location)
+    setLocationCoords(coords || null)
   }
 
   return (
@@ -129,7 +171,10 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
 
         <div className="flex items-center justify-between w-full">
           <div className="flex flex-wrap items-center gap-4">
-            <LocationSelector selectedLocation={selectedLocation} onLocationChange={setSelectedLocation} />
+            <LocationSelector 
+              selectedLocation={selectedLocation} 
+              onLocationChange={handleLocationChange}
+            />
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-40 cursor-pointer">
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
@@ -142,6 +187,7 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
               </SelectContent>
             </Select>
           </div>
+          
           {user && 
           <div className="flex flex-wrap items-center gap-4">
             <Button asChild>

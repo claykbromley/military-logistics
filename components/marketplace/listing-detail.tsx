@@ -79,16 +79,62 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
     setIsLoading(true)
     const supabase = createClient()
 
-    await supabase.from("messages").insert({
+    // Check if conversation already exists
+    const { data: existingConversation } = await supabase
+      .from("marketplace_conversations")
+      .select("id")
+      .eq("listing_id", listing.id)
+      .eq("buyer_id", user.id)
+      .eq("seller_id", listing.user_id)
+      .single()
+
+    let conversationId: string
+
+    if (existingConversation) {
+      conversationId = existingConversation.id
+    } else {
+      // Create new conversation
+      const { data: newConversation, error: convError } = await supabase
+        .from("marketplace_conversations")
+        .insert({
+          listing_id: listing.id,
+          buyer_id: user.id,
+          seller_id: listing.user_id,
+        })
+        .select("id")
+        .single()
+
+      if (convError || !newConversation) {
+        setIsLoading(false)
+        return
+      }
+
+      conversationId = newConversation.id
+    }
+
+    // Send the message
+    await supabase.from("marketplace_messages").insert({
+      conversation_id: conversationId,
       listing_id: listing.id,
       sender_id: user.id,
       receiver_id: listing.user_id,
       content: message,
     })
 
+    // Update conversation last_message_at
+    await supabase
+      .from("marketplace_conversations")
+      .update({ last_message_at: new Date().toISOString() })
+      .eq("id", conversationId)
+
     setMessage("")
     setMessageSent(true)
     setIsLoading(false)
+
+    // Redirect to conversation after a moment
+    setTimeout(() => {
+      router.push(`/community/marketplace/dashboard/messages/${conversationId}`)
+    }, 1500)
   }
 
   const conditionColors: Record<string, string> = {
@@ -101,6 +147,7 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
 
   const categoryLabel = CATEGORIES.find((c) => c.value === listing.category)?.label || listing.category
   const conditionLabel = CONDITIONS.find((c) => c.value === listing.condition)?.label || listing.condition
+  const locationDisplay = listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -177,8 +224,13 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
               <div className="mt-6 flex flex-col gap-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4" />
-                  {listing.location}
+                  <span>{locationDisplay}</span>
                 </div>
+                {listing.nearby_base && listing.nearby_base !== locationDisplay && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground ml-6">
+                    Near {listing.nearby_base}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Calendar className="h-4 w-4" />
                   Listed {formatDate(listing.created_at)}
@@ -255,7 +307,7 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
 
           {user && user.id === listing.user_id && (
             <Button variant="outline" asChild>
-              <Link href={`/dashboard/listings/${listing.id}/edit`}>Edit Listing</Link>
+              <Link href={`/community/marketplace/dashboard/listings/${listing.id}/edit`}>Edit Listing</Link>
             </Button>
           )}
         </div>

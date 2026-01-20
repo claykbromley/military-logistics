@@ -18,7 +18,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
   // Fetch listing with seller profile
   const { data: listing } = await supabase
     .from("marketplace_listings")
-    .select("*")
+    .select("*, profiles(*)")
     .eq("id", id)
     .single()
 

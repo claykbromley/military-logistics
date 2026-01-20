@@ -23,6 +23,14 @@ export type MilitaryBranch =
   | "national-guard"
   | "civilian"
 
+export type MilitaryBase = {
+  id: number
+  name: string
+  state: string
+  latitude: number
+  longitude: number
+}
+
 export interface Profile {
   id: string
   display_name: string | null
@@ -192,21 +200,80 @@ export const STATES: { name: string; abbr: string; dmv: string }[] = [
   { name: "Wyoming", abbr: "WY", dmv: "https://dot.state.wy.us/" },
 ]
 
-// Popular military base locations
-export const MILITARY_BASES = [
-  { name: "Fort Bragg", state: "NC", lat: 35.1393, lng: -79.0061 },
-  { name: "Fort Hood", state: "TX", lat: 31.1349, lng: -97.7756 },
-  { name: "Joint Base Lewis-McChord", state: "WA", lat: 47.1108, lng: -122.5556 },
-  { name: "Fort Campbell", state: "KY", lat: 36.6681, lng: -87.4631 },
-  { name: "Fort Benning", state: "GA", lat: 32.3591, lng: -84.9494 },
-  { name: "Camp Pendleton", state: "CA", lat: 33.3867, lng: -117.5657 },
-  { name: "Fort Stewart", state: "GA", lat: 31.8723, lng: -81.6117 },
-  { name: "Naval Station Norfolk", state: "VA", lat: 36.9465, lng: -76.3034 },
-  { name: "Joint Base San Antonio", state: "TX", lat: 29.3849, lng: -98.5813 },
-  { name: "Eglin Air Force Base", state: "FL", lat: 30.4833, lng: -86.5257 },
-  { name: "Marine Corps Base Quantico", state: "VA", lat: 38.5229, lng: -77.3202 },
-  { name: "Schofield Barracks", state: "HI", lat: 21.4957, lng: -158.0651 },
-  { name: "Fort Riley", state: "KS", lat: 39.0553, lng: -96.7667 },
-  { name: "Fort Carson", state: "CO", lat: 38.7378, lng: -104.7897 },
-  { name: "Naval Base San Diego", state: "CA", lat: 32.6839, lng: -117.1344 },
-]
+export interface Profile {
+  id: string
+  display_name: string | null
+  location: string | null
+  city: string | null
+  state: string | null
+  latitude: number | null
+  longitude: number | null
+  nearby_base: string | null
+  military_branch: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Listing {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  price: number
+  category: Category
+  condition: Condition
+  location: string
+  city: string | null
+  state: string | null
+  nearby_base: string | null
+  latitude: number | null
+  longitude: number | null
+  images: string[]
+  status: ListingStatus
+  created_at: string
+  updated_at: string
+  profiles?: Profile
+  distance?: number
+}
+
+export interface Conversation {
+  id: string
+  listing_id: string | null
+  buyer_id: string
+  seller_id: string
+  last_message_at: string
+  created_at: string
+  listings?: Pick<Listing, "id" | "title" | "images"> | null
+  buyer?: Pick<Profile, "id" | "display_name"> | null
+  seller?: Pick<Profile, "id" | "display_name"> | null
+  last_message?: Message | null
+  unread_count: number
+}
+
+export interface Message {
+  id: string
+  listing_id: string | null
+  conversation_id: string | null
+  sender_id: string
+  receiver_id: string
+  content: string
+  read: boolean
+  created_at: string
+  sender_profile?: Pick<Profile, "id" | "display_name"> | null
+}
+
+export interface SavedListing {
+  id: string
+  user_id: string
+  listing_id: string
+  created_at: string
+  listings?: Listing
+}
+
+export interface UserLocation {
+  city: string
+  state: string
+  latitude: number
+  longitude: number
+  nearbyBase?: string
+}

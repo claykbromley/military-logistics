@@ -63,7 +63,7 @@ export function ListingCard({ listing, isSaved: initialSaved = false, userId }: 
   }
 
   return (
-    <Link href={`/listings/${listing.id}`}>
+    <Link href={`/community/marketplace/listings/${listing.id}`}>
       <Card className="group overflow-hidden transition-all hover:shadow-lg">
         <div className="relative aspect-square overflow-hidden bg-muted">
           {listing.images && listing.images.length > 0 ? (
