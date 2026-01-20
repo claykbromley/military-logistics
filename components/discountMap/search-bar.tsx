@@ -53,7 +53,7 @@ export function SearchBar({ onSearch, onUseCurrentLocation, isLoading, isLoaded 
 
     if (value.length > 2 && autocompleteRef.current) {
       autocompleteRef.current.getPlacePredictions(
-        { input: value, types: ["geocode"] },
+        { input: value/*, types: ["geocode"]*/ },
         (results: google.maps.places.AutocompletePrediction[] | null) => {
           if (results) {
             setPredictions(results.map((r) => ({ place_id: r.place_id, description: r.description })))

@@ -4,15 +4,33 @@ import { CATEGORIES, CATEGORY_COLORS } from "@/lib/known-chains"
 import { Button } from "@/components/ui/button"
 
 interface CategoryFilterProps {
-  selected: string
-  onChange: (category: string) => void
+  selected: string[]
+  onChange: (categories: string[]) => void
 }
 
 export function CategoryFilter({ selected, onChange }: CategoryFilterProps) {
+  const handleCategoryClick = (categoryValue: string) => {
+    if (categoryValue === "all") {
+      // If "all" is clicked, clear all selections (show all)
+      onChange([])
+    } else {
+      // Toggle the category
+      if (selected.includes(categoryValue)) {
+        // Remove it
+        onChange(selected.filter((c) => c !== categoryValue))
+      } else {
+        // Add it
+        onChange([...selected, categoryValue])
+      }
+    }
+  }
+
+  const isAllSelected = selected.length === 0
+
   return (
     <div className="flex flex-wrap gap-2">
       {CATEGORIES.map((category) => {
-        const isSelected = selected === category.value
+        const isSelected = category.value === "all" ? isAllSelected : selected.includes(category.value)
         const color = category.value === "all" ? "#1e3a5f" : CATEGORY_COLORS[category.value]
 
         return (
@@ -20,7 +38,7 @@ export function CategoryFilter({ selected, onChange }: CategoryFilterProps) {
             key={category.value}
             variant={isSelected ? "default" : "outline"}
             size="sm"
-            onClick={() => onChange(category.value)}
+            onClick={() => handleCategoryClick(category.value)}
             className="transition-all"
             style={{
               backgroundColor: isSelected ? color : undefined,

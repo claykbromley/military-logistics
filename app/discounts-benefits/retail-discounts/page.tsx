@@ -15,19 +15,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 
 export default function MilitaryDiscountMap() {
-  const [center, setCenter] = useState({ lat: 39.8283, lng: -98.5795 }) // Center of US
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [center, setCenter] = useState({ lat: 32.776470, lng: -79.931030 }) // Center of US
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [currentAddress, setCurrentAddress] = useState("United States")
   const [activeTab, setActiveTab] = useState("map")
+  const [selectedCategory, setSelectedCategory] = useState("all"); // Declare selectedCategory
 
   const { isLoaded, isSearching, status, statusMessage, businesses, cacheStats, searchNearby, clearCache } =
     useGoogleMaps()
 
-  // Filter businesses by category
+  // Filter businesses by selected categories
   const filteredBusinesses =
-    selectedCategory === "all" ? businesses : businesses.filter((b) => b.category === selectedCategory)
+    selectedCategories.length === 0
+      ? businesses
+      : businesses.filter((b) => selectedCategories.includes(b.category))
 
   // Handle search
   const handleSearch = useCallback(
@@ -112,7 +115,7 @@ export default function MilitaryDiscountMap() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      {/* <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-lg">
+      <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -130,8 +133,7 @@ export default function MilitaryDiscountMap() {
             </div>
           </div>
         </div>
-      </header> */}
-      <Header />
+      </header>
 
       <main className="container mx-auto px-4 py-6">
         {/* Search Section */}
@@ -144,7 +146,7 @@ export default function MilitaryDiscountMap() {
           />
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
-            <CategoryFilter selected={selectedCategory} onChange={setSelectedCategory} />
+            <CategoryFilter selected={selectedCategories} onChange={setSelectedCategories} />
           </div>
 
           <StatusIndicator status={status} message={statusMessage} cacheStats={cacheStats} />
