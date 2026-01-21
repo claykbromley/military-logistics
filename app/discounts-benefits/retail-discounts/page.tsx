@@ -13,6 +13,7 @@ import type { Business } from "@/lib/known-chains"
 import { Shield, Map, List } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
+import Head from "next/head"
 
 export default function MilitaryDiscountMap() {
   const [center, setCenter] = useState({ lat: 32.776470, lng: -79.931030 }) // Center of US
@@ -115,26 +116,7 @@ export default function MilitaryDiscountMap() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-lg">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-accent rounded-lg flex items-center justify-center">
-                <Shield className="h-6 w-6 text-accent-foreground" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold">Milify</h1>
-                <p className="text-xs text-primary-foreground/80">Military Discount Finder</p>
-              </div>
-            </div>
-            <div className="hidden md:block text-right">
-              <p className="text-sm font-medium">{filteredBusinesses.length} locations</p>
-              <p className="text-xs text-primary-foreground/80">{currentAddress}</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
+      <Header />
       <main className="container mx-auto px-4 py-6">
         {/* Search Section */}
         <div className="space-y-4 mb-6">
