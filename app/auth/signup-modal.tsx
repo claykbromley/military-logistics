@@ -97,7 +97,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
                 onClick={onClose}
                 className="font-bold transition-colors cursor-pointer"
               >
-                Return to Home
+                Close
               </Button>
             </div>
           </div>

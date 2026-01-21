@@ -1,18 +1,19 @@
 export type CategoryType = "restaurant" | "retail" | "automotive" | "hotel" | "entertainment";
 
 export interface Business {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  address: string;
-  distance?: number; // Make optional
-  category: CategoryType;
-  discount: string;
-  rating?: number;
-  note?: string;
-  zipCode?: string;
-  placeId?: string;
+  id: string
+  name: string
+  category: string
+  address: string
+  lat: number
+  lng: number
+  discount?: string
+  phone?: string
+  website?: string
+  hours?: string
+  note?: string
+  placeId?: string
+  source?: 'google' | 'user_submitted' // Add this field
 }
 
 export const KNOWN_CHAINS: Record<string, { discount: string; category: CategoryType; note: string }> = {
