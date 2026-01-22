@@ -13,6 +13,7 @@ import type { Business } from "@/lib/known-chains"
 import { Map, List } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 
 export default function MilitaryDiscountMap() {
   const [center, setCenter] = useState({ lat: 32.776470, lng: -79.931030 })
@@ -233,17 +234,7 @@ export default function MilitaryDiscountMap() {
         </div>
       </main>
 
-      <footer className="bg-muted border-t border-border mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground">
-            <p className="mb-2">
-              <strong>Disclaimer:</strong> Discounts are subject to change. Always verify with the business before
-              visiting.
-            </p>
-            <p>© {new Date().getFullYear()} Milify. Supporting our military community.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

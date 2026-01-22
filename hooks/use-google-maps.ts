@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
+const API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
 const SEARCH_RADIUS = 24140 // 15 miles in meters
 
 interface UseGoogleMapsReturn {
@@ -78,7 +78,7 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     }
 
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,marker&v=weekly`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places,marker&v=weekly`
     script.async = true
     script.defer = true
     script.onload = () => {
