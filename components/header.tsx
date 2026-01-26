@@ -32,7 +32,7 @@ const navItems = [
   },
   {
     name: "Transitions",
-    items: ["Enlistment", "Deployment", "PCS", "Leaving the Military"],
+    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation"],
   },
   {
     name: "Discounts/Benefits",
@@ -54,7 +54,7 @@ const navItems = [
 
 const getItemUrl = (sectionName: string, itemName: string) => {
   const section = sectionName.toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-")
-  const item = itemName.toLowerCase().replace(/\s+/g, "-")
+  const item = itemName.toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-")
   return `/${section}/${item}`
 }
 

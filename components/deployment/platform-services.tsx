@@ -1,23 +1,7 @@
 "use client"
 
-import React from "react"
-
-import {
-  DollarSign,
-  FileText,
-  Home,
-  Users,
-  Calendar,
-  MessageSquare,
-  ShieldCheck,
-  Briefcase,
-  PawPrint,
-  Heart,
-  Car,
-  ArrowRight,
-  Clock,
-  CheckCircle2,
-} from "lucide-react"
+import React, { useState } from "react"
+import { ChevronDown, DollarSign, FileText, Home, Users, Calendar, MessageSquare, ShieldCheck, Briefcase, PawPrint, Heart, Car, ArrowRight, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -27,7 +11,6 @@ interface PlatformService {
   features: string[]
   icon: React.ReactNode
   href: string
-  status: "available" | "coming-soon"
   highlight?: boolean
 }
 
@@ -44,8 +27,7 @@ const platformServices: PlatformService[] = [
       "Deployment savings tracker",
     ],
     icon: <DollarSign className="w-6 h-6" />,
-    href: "/services/financial",
-    status: "coming-soon",
+    href: "/transitions/deployment/services/financial",
     highlight: true,
   },
   {
@@ -60,8 +42,7 @@ const platformServices: PlatformService[] = [
       "Quick-access emergency docs",
     ],
     icon: <FileText className="w-6 h-6" />,
-    href: "/services/documents",
-    status: "available",
+    href: "/transitions/deployment/services/documents",
   },
   {
     title: "Property & Vehicle Manager",
@@ -75,8 +56,7 @@ const platformServices: PlatformService[] = [
       "Property inspection checklists",
     ],
     icon: <Home className="w-6 h-6" />,
-    href: "/services/property",
-    status: "available",
+    href: "/transitions/deployment/services/property",
   },
   {
     title: "Family Communication Hub",
@@ -90,8 +70,7 @@ const platformServices: PlatformService[] = [
       "Special date reminders",
     ],
     icon: <MessageSquare className="w-6 h-6" />,
-    href: "/services/communication",
-    status: "available",
+    href: "/transitions/deployment/services/communication",
   },
   {
     title: "Emergency Contact Network",
@@ -105,8 +84,7 @@ const platformServices: PlatformService[] = [
       "Quick-dial integration",
     ],
     icon: <Users className="w-6 h-6" />,
-    href: "/services/contacts",
-    status: "available",
+    href: "/transitions/deployment/services/contacts",
   },
   {
     title: "Deployment Countdown & Calendar",
@@ -120,8 +98,7 @@ const platformServices: PlatformService[] = [
       "Shared family calendar",
     ],
     icon: <Calendar className="w-6 h-6" />,
-    href: "/services/calendar",
-    status: "available",
+    href: "/transitions/deployment/services/calendar",
   },
   {
     title: "Pet Care Coordinator",
@@ -135,8 +112,7 @@ const platformServices: PlatformService[] = [
       "Photo updates from caregivers",
     ],
     icon: <PawPrint className="w-6 h-6" />,
-    href: "/services/pets",
-    status: "available",
+    href: "/transitions/deployment/services/pets",
   },
   {
     title: "Wellness & Journal",
@@ -150,8 +126,7 @@ const platformServices: PlatformService[] = [
       "Chaplain & counselor finder",
     ],
     icon: <Heart className="w-6 h-6" />,
-    href: "/services/wellness",
-    status: "available",
+    href: "/transitions/deployment/services/wellness",
   },
   {
     title: "Legal Ready Center",
@@ -165,8 +140,7 @@ const platformServices: PlatformService[] = [
       "Notary finder",
     ],
     icon: <ShieldCheck className="w-6 h-6" />,
-    href: "/services/legal",
-    status: "available",
+    href: "/transitions/deployment/services/legal",
   },
   {
     title: "Career & Benefits Tracker",
@@ -180,8 +154,7 @@ const platformServices: PlatformService[] = [
       "Benefits utilization",
     ],
     icon: <Briefcase className="w-6 h-6" />,
-    href: "/services/career",
-    status: "available",
+    href: "/transitions/deployment/services/career",
   },
   {
     title: "Vehicle Storage & Care",
@@ -195,20 +168,23 @@ const platformServices: PlatformService[] = [
       "Return inspection checklist",
     ],
     icon: <Car className="w-6 h-6" />,
-    href: "/services/property",
-    status: "available",
+    href: "/transitions/deployment/services/property",
   },
 ]
 
 export function PlatformServices() {
+  const [expandedSections, setExpandedSections] = useState<string[]>([""])
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) =>
+      prev.includes(sectionId) ? prev.filter((id) => id !== sectionId) : [...prev, sectionId]
+    )
+  }
+
   return (
     <section id="platform-services" className="py-16">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
-            <CheckCircle2 className="w-4 h-4" />
-            Available Now
-          </div>
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-balance">
             Your Personal Deployment Command Center
           </h2>
@@ -218,13 +194,14 @@ export function PlatformServices() {
           </p>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="columns-1 md:columns-2 gap-6">
           {platformServices.map((service) => (
             <div
               key={service.title}
-              className={`bg-card border rounded-lg p-6 transition-all hover:border-accent/50 ${
+              className={`break-inside-avoid mb-6 bg-card border rounded-lg p-6 transition-all hover:border-accent/50 ${
                 service.highlight ? "border-accent/30 ring-1 ring-accent/10" : "border-border"
               }`}
+              onClick={() => toggleSection(service.title)}
             >
               <div className="flex items-start gap-4">
                 <div
@@ -237,45 +214,31 @@ export function PlatformServices() {
                   {service.icon}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center justify-between gap-2 mb-2">
                     <h3 className="font-semibold text-foreground text-lg">{service.title}</h3>
-                    {service.status === "coming-soon" ? (
-                      <span className="px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded">
-                        Soon
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs font-medium bg-accent/10 text-accent rounded">
-                        Live
-                      </span>
-                    )}
+                    <ChevronDown
+                      className={`h-5 w-5 text-slate-400 transition-transform ${expandedSections.includes(service.title) ? "rotate-180" : ""}`}
+                    />
                   </div>
-                  <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
-                  <ul className="space-y-2 mb-4">
-                    {service.features.slice(0, 3).map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-foreground">
-                        <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
-                        {feature}
-                      </li>
-                    ))}
-                    {service.features.length > 3 && (
-                      <li className="text-sm text-muted-foreground pl-6">
-                        +{service.features.length - 3} more features
-                      </li>
-                    )}
-                  </ul>
-                  {service.status === "available" ? (
-                    <Button variant="outline" size="sm" className="gap-1 bg-transparent" asChild>
-                      <Link href={service.href}>
-                        Open Service
-                        <ArrowRight className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" className="gap-1 bg-transparent" disabled>
-                      Coming Soon
-                      <Clock className="w-4 h-4" />
-                    </Button>
+                  {expandedSections.includes(service.title) && (
+                    <div>
+                      <p className="text-muted-foreground text-sm mb-4">{service.description}</p>
+                      <ul className="space-y-2 mb-4">
+                        {service.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2 text-sm text-foreground">
+                            <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   )}
+                  <Button variant="outline" size="sm" className="gap-1 bg-transparent" asChild>
+                    <Link href={service.href} onClick={(e) => e.stopPropagation()}>
+                      Open Service
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -289,7 +252,7 @@ export function PlatformServices() {
             prioritize the features that matter most.
           </p>
           <Button variant="secondary" size="lg" asChild>
-            <Link href="/feedback">Share Your Ideas</Link>
+            <Link href="/contact-us/feedback">Share Your Ideas</Link>
           </Button>
         </div>
       </div>

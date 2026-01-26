@@ -7,7 +7,7 @@ export function Hero() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.2),transparent_50%)]" />
       </div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 relative">
-        <div className="">
+        <div>
           <h1 className="text-center text-4xl md:text-5xl lg:text-6xl font-bold text-primary-foreground leading-tight text-balance">
             Pre-Deployment Preparation Made Simple
           </h1>
@@ -18,16 +18,28 @@ export function Hero() {
           <div className="mt-8 flex flex-wrap gap-4 justify-center">
             <a
               href="#checklists"
-              className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/90 transition-colors"
+              className="inline-flex items-center gap-2 border border-primary-foreground/30 text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/10 transition-colors"
             >
               Start Your Checklist
               <ArrowDown className="w-4 h-4" />
             </a>
             <a
-              href="#resources"
+              href="/transitions/deployment/services"
+              className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/90 transition-colors"
+            >
+              View Services
+            </a>
+            <a
+              href="/transitions/deployment/resources"
               className="inline-flex items-center gap-2 border border-primary-foreground/30 text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/10 transition-colors"
             >
-              View Resources
+              External Resources
+            </a>
+            <a
+              href="/transitions/deployment/emergency-contacts"
+              className="inline-flex items-center gap-2 border border-primary-foreground/30 text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/10 transition-colors"
+            >
+              Emergency Contacts
             </a>
           </div>
         </div>

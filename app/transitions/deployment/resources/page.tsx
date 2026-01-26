@@ -101,7 +101,7 @@ export default function DeploymentResourcesPage() {
           <div className="top-20 p-6">
             <a href="/transitions/deployment">
               <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
-                Preparing for Deployment
+                Deployment
               </h2>
             </a>
             <div className="space-y-3">

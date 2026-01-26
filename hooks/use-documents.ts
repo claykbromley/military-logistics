@@ -20,6 +20,8 @@ export interface Document {
   documentName: string
   documentType: DocumentType
   fileUrl?: string
+  fileName?: string
+  fileSize?: number
   expirationDate?: string
   notes?: string
   isCritical: boolean
@@ -36,8 +38,11 @@ interface DbDocument {
   category: string
   file_url: string | null
   file_type: string | null
+  file_name: string | null
+  file_size: number | null
   expiration_date: string | null
   notes: string | null
+  is_critical: boolean | null
   is_shared: boolean
   shared_with: string[] | null
   created_at: string
@@ -45,6 +50,7 @@ interface DbDocument {
 }
 
 const STORAGE_KEY = "deployment-documents"
+const STORAGE_BUCKET = "document-vault"
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -58,9 +64,11 @@ function dbToLocal(db: DbDocument): Document {
     documentName: db.name,
     documentType: db.category as DocumentType,
     fileUrl: db.file_url || undefined,
+    fileName: db.file_name || undefined,
+    fileSize: db.file_size || undefined,
     expirationDate: db.expiration_date || undefined,
     notes: db.notes || undefined,
-    isCritical: db.category === "will" || db.category === "poa", // Mark critical by type
+    isCritical: db.is_critical || false, // Use is_critical from database
     sharedWith: db.shared_with || [],
     createdAt: db.created_at,
     updatedAt: db.updated_at,
@@ -76,8 +84,11 @@ function localToDb(
     category: local.documentType,
     file_url: local.fileUrl || null,
     file_type: null,
+    file_name: local.fileName || null,
+    file_size: local.fileSize || null,
     expiration_date: local.expirationDate || null,
     notes: local.notes || null,
+    is_critical: local.isCritical,
     is_shared: local.sharedWith.length > 0,
     shared_with: local.sharedWith.length > 0 ? local.sharedWith : null,
   }
@@ -88,7 +99,27 @@ export function useDocuments() {
   const [isLoaded, setIsLoaded] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [syncError, setSyncError] = useState<string | null>(null)
+
+  // Check if storage bucket exists (don't create automatically due to RLS)
+  const checkBucketExists = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const { data: buckets } = await supabase.storage.listBuckets()
+      const bucketExists = buckets?.some(b => b.name === STORAGE_BUCKET)
+      
+      if (!bucketExists) {
+        console.warn(`Storage bucket '${STORAGE_BUCKET}' does not exist. Please create it manually in Supabase Dashboard.`)
+      }
+      
+      return bucketExists
+    } catch (error) {
+      console.error('Error checking bucket:', error)
+      return false
+    }
+  }, [])
 
   // Check auth and load data
   useEffect(() => {
@@ -101,16 +132,39 @@ export function useDocuments() {
       setIsAuthenticated(!!user)
 
       if (user) {
-        // Load from Supabase
+        // Check if storage bucket exists
+        await checkBucketExists()
+        
+        // Load from Supabase - get both owned and shared documents
         try {
-          const { data, error } = await supabase
-            .from("documents")
+          // Fetch documents owned by user
+          const { data: ownedDocs, error: ownedError } = await supabase
+            .from("document_vault")
             .select("*")
-            .order("created_at", { ascending: false })
+            .eq("user_id", user.id)
 
-          if (error) throw error
+          if (ownedError) throw ownedError
 
-          const localDocs = (data as DbDocument[]).map(dbToLocal)
+          // Fetch documents shared with user's email
+          const { data: sharedDocs, error: sharedError } = await supabase
+            .from("document_vault")
+            .select("*")
+            .contains("shared_with", [user.email])
+
+          if (sharedError) throw sharedError
+
+          // Combine and deduplicate documents
+          const allDocs = [...(ownedDocs || []), ...(sharedDocs || [])]
+          const uniqueDocs = Array.from(
+            new Map(allDocs.map(doc => [doc.id, doc])).values()
+          )
+
+          // Sort by created_at descending
+          uniqueDocs.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+
+          const localDocs = (uniqueDocs as DbDocument[]).map(dbToLocal)
           setDocuments(localDocs)
           localStorage.setItem(STORAGE_KEY, JSON.stringify(localDocs))
         } catch (error) {
@@ -127,15 +181,9 @@ export function useDocuments() {
           }
         }
       } else {
-        // Load from localStorage only
-        const stored = localStorage.getItem(STORAGE_KEY)
-        if (stored) {
-          try {
-            setDocuments(JSON.parse(stored))
-          } catch (e) {
-            console.error("Failed to parse stored documents:", e)
-          }
-        }
+        // User logged out - clear all data
+        setDocuments([])
+        localStorage.removeItem(STORAGE_KEY)
       }
 
       setIsLoaded(true)
@@ -143,12 +191,31 @@ export function useDocuments() {
 
     loadData()
 
-    // Listen for auth changes
+    // Listen for auth changes and clear data on logout/login
     const supabase = createClient()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user)
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const wasAuthenticated = isAuthenticated
+      const nowAuthenticated = !!session?.user
+      
+      setIsAuthenticated(nowAuthenticated)
+
+      // Clear data when logging out or switching users
+      if (event === 'SIGNED_OUT' || (wasAuthenticated && !nowAuthenticated)) {
+        setDocuments([])
+        localStorage.removeItem(STORAGE_KEY)
+        setIsLoaded(true) // Set to true so UI shows empty state instead of loading
+      }
+      
+      // Reload data when signing in or switching users
+      if (event === 'SIGNED_IN' || (!wasAuthenticated && nowAuthenticated)) {
+        setDocuments([])
+        localStorage.removeItem(STORAGE_KEY)
+        setIsLoaded(false)
+        // Trigger reload
+        await loadData()
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -161,12 +228,104 @@ export function useDocuments() {
     }
   }, [documents, isLoaded])
 
+  const uploadFile = useCallback(
+    async (file: File, documentId?: string): Promise<string | null> => {
+      if (!isAuthenticated) {
+        throw new Error("Must be authenticated to upload files")
+      }
+
+      setIsUploading(true)
+      setUploadProgress(0)
+
+      try {
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) throw new Error("No user found")
+
+        // Create unique file path
+        const fileExt = file.name.split(".").pop()
+        const fileName = `${user.id}/${documentId || generateId()}.${fileExt}`
+
+        // Upload file to Supabase Storage
+        const { data, error } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          })
+
+        if (error) throw error
+
+        // Get public URL
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(data.path)
+
+        setUploadProgress(100)
+        return publicUrl
+      } catch (error) {
+        console.error("Error uploading file:", error)
+        throw error
+      } finally {
+        setIsUploading(false)
+        setUploadProgress(0)
+      }
+    },
+    [isAuthenticated]
+  )
+
+  const deleteFile = useCallback(
+    async (fileUrl: string) => {
+      if (!isAuthenticated) return
+
+      try {
+        const supabase = createClient()
+        const filePath = fileUrl.split(`${STORAGE_BUCKET}/`)[1]
+
+        if (filePath) {
+          const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([filePath])
+          if (error) throw error
+        }
+      } catch (error) {
+        console.error("Error deleting file:", error)
+      }
+    },
+    [isAuthenticated]
+  )
+
   const addDocument = useCallback(
-    async (doc: Omit<Document, "id" | "createdAt" | "updatedAt">) => {
+    async (
+      doc: Omit<Document, "id" | "createdAt" | "updatedAt">,
+      file?: File
+    ): Promise<Document | null> => {
       const now = new Date().toISOString()
+      const docId = generateId()
+      
+      let fileUrl = doc.fileUrl
+      let fileName = doc.fileName
+      let fileSize = doc.fileSize
+
+      // Upload file if provided
+      if (file && isAuthenticated) {
+        try {
+          fileUrl = await uploadFile(file, docId) || undefined
+          fileName = file.name
+          fileSize = file.size
+        } catch (error) {
+          console.error("Error uploading file:", error)
+          throw new Error("Failed to upload file")
+        }
+      }
+
       const newDoc: Document = {
         ...doc,
-        id: generateId(),
+        id: docId,
+        fileUrl,
+        fileName,
+        fileSize,
         createdAt: now,
         updatedAt: now,
       }
@@ -181,9 +340,9 @@ export function useDocuments() {
 
           if (user) {
             const { data, error } = await supabase
-              .from("documents")
+              .from("document_vault")
               .insert({
-                ...localToDb(doc),
+                ...localToDb(newDoc),
                 user_id: user.id,
               })
               .select()
@@ -210,16 +369,49 @@ export function useDocuments() {
 
       return newDoc
     },
-    [isAuthenticated]
+    [isAuthenticated, uploadFile]
   )
 
   const updateDocument = useCallback(
-    async (id: string, updates: Partial<Document>) => {
+    async (
+      id: string,
+      updates: Partial<Document>,
+      newFile?: File
+    ) => {
       const now = new Date().toISOString()
+      const existingDoc = documents.find((d) => d.id === id)
+
+      let fileUrl = updates.fileUrl !== undefined ? updates.fileUrl : existingDoc?.fileUrl
+      let fileName = updates.fileName !== undefined ? updates.fileName : existingDoc?.fileName
+      let fileSize = updates.fileSize !== undefined ? updates.fileSize : existingDoc?.fileSize
+
+      // Upload new file if provided
+      if (newFile && isAuthenticated) {
+        try {
+          // Delete old file if exists
+          if (existingDoc?.fileUrl) {
+            await deleteFile(existingDoc.fileUrl)
+          }
+          fileUrl = await uploadFile(newFile, id) || undefined
+          fileName = newFile.name
+          fileSize = newFile.size
+        } catch (error) {
+          console.error("Error uploading file:", error)
+          throw new Error("Failed to upload file")
+        }
+      }
+
+      const finalUpdates = {
+        ...updates,
+        fileUrl,
+        fileName,
+        fileSize,
+        updatedAt: now,
+      }
 
       // Update locally first
       setDocuments((prev) =>
-        prev.map((doc) => (doc.id === id ? { ...doc, ...updates, updatedAt: now } : doc))
+        prev.map((doc) => (doc.id === id ? { ...doc, ...finalUpdates } : doc))
       )
 
       if (isAuthenticated) {
@@ -227,20 +419,27 @@ export function useDocuments() {
         try {
           const supabase = createClient()
 
-          // Map updates to database format
+          // Map updates to database format - only include fields that were actually updated
           const dbUpdates: Record<string, unknown> = {}
           if (updates.documentName !== undefined) dbUpdates.name = updates.documentName
           if (updates.documentType !== undefined) dbUpdates.category = updates.documentType
-          if (updates.fileUrl !== undefined) dbUpdates.file_url = updates.fileUrl || null
           if (updates.expirationDate !== undefined)
             dbUpdates.expiration_date = updates.expirationDate || null
           if (updates.notes !== undefined) dbUpdates.notes = updates.notes || null
+          if (updates.isCritical !== undefined) dbUpdates.is_critical = updates.isCritical
           if (updates.sharedWith !== undefined) {
             dbUpdates.is_shared = updates.sharedWith.length > 0
             dbUpdates.shared_with = updates.sharedWith.length > 0 ? updates.sharedWith : null
           }
+          
+          // Only update file fields if they were actually changed
+          if (newFile || updates.fileUrl !== undefined) {
+            dbUpdates.file_url = fileUrl || null
+            dbUpdates.file_name = fileName || null
+            dbUpdates.file_size = fileSize || null
+          }
 
-          const { error } = await supabase.from("documents").update(dbUpdates).eq("id", id)
+          const { error } = await supabase.from("document_vault").update(dbUpdates).eq("id", id)
 
           if (error) throw error
           setSyncError(null)
@@ -252,11 +451,18 @@ export function useDocuments() {
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticated, documents, uploadFile, deleteFile]
   )
 
   const deleteDocument = useCallback(
     async (id: string) => {
+      const doc = documents.find((d) => d.id === id)
+
+      // Delete file if exists
+      if (doc?.fileUrl && isAuthenticated) {
+        await deleteFile(doc.fileUrl)
+      }
+
       // Delete locally first
       setDocuments((prev) => prev.filter((doc) => doc.id !== id))
 
@@ -264,7 +470,7 @@ export function useDocuments() {
         setIsSyncing(true)
         try {
           const supabase = createClient()
-          const { error } = await supabase.from("documents").delete().eq("id", id)
+          const { error } = await supabase.from("document_vault").delete().eq("id", id)
 
           if (error) throw error
           setSyncError(null)
@@ -276,7 +482,14 @@ export function useDocuments() {
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticated, documents, deleteFile]
+  )
+
+  const shareDocument = useCallback(
+    async (id: string, emails: string[]) => {
+      await updateDocument(id, { sharedWith: emails })
+    },
+    [updateDocument]
   )
 
   const forceSync = useCallback(async () => {
@@ -285,14 +498,40 @@ export function useDocuments() {
     setIsSyncing(true)
     try {
       const supabase = createClient()
-      const { data, error } = await supabase
-        .from("documents")
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) return
+
+      // Fetch documents owned by user
+      const { data: ownedDocs, error: ownedError } = await supabase
+        .from("document_vault")
         .select("*")
-        .order("created_at", { ascending: false })
+        .eq("user_id", user.id)
 
-      if (error) throw error
+      if (ownedError) throw ownedError
 
-      const localDocs = (data as DbDocument[]).map(dbToLocal)
+      // Fetch documents shared with user's email
+      const { data: sharedDocs, error: sharedError } = await supabase
+        .from("document_vault")
+        .select("*")
+        .contains("shared_with", [user.email])
+
+      if (sharedError) throw sharedError
+
+      // Combine and deduplicate documents
+      const allDocs = [...(ownedDocs || []), ...(sharedDocs || [])]
+      const uniqueDocs = Array.from(
+        new Map(allDocs.map(doc => [doc.id, doc])).values()
+      )
+
+      // Sort by created_at descending
+      uniqueDocs.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )
+
+      const localDocs = (uniqueDocs as DbDocument[]).map(dbToLocal)
       setDocuments(localDocs)
       setSyncError(null)
     } catch (error) {
@@ -302,6 +541,21 @@ export function useDocuments() {
       setIsSyncing(false)
     }
   }, [isAuthenticated])
+
+  const isDocumentOwner = useCallback(
+    async (documentId: string): Promise<boolean> => {
+      const doc = documents.find(d => d.id === documentId)
+      if (!doc) return false
+
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      return doc.user_id === user?.id
+    },
+    [documents]
+  )
 
   const getDocumentsByType = useCallback(
     (type: DocumentType) => documents.filter((doc) => doc.documentType === type),
@@ -330,11 +584,17 @@ export function useDocuments() {
     isLoaded,
     isAuthenticated,
     isSyncing,
+    isUploading,
+    uploadProgress,
     syncError,
     addDocument,
     updateDocument,
     deleteDocument,
+    shareDocument,
+    uploadFile,
+    deleteFile,
     forceSync,
+    isDocumentOwner,
     getDocumentsByType,
     getCriticalDocuments,
     getExpiringDocuments,

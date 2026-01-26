@@ -4,7 +4,7 @@ import { Hero } from "@/components/deployment/hero"
 import { ChecklistSection } from "@/components/deployment/checklist-section"
 import { ProgressOverview } from "@/components/deployment/progress-overview"
 import { Footer } from "@/components/footer"
-import { Scale, DollarSign, Home, MessageSquare, ChevronRight, CircleAlert, Briefcase, BookOpen } from "lucide-react"
+import { Scale, DollarSign, Home, MessageSquare, ChevronRight } from "lucide-react"
 import { legalChecklist, homeChecklist, financialChecklist, familyChecklist } from "@/components/deployment/checklists"
 
 const checklistCategories = [
@@ -12,12 +12,6 @@ const checklistCategories = [
   { category: "financial", label: "Financial", totalItems: financialChecklist.length },
   { category: "home", label: "Home & Vehicles", totalItems: homeChecklist.length },
   { category: "family", label: "Family & Communication", totalItems: familyChecklist.length },
-]
-
-const serviceCategories = [
-  { name: "Services", icon: Briefcase, description: "Manage your life during deployment" },
-  { name: "Resources", icon: BookOpen, description: "Access external resources available to you" },
-  { name: "Emergency Contacts", icon: CircleAlert, description: "Have emergency contacts readily available" },
 ]
 
 export default function DeploymentPage() {
@@ -42,95 +36,57 @@ export default function DeploymentPage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-180px)]">
-        {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r">
-          <div className="top-20 p-6">
-            <a href="/transitions/deployment">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
-                Preparing for Deployment
-              </h2>
-            </a>
-            <div className="space-y-3">
-              {serviceCategories.map((category) => {
-                const Icon = category.icon
-                return (
-                  <Card
-                    key={category.name}
-                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
-                  >
-                    <a key={category.name} href={`/transitions/deployment/${category.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
-                            {category.name}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">{category.description}</p>
-                        </div>
-                      </div>
-                    </a>
-                  </Card>
-                )
-              })}
-            </div>
-          </div>
-        </aside>
+      {/* Main Content */}
+      <main className="flex-1 min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+        <div className="items-center">
+          <Hero />
 
-        {/* Main Content */}
-        <main className="flex-1 min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
-          <div className="items-center">
-            <Hero />
-
-            {/* Checklists Section */}
-            <section id="checklists" className="py-16">
-              <div className="max-w-4xl mx-auto px-4 sm:px-6">
-                <div className="text-center mb-10">
-                  <h2 className="text-2xl md:text-3xl font-bold text-foreground">Pre-Deployment Checklists</h2>
-                  <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-                    Work through each category to ensure nothing is overlooked. Your progress is automatically
-                    saved as you check items off.
-                  </p>
-                </div>
-
-                {/* Progress Overview */}
-                <div className="mb-8">
-                  <ProgressOverview categories={checklistCategories} />
-                </div>
-
-                <div className="space-y-4">
-                  <ChecklistSection
-                    title="Legal"
-                    category="legal"
-                    icon={<Scale className="w-5 h-5" />}
-                    items={legalChecklist}
-                  />
-                  <ChecklistSection
-                    title="Financial"
-                    category="financial"
-                    icon={<DollarSign className="w-5 h-5" />}
-                    items={financialChecklist}
-                  />
-                  <ChecklistSection
-                    title="Home & Vehicles"
-                    category="home"
-                    icon={<Home className="w-5 h-5" />}
-                    items={homeChecklist}
-                  />
-                  <ChecklistSection
-                    title="Family & Communication"
-                    category="family"
-                    icon={<MessageSquare className="w-5 h-5" />}
-                    items={familyChecklist}
-                  />
-                </div>
+          {/* Checklists Section */}
+          <section id="checklists" className="py-16">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6">
+              <div className="text-center mb-10">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground">Pre-Deployment Checklists</h2>
+                <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+                  Work through each category to ensure nothing is overlooked. Your progress is automatically
+                  saved as you check items off.
+                </p>
               </div>
-            </section>
-          </div>
-        </main>
-      </div>
+
+              {/* Progress Overview */}
+              <div className="mb-8">
+                <ProgressOverview categories={checklistCategories} />
+              </div>
+
+              <div className="space-y-4">
+                <ChecklistSection
+                  title="Legal"
+                  category="legal"
+                  icon={<Scale className="w-5 h-5" />}
+                  items={legalChecklist}
+                />
+                <ChecklistSection
+                  title="Financial"
+                  category="financial"
+                  icon={<DollarSign className="w-5 h-5" />}
+                  items={financialChecklist}
+                />
+                <ChecklistSection
+                  title="Home & Vehicles"
+                  category="home"
+                  icon={<Home className="w-5 h-5" />}
+                  items={homeChecklist}
+                />
+                <ChecklistSection
+                  title="Family & Communication"
+                  category="family"
+                  icon={<MessageSquare className="w-5 h-5" />}
+                  items={familyChecklist}
+                />
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
       <Footer />
     </>
   )
