@@ -38,6 +38,12 @@ const features = [
     description: "Schedule medical appointments, training sessions, and administrative tasks in one place.",
     path: "/scheduler/appointments",
   },
+  {
+    icon: FileText,
+    title: "Tasks",
+    description: "Create and manage your personal and professional tasks with ease.",
+    path: "/scheduler/tasks",
+  },
 ]
 
 export function Features() {
