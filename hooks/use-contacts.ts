@@ -50,6 +50,7 @@ export function useContacts() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -59,10 +60,10 @@ export function useContacts() {
       } = await supabase.auth.getUser()
 
       setIsAuthenticated(!!user)
+      setCurrentUserEmail(user?.email || null)
 
       if (user) {
         try {
-          // Load contacts
           const { data: contactsData, error: contactsError } = await supabase
             .from("emergency_contacts")
             .select("*")
@@ -76,13 +77,15 @@ export function useContacts() {
             contactName: c.name,
             relationship: c.relationship || undefined,
             phonePrimary: c.phone || undefined,
+            phoneSecondary: undefined,
             email: c.email || undefined,
             address: c.address || undefined,
             role: c.role || "other",
             isEmergencyContact: c.role === "primary" || c.role === "secondary",
             isPoaHolder: c.has_poa || false,
             poaType: c.poa_type || undefined,
-            canAccessAccounts: c.role === "financial",
+            // Store canAccessAccounts in a metadata field or use role "financial"
+            canAccessAccounts: c.can_access_accounts !== undefined ? c.can_access_accounts : c.role === "financial",
             priority: c.priority || 0,
             notes: c.notes || undefined,
             createdAt: c.created_at,
@@ -92,7 +95,6 @@ export function useContacts() {
           setContacts(localContacts)
           localStorage.setItem(CONTACTS_KEY, JSON.stringify(localContacts))
 
-          // Load communication logs
           const { data: commData, error: commError } = await supabase
             .from("communication_logs")
             .select("*")
@@ -151,8 +153,25 @@ export function useContacts() {
     const supabase = createClient()
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const newEmail = session?.user?.email || null
+      
+      // If user signs out or changes, reload the page for security
+      if (event === 'SIGNED_OUT' || 
+          (event === 'SIGNED_IN' && newEmail !== currentUserEmail && currentUserEmail !== null)) {
+        // Clear localStorage to prevent data leakage
+        localStorage.removeItem(CONTACTS_KEY)
+        localStorage.removeItem(COMM_LOG_KEY)
+        
+        // Force page reload
+        window.location.reload()
+      } else if (event === 'SIGNED_IN' && currentUserEmail === null) {
+        // Initial sign in (not a switch), just reload data
+        loadData()
+      }
+      
       setIsAuthenticated(!!session?.user)
+      setCurrentUserEmail(newEmail)
     })
 
     return () => subscription.unsubscribe()
@@ -198,6 +217,7 @@ export function useContacts() {
                 poa_type: contact.poaType || null,
                 notes: contact.notes || null,
                 priority: contact.priority || 0,
+                can_access_accounts: contact.canAccessAccounts || false,
               })
               .select()
               .single()
@@ -213,10 +233,10 @@ export function useContacts() {
               email: data.email || undefined,
               address: data.address || undefined,
               role: data.role || "other",
-              isEmergencyContact: data.role === "primary" || data.role === "secondary",
+              isEmergencyContact: contact.isEmergencyContact,
               isPoaHolder: data.has_poa || false,
               poaType: data.poa_type || undefined,
-              canAccessAccounts: data.role === "financial",
+              canAccessAccounts: data.can_access_accounts || false,
               priority: data.priority || 0,
               notes: data.notes || undefined,
               createdAt: data.created_at,
@@ -245,8 +265,10 @@ export function useContacts() {
 
   const updateContact = useCallback(
     async (id: string, updates: Partial<Contact>) => {
+      const now = new Date().toISOString()
+      
       setContacts((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: new Date().toISOString() } : c))
+        prev.map((c) => (c.id === id ? { ...c, ...updates, updatedAt: now } : c))
       )
 
       if (isAuthenticated) {
@@ -254,7 +276,7 @@ export function useContacts() {
         try {
           const supabase = createClient()
 
-          const dbUpdates: Record<string, unknown> = {}
+          const dbUpdates: Record<string, unknown> = { updated_at: now }
           if (updates.contactName !== undefined) dbUpdates.name = updates.contactName
           if (updates.relationship !== undefined) dbUpdates.relationship = updates.relationship || null
           if (updates.phonePrimary !== undefined) dbUpdates.phone = updates.phonePrimary || null
@@ -265,6 +287,7 @@ export function useContacts() {
           if (updates.poaType !== undefined) dbUpdates.poa_type = updates.poaType || null
           if (updates.notes !== undefined) dbUpdates.notes = updates.notes || null
           if (updates.priority !== undefined) dbUpdates.priority = updates.priority
+          if (updates.canAccessAccounts !== undefined) dbUpdates.can_access_accounts = updates.canAccessAccounts
 
           const { error } = await supabase.from("emergency_contacts").update(dbUpdates).eq("id", id)
 
@@ -283,6 +306,11 @@ export function useContacts() {
 
   const deleteContact = useCallback(
     async (id: string) => {
+      // Get the contact being deleted to know its priority
+      const deletedContact = contacts.find((c) => c.id === id)
+      const deletedPriority = deletedContact?.priority || 0
+      
+      // Remove the contact
       setContacts((prev) => prev.filter((c) => c.id !== id))
       setCommunicationLog((prev) => prev.filter((log) => log.contactId !== id))
 
@@ -290,9 +318,30 @@ export function useContacts() {
         setIsSyncing(true)
         try {
           const supabase = createClient()
-          const { error } = await supabase.from("emergency_contacts").delete().eq("id", id)
+          
+          // Delete the contact
+          const { error: deleteError } = await supabase.from("emergency_contacts").delete().eq("id", id)
+          if (deleteError) throw deleteError
 
-          if (error) throw error
+          // Reorder priorities - shift all contacts with higher priority numbers down by 1
+          const contactsToUpdate = contacts.filter(
+            (c) => c.id !== id && c.priority > deletedPriority
+          )
+
+          // Update priorities in the database
+          for (const contact of contactsToUpdate) {
+            const newPriority = contact.priority - 1
+            await supabase
+              .from("emergency_contacts")
+              .update({ priority: newPriority })
+              .eq("id", contact.id)
+            
+            // Update local state
+            setContacts((prev) =>
+              prev.map((c) => (c.id === contact.id ? { ...c, priority: newPriority } : c))
+            )
+          }
+
           setSyncError(null)
         } catch (error) {
           console.error("Error deleting contact:", error)
@@ -302,7 +351,7 @@ export function useContacts() {
         }
       }
     },
-    [isAuthenticated]
+    [isAuthenticated, contacts]
   )
 
   const addCommunication = useCallback(
@@ -397,12 +446,21 @@ export function useContacts() {
     [isAuthenticated]
   )
 
+  const exportToPDF = useCallback(async () => {
+    // Use client-side PDF generation (works without server setup)
+    const { exportContactsToPDFClientSide } = await import("@/lib/pdf-generation/emergency-contacts")
+    await exportContactsToPDFClientSide(contacts, currentUserEmail || "user")
+  }, [contacts, currentUserEmail])
+
   const getEmergencyContacts = useCallback(
-    () => contacts.filter((c) => c.isEmergencyContact),
+    () => contacts.filter((c) => c.isEmergencyContact).sort((a, b) => (a.priority || 0) - (b.priority || 0)),
     [contacts]
   )
 
-  const getPoaHolders = useCallback(() => contacts.filter((c) => c.isPoaHolder), [contacts])
+  const getPoaHolders = useCallback(
+    () => contacts.filter((c) => c.isPoaHolder).sort((a, b) => (a.priority || 0) - (b.priority || 0)),
+    [contacts]
+  )
 
   const getRecentCommunications = useCallback(
     (limit: number = 10) => communicationLog.slice(0, limit),
@@ -421,14 +479,104 @@ export function useContacts() {
     isAuthenticated,
     isSyncing,
     syncError,
+    currentUserEmail,
     addContact,
     updateContact,
     deleteContact,
     addCommunication,
     deleteCommunication,
+    exportToPDF,
     getEmergencyContacts,
     getPoaHolders,
     getRecentCommunications,
     getContactCommunications,
   }
+}
+
+// Hook to find contacts where the current user's email appears
+export function useSharedWithMe() {
+  const [sharedContacts, setSharedContacts] = useState<Array<Contact & { ownerName?: string }>>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [currentEmail, setCurrentEmail] = useState<string | null>(null)
+
+  const loadSharedContacts = useCallback(async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    setCurrentEmail(user?.email || null)
+
+    if (!user?.email) {
+      setSharedContacts([])
+      setIsLoaded(true)
+      return
+    }
+
+    try {
+      // Find all contacts where the email matches the current user's email
+      const { data, error } = await supabase
+        .from("emergency_contacts")
+        .select(`
+          *,
+          profiles:user_id (
+            email
+          )
+        `)
+        .eq("email", user.email)
+        .neq("user_id", user.id) // Exclude contacts created by the current user
+
+      if (error) throw error
+
+      const shared: Array<Contact & { ownerName?: string }> = (data || []).map((c) => ({
+        id: c.id,
+        user_id: c.user_id,
+        contactName: c.name,
+        relationship: c.relationship || undefined,
+        phonePrimary: c.phone || undefined,
+        email: c.email || undefined,
+        address: c.address || undefined,
+        role: c.role || "other",
+        isEmergencyContact: c.role === "primary" || c.role === "secondary",
+        isPoaHolder: c.has_poa || false,
+        poaType: c.poa_type || undefined,
+        canAccessAccounts: c.can_access_accounts !== undefined ? c.can_access_accounts : c.role === "financial",
+        priority: c.priority || 0,
+        notes: c.notes || undefined,
+        createdAt: c.created_at,
+        updatedAt: c.updated_at,
+        ownerName: c.profiles?.email || "Unknown User",
+      }))
+
+      setSharedContacts(shared)
+    } catch (error) {
+      console.error("Error loading shared contacts:", error)
+      setSharedContacts([])
+    } finally {
+      setIsLoaded(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSharedContacts()
+
+    // Subscribe to auth changes
+    const supabase = createClient()
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const newEmail = session?.user?.email || null
+      
+      // Reload shared contacts when auth state changes
+      if (event === 'SIGNED_IN' && newEmail) {
+        loadSharedContacts()
+      } else if (event === 'SIGNED_OUT') {
+        setSharedContacts([])
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [loadSharedContacts])
+
+  return { sharedContacts, isLoaded, refreshSharedContacts: loadSharedContacts }
 }

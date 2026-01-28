@@ -1,71 +1,44 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import {
-  Users,
-  Plus,
-  ArrowLeft,
-  Phone,
-  Mail,
-  Shield,
-  AlertTriangle,
-  ChevronDown,
-  Trash2,
-  Edit,
-  Key,
-  Wallet,
-  FileText,
-  MapPin,
-  Star,
-  StarOff,
-} from "lucide-react"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import { Users, Plus, ArrowLeft, Phone, Mail, Shield, AlertTriangle, ChevronDown, Trash2, Edit, Key, FileText, MapPin, Star, StarOff, GripVertical, Download, Info, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useContacts, type Contact } from "@/hooks/use-contacts"
-
-const roleDescriptions = {
-  emergency: "First person to call in emergencies",
-  poa: "Has Power of Attorney authority",
-  accounts: "Can access financial accounts",
-}
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useContacts, type Contact, useSharedWithMe } from "@/hooks/use-contacts"
+import { createClient } from "@/lib/supabase/client"
 
 function EmergencyContactCard({
   contact,
   onEdit,
   onDelete,
   onToggleRole,
+  showPriority = false,
+  onMoveUp,
+  onMoveDown,
+  isFirst,
+  isLast,
+  isSharedWithMe = false,
 }: {
   contact: Contact
-  onEdit: () => void
-  onDelete: () => void
-  onToggleRole: (role: "emergency" | "poa" | "accounts") => void
+  onEdit?: () => void
+  onDelete?: () => void
+  onToggleRole?: (role: "emergency" | "poa" | "accounts") => void
+  showPriority?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+  isFirst?: boolean
+  isLast?: boolean
+  isSharedWithMe?: boolean
 }) {
   const roles = []
   if (contact.isEmergencyContact) roles.push("Emergency Contact")
@@ -73,12 +46,19 @@ function EmergencyContactCard({
   if (contact.canAccessAccounts) roles.push("Account Access")
 
   return (
-    <div className="bg-card border rounded-lg overflow-hidden">
+    <div className={`bg-card border rounded-lg overflow-hidden hover:border-primary/50 transition-colors ${isSharedWithMe ? 'border-blue-300 bg-blue-50/50' : ''}`}>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
+          <div className="flex items-start gap-3 flex-1">
+            {showPriority && !isSharedWithMe && (
+              <div className="flex flex-col gap-1 mt-1">
+                <span className="text-xs text-muted-foreground text-center font-mono">
+                  #{contact.priority}
+                </span>
+              </div>
+            )}
             <div
-              className={`w-12 h-12 rounded-full flex items-center justify-center ${
+              className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${
                 contact.isEmergencyContact
                   ? "bg-destructive/10 text-destructive"
                   : contact.isPoaHolder
@@ -94,48 +74,70 @@ function EmergencyContactCard({
                 <Users className="w-6 h-6" />
               )}
             </div>
-            <div>
-              <h3 className="font-semibold text-foreground">{contact.contactName}</h3>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground">{contact.contactName}</h3>
+                {isSharedWithMe && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    Listed you as contact
+                  </span>
+                )}
+              </div>
               {contact.relationship && (
                 <p className="text-sm text-muted-foreground">{contact.relationship}</p>
               )}
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Contact
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onToggleRole("emergency")}>
-                {contact.isEmergencyContact ? (
-                  <StarOff className="w-4 h-4 mr-2" />
-                ) : (
-                  <Star className="w-4 h-4 mr-2" />
+          {!isSharedWithMe && onEdit && onDelete && onToggleRole && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Contact
+                </DropdownMenuItem>
+                {showPriority && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onMoveUp} disabled={isFirst}>
+                      <GripVertical className="w-4 h-4 mr-2" />
+                      Move Up
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onMoveDown} disabled={isLast}>
+                      <GripVertical className="w-4 h-4 mr-2" />
+                      Move Down
+                    </DropdownMenuItem>
+                  </>
                 )}
-                {contact.isEmergencyContact ? "Remove from" : "Add as"} Emergency Contact
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleRole("poa")}>
-                <Shield className="w-4 h-4 mr-2" />
-                {contact.isPoaHolder ? "Remove" : "Designate as"} POA Holder
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onToggleRole("accounts")}>
-                <Key className="w-4 h-4 mr-2" />
-                {contact.canAccessAccounts ? "Revoke" : "Grant"} Account Access
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onToggleRole("emergency")}>
+                  {contact.isEmergencyContact ? (
+                    <StarOff className="w-4 h-4 mr-2" />
+                  ) : (
+                    <Star className="w-4 h-4 mr-2" />
+                  )}
+                  {contact.isEmergencyContact ? "Remove from" : "Add as"} Emergency Contact
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onToggleRole("poa")}>
+                  <Shield className="w-4 h-4 mr-2" />
+                  {contact.isPoaHolder ? "Remove" : "Designate as"} POA Holder
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onToggleRole("accounts")}>
+                  <Key className="w-4 h-4 mr-2" />
+                  {contact.canAccessAccounts ? "Revoke" : "Grant"} Account Access
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Roles */}
@@ -216,19 +218,51 @@ function AddEmergencyContactDialog({
   onSave: (contact: Omit<Contact, "id" | "createdAt" | "updatedAt">) => void
   editingContact?: Contact | null
 }) {
-  const [name, setName] = useState(editingContact?.contactName || "")
-  const [relationship, setRelationship] = useState(editingContact?.relationship || "")
-  const [phonePrimary, setPhonePrimary] = useState(editingContact?.phonePrimary || "")
-  const [phoneSecondary, setPhoneSecondary] = useState(editingContact?.phoneSecondary || "")
-  const [email, setEmail] = useState(editingContact?.email || "")
-  const [address, setAddress] = useState(editingContact?.address || "")
-  const [notes, setNotes] = useState(editingContact?.notes || "")
-  const [isEmergencyContact, setIsEmergencyContact] = useState(editingContact?.isEmergencyContact || false)
-  const [isPoaHolder, setIsPoaHolder] = useState(editingContact?.isPoaHolder || false)
-  const [canAccessAccounts, setCanAccessAccounts] = useState(editingContact?.canAccessAccounts || false)
+  const [name, setName] = useState("")
+  const [relationship, setRelationship] = useState("")
+  const [phonePrimary, setPhonePrimary] = useState("")
+  const [phoneSecondary, setPhoneSecondary] = useState("")
+  const [email, setEmail] = useState("")
+  const [address, setAddress] = useState("")
+  const [notes, setNotes] = useState("")
+  const [isEmergencyContact, setIsEmergencyContact] = useState(false)
+  const [isPoaHolder, setIsPoaHolder] = useState(false)
+  const [canAccessAccounts, setCanAccessAccounts] = useState(false)
+
+  useEffect(() => {
+    if (editingContact) {
+      setName(editingContact.contactName || "")
+      setRelationship(editingContact.relationship || "")
+      setPhonePrimary(editingContact.phonePrimary || "")
+      setPhoneSecondary(editingContact.phoneSecondary || "")
+      setEmail(editingContact.email || "")
+      setAddress(editingContact.address || "")
+      setNotes(editingContact.notes || "")
+      setIsEmergencyContact(editingContact.isEmergencyContact || false)
+      setIsPoaHolder(editingContact.isPoaHolder || false)
+      setCanAccessAccounts(editingContact.canAccessAccounts || false)
+    } else {
+      setName("")
+      setRelationship("")
+      setPhonePrimary("")
+      setPhoneSecondary("")
+      setEmail("")
+      setAddress("")
+      setNotes("")
+      setIsEmergencyContact(false)
+      setIsPoaHolder(false)
+      setCanAccessAccounts(false)
+    }
+  }, [editingContact, open])
 
   const handleSave = () => {
     if (!name.trim()) return
+    
+    let role: Contact["role"] = "other"
+    if (isEmergencyContact) role = "primary"
+    else if (canAccessAccounts) role = "financial"
+    else if (isPoaHolder) role = "legal"
+
     onSave({
       contactName: name.trim(),
       relationship: relationship.trim() || undefined,
@@ -240,18 +274,9 @@ function AddEmergencyContactDialog({
       isEmergencyContact,
       isPoaHolder,
       canAccessAccounts,
+      role,
+      priority: editingContact?.priority || 0,
     })
-    // Reset form
-    setName("")
-    setRelationship("")
-    setPhonePrimary("")
-    setPhoneSecondary("")
-    setEmail("")
-    setAddress("")
-    setNotes("")
-    setIsEmergencyContact(false)
-    setIsPoaHolder(false)
-    setCanAccessAccounts(false)
     onOpenChange(false)
   }
 
@@ -318,6 +343,9 @@ function AddEmergencyContactDialog({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jane@example.com"
             />
+            <p className="text-xs text-muted-foreground">
+              If this email has an account, your info will appear on their contacts page
+            </p>
           </div>
 
           <div className="space-y-2">
@@ -341,7 +369,7 @@ function AddEmergencyContactDialog({
                   onCheckedChange={(checked) => setIsEmergencyContact(checked === true)}
                 />
                 <div>
-                  <label htmlFor="emergency" className="text-sm font-medium">
+                  <label htmlFor="emergency" className="text-sm font-medium cursor-pointer">
                     Emergency Contact
                   </label>
                   <p className="text-xs text-muted-foreground">
@@ -356,7 +384,7 @@ function AddEmergencyContactDialog({
                   onCheckedChange={(checked) => setIsPoaHolder(checked === true)}
                 />
                 <div>
-                  <label htmlFor="poa" className="text-sm font-medium">
+                  <label htmlFor="poa" className="text-sm font-medium cursor-pointer">
                     Power of Attorney Holder
                   </label>
                   <p className="text-xs text-muted-foreground">
@@ -371,7 +399,7 @@ function AddEmergencyContactDialog({
                   onCheckedChange={(checked) => setCanAccessAccounts(checked === true)}
                 />
                 <div>
-                  <label htmlFor="accounts" className="text-sm font-medium">
+                  <label htmlFor="accounts" className="text-sm font-medium cursor-pointer">
                     Financial Account Access
                   </label>
                   <p className="text-xs text-muted-foreground">
@@ -415,43 +443,97 @@ export default function EmergencyContactsPage() {
     deleteContact,
     getEmergencyContacts,
     getPoaHolders,
+    exportToPDF,
   } = useContacts()
+
+  const { sharedContacts, isLoaded: sharedLoaded, refreshSharedContacts } = useSharedWithMe()
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
   const [activeTab, setActiveTab] = useState("all")
+  const [isExporting, setIsExporting] = useState(false)
 
   const emergencyContacts = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const accountAccessContacts = contacts.filter((c) => c.canAccessAccounts)
 
-  const handleSaveContact = (contactData: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
+  const handleSaveContact = async (contactData: Omit<Contact, "id" | "createdAt" | "updatedAt">) => {
     if (editingContact) {
-      updateContact(editingContact.id, contactData)
+      await updateContact(editingContact.id, contactData)
       setEditingContact(null)
     } else {
-      addContact(contactData)
+      const maxPriority = contacts.reduce((max, c) => Math.max(max, c.priority || 0), 0)
+      await addContact({
+        ...contactData,
+        priority: maxPriority + 1,
+      })
     }
   }
 
-  const handleToggleRole = (contact: Contact, role: "emergency" | "poa" | "accounts") => {
+  const handleToggleRole = async (contact: Contact, role: "emergency" | "poa" | "accounts") => {
     const updates: Partial<Contact> = {}
-    if (role === "emergency") updates.isEmergencyContact = !contact.isEmergencyContact
-    if (role === "poa") updates.isPoaHolder = !contact.isPoaHolder
-    if (role === "accounts") updates.canAccessAccounts = !contact.canAccessAccounts
-    updateContact(contact.id, updates)
+    
+    if (role === "emergency") {
+      updates.isEmergencyContact = !contact.isEmergencyContact
+      if (!contact.isEmergencyContact) {
+        updates.role = "primary"
+      }
+    }
+    if (role === "poa") {
+      updates.isPoaHolder = !contact.isPoaHolder
+      if (!contact.isPoaHolder && !contact.isEmergencyContact) {
+        updates.role = "legal"
+      }
+    }
+    if (role === "accounts") {
+      updates.canAccessAccounts = !contact.canAccessAccounts
+      if (!contact.canAccessAccounts && !contact.isEmergencyContact && !contact.isPoaHolder) {
+        updates.role = "financial"
+      }
+    }
+    
+    await updateContact(contact.id, updates)
+  }
+
+  const handleMovePriority = async (contactId: string, direction: "up" | "down") => {
+    const sortedContacts = [...contacts].sort((a, b) => (a.priority || 0) - (b.priority || 0))
+    const currentIndex = sortedContacts.findIndex((c) => c.id === contactId)
+    
+    if (currentIndex === -1) return
+    if (direction === "up" && currentIndex === 0) return
+    if (direction === "down" && currentIndex === sortedContacts.length - 1) return
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
+    const currentContact = sortedContacts[currentIndex]
+    const targetContact = sortedContacts[targetIndex]
+
+    await updateContact(currentContact.id, { priority: targetContact.priority })
+    await updateContact(targetContact.id, { priority: currentContact.priority })
+  }
+
+  const handleExportPDF = async () => {
+    setIsExporting(true)
+    try {
+      await exportToPDF()
+    } catch (error) {
+      console.error("Error exporting PDF:", error)
+    } finally {
+      setIsExporting(false)
+    }
   }
 
   const filteredContacts =
     activeTab === "all"
-      ? contacts
+      ? [...contacts].sort((a, b) => (a.priority || 0) - (b.priority || 0))
       : activeTab === "emergency"
       ? emergencyContacts
       : activeTab === "poa"
       ? poaHolders
+      : activeTab === "shared"
+      ? sharedContacts
       : accountAccessContacts
 
-  if (!isLoaded) {
+  if (!isLoaded || !sharedLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-muted-foreground">Loading...</div>
@@ -461,13 +543,14 @@ export default function EmergencyContactsPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild>
-                <Link href="/">
+                <Link href="./">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
@@ -478,17 +561,36 @@ export default function EmergencyContactsPage() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Contact
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                asChild
+              >
+                <Link href="./communication">
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  View Logs
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleExportPDF}
+                disabled={isExporting || contacts.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isExporting ? "Exporting..." : "Export PDF"}
+              </Button>
+              <Button onClick={() => setIsDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Contact
+              </Button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
           <div className="bg-card border rounded-lg p-4">
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-muted-foreground" />
@@ -525,7 +627,27 @@ export default function EmergencyContactsPage() {
               </div>
             </div>
           </div>
+          <div className="bg-card border rounded-lg p-4 border-blue-300">
+            <div className="flex items-center gap-3">
+              <Info className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-2xl font-bold text-foreground">{sharedContacts.length}</p>
+                <p className="text-sm text-muted-foreground">Shared With You</p>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Shared Contacts Alert */}
+        {sharedContacts.length > 0 && (
+          <Alert className="mb-6 border-blue-300 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>{sharedContacts.length} {sharedContacts.length === 1 ? 'person has' : 'people have'}</strong> listed you as their emergency contact. 
+              View them in the "Shared With You" tab.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Important Notice */}
         {(emergencyContacts.length === 0 || poaHolders.length === 0) && (
@@ -591,21 +713,57 @@ export default function EmergencyContactsPage() {
             <TabsTrigger value="emergency">Emergency ({emergencyContacts.length})</TabsTrigger>
             <TabsTrigger value="poa">POA ({poaHolders.length})</TabsTrigger>
             <TabsTrigger value="accounts">Account Access ({accountAccessContacts.length})</TabsTrigger>
+            <TabsTrigger value="shared" className="relative">
+              Shared With You ({sharedContacts.length})
+              {sharedContacts.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-600 rounded-full"></span>
+              )}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab}>
+            {activeTab === "all" && contacts.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                <strong>Priority Order:</strong> Use the move buttons to reorder contacts by priority. 
+                Lower numbers indicate higher priority.
+              </div>
+            )}
+
+            {activeTab === "shared" && sharedContacts.length > 0 && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800 flex items-center justify-between">
+                <div>
+                  <strong>Shared Contacts:</strong> These people have listed you as their emergency contact. 
+                  You cannot edit or delete these entries.
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={refreshSharedContacts}
+                  className="ml-4"
+                >
+                  Refresh
+                </Button>
+              </div>
+            )}
+            
             {filteredContacts.length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
-                {filteredContacts.map((contact) => (
+                {filteredContacts.map((contact, index) => (
                   <EmergencyContactCard
                     key={contact.id}
                     contact={contact}
-                    onEdit={() => {
+                    onEdit={activeTab !== "shared" ? () => {
                       setEditingContact(contact)
                       setIsDialogOpen(true)
-                    }}
-                    onDelete={() => deleteContact(contact.id)}
-                    onToggleRole={(role) => handleToggleRole(contact, role)}
+                    } : undefined}
+                    onDelete={activeTab !== "shared" ? () => deleteContact(contact.id) : undefined}
+                    onToggleRole={activeTab !== "shared" ? (role) => handleToggleRole(contact, role) : undefined}
+                    showPriority={activeTab === "all"}
+                    onMoveUp={() => handleMovePriority(contact.id, "up")}
+                    onMoveDown={() => handleMovePriority(contact.id, "down")}
+                    isFirst={index === 0}
+                    isLast={index === filteredContacts.length - 1}
+                    isSharedWithMe={activeTab === "shared"}
                   />
                 ))}
               </div>
@@ -613,14 +771,20 @@ export default function EmergencyContactsPage() {
               <div className="text-center py-12 bg-card border rounded-lg">
                 <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-medium text-foreground mb-2">
-                  {contacts.length === 0 ? "No contacts yet" : "No contacts in this category"}
+                  {contacts.length === 0 && activeTab !== "shared" 
+                    ? "No contacts yet" 
+                    : activeTab === "shared"
+                    ? "No one has listed you yet"
+                    : "No contacts in this category"}
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  {contacts.length === 0
+                  {contacts.length === 0 && activeTab !== "shared"
                     ? "Add trusted people who can act on your behalf during deployment."
+                    : activeTab === "shared"
+                    ? "When someone adds your email as their emergency contact, they'll appear here."
                     : "Add contacts to this category using the dropdown menu."}
                 </p>
-                {contacts.length === 0 && (
+                {contacts.length === 0 && activeTab !== "shared" && (
                   <Button onClick={() => setIsDialogOpen(true)}>
                     <Plus className="w-4 h-4 mr-2" />
                     Add Your First Contact
@@ -631,6 +795,7 @@ export default function EmergencyContactsPage() {
           </TabsContent>
         </Tabs>
       </main>
+      <Footer />
 
       {/* Dialog */}
       <AddEmergencyContactDialog

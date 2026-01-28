@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pdf } from '@react-pdf/renderer'
-import { PropertySummaryDocument, SummaryData } from '@/lib/pdf-generator'
+import { PropertySummaryDocument, SummaryData } from '@/lib/pdf-generation/property-management'
 import {
   useProperties,
   type Property,
@@ -55,7 +55,7 @@ function getDaysUntil(date: string): number {
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString("en-US", {
+  return new Date(date+"T00:00:00").toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -315,16 +315,17 @@ function AddPropertyDialog({
   }, [editingProperty, open])
 
   const handleCaretakerChange = (contactId: string) => {
-    setCaretakerContactId(contactId)
-    if (contactId) {
-      const contact = emergencyContacts.find(c => c.id === contactId)
+    if (contactId === "none") {
+      setCaretakerContactId("")
+      setCaretakerName("")
+      setCaretakerPhone("")
+    } else {
+      const contact = emergencyContacts.find((c) => c.id === contactId)
       if (contact) {
+        setCaretakerContactId(contactId)
         setCaretakerName(contact.name)
         setCaretakerPhone(contact.phone || "")
       }
-    } else {
-      setCaretakerName("")
-      setCaretakerPhone("")
     }
   }
 
@@ -469,7 +470,7 @@ function AddPropertyDialog({
                       <SelectValue placeholder="Choose a contact or enter manually" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None (Enter manually)</SelectItem>
+                      <SelectItem value="none">None (Enter manually)</SelectItem>
                       {emergencyContacts.map((contact) => (
                         <SelectItem key={contact.id} value={contact.id}>
                           {contact.name} {contact.phone && `- ${contact.phone}`}

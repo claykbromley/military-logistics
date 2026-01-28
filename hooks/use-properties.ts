@@ -620,6 +620,8 @@ export function useProperties() {
             updates.isCompleted = false // Reset completion status for recurring task
           } else if (!updates.lastCompleted) {
             dbUpdates.completed_date = new Date().toISOString().split("T")[0]
+          } else if (task && task.frequency === "one_time") {
+            deleteMaintenanceTask(propertyId, taskId)
           }
         }
       }
