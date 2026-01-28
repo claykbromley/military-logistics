@@ -2,61 +2,28 @@
 
 import React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 import Link from "next/link"
-import {
-  Home,
-  Car,
-  Warehouse,
-  Building2,
-  Plus,
-  ArrowLeft,
-  AlertTriangle,
-  Calendar,
-  Wrench,
-  ChevronDown,
-  Trash2,
-  Edit,
-  User,
-  Phone,
-  Shield,
-  FileCheck,
-  Clock,
-  CheckCircle2,
-} from "lucide-react"
+import { Home, Car, Warehouse, Building2, Plus, ArrowLeft, AlertTriangle, Calendar, Wrench, ChevronDown, Trash2, Edit, User, Phone, Shield, Clock, CheckCircle2, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { pdf } from '@react-pdf/renderer'
+import { PropertySummaryDocument, SummaryData } from '@/lib/pdf-generator'
 import {
   useProperties,
   type Property,
   type PropertyType,
   type MaintenanceTask,
   type MaintenanceFrequency,
+  type EmergencyContact,
 } from "@/hooks/use-properties"
 
 const propertyTypes: { value: PropertyType; label: string; icon: React.ReactNode }[] = [
@@ -100,12 +67,16 @@ function PropertyCard({
   onEdit,
   onDelete,
   onAddTask,
+  onEditTask,
+  onDeleteTask,
   onCompleteTask,
 }: {
   property: Property
   onEdit: () => void
   onDelete: () => void
   onAddTask: () => void
+  onEditTask: (task: MaintenanceTask) => void
+  onDeleteTask: (taskId: string) => void
   onCompleteTask: (taskId: string) => void
 }) {
   const pendingTasks = property.maintenanceTasks.filter((t) => !t.isCompleted)
@@ -165,15 +136,20 @@ function PropertyCard({
 
         {/* Caretaker Info */}
         {property.caretakerName && (
-          <div className="mt-3 flex items-center gap-4 text-sm">
+          <div className="mt-3 flex flex-col gap-1 text-sm">
             <div className="flex items-center gap-1 text-muted-foreground">
               <User className="w-4 h-4" />
               <span>Caretaker: {property.caretakerName}</span>
             </div>
             {property.caretakerPhone && (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Phone className="w-4 h-4" />
+              <div className="flex items-center gap-1 text-muted-foreground pl-5">
+                <Phone className="w-3 h-3" />
                 <span>{property.caretakerPhone}</span>
+              </div>
+            )}
+            {property.caretakerEmail && (
+              <div className="flex items-center gap-1 text-muted-foreground pl-5 text-xs">
+                <span>{property.caretakerEmail}</span>
               </div>
             )}
           </div>
@@ -220,22 +196,41 @@ function PropertyCard({
                 key={task.id}
                 className="flex items-center justify-between bg-card rounded p-2 text-sm"
               >
-                <div>
+                <div className="flex-1">
                   <p className="font-medium text-foreground">{task.taskName}</p>
-                  {task.nextDue && (
-                    <p className="text-xs text-muted-foreground">
-                      Due: {formatDate(task.nextDue)}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {task.nextDue && (
+                      <span>Due: {formatDate(task.nextDue)}</span>
+                    )}
+                    {task.assignedToName && (
+                      <span>• {task.assignedToName}</span>
+                    )}
+                  </div>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onCompleteTask(task.id)}
-                  className="text-accent hover:text-accent"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <ChevronDown className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onCompleteTask(task.id)}>
+                        <CheckCircle2 className="w-4 h-4 mr-2" />
+                        Mark Complete
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onEditTask(task)}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit Task
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onDeleteTask(task.id)} className="text-destructive">
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             ))}
             {pendingTasks.length > 3 && (
@@ -266,23 +261,72 @@ function AddPropertyDialog({
   onOpenChange,
   onSave,
   editingProperty,
+  emergencyContacts,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (prop: Omit<Property, "id" | "createdAt" | "updatedAt" | "maintenanceTasks">) => void
   editingProperty?: Property | null
+  emergencyContacts: EmergencyContact[]
 }) {
-  const [name, setName] = useState(editingProperty?.propertyName || "")
-  const [type, setType] = useState<PropertyType>(editingProperty?.propertyType || "home")
-  const [address, setAddress] = useState(editingProperty?.address || "")
-  const [insuranceCompany, setInsuranceCompany] = useState(editingProperty?.insuranceCompany || "")
-  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState(editingProperty?.insurancePolicyNumber || "")
-  const [insuranceExpiry, setInsuranceExpiry] = useState(editingProperty?.insuranceExpiry || "")
-  const [registrationExpiry, setRegistrationExpiry] = useState(editingProperty?.registrationExpiry || "")
-  const [inspectionExpiry, setInspectionExpiry] = useState(editingProperty?.inspectionExpiry || "")
-  const [caretakerName, setCaretakerName] = useState(editingProperty?.caretakerName || "")
-  const [caretakerPhone, setCaretakerPhone] = useState(editingProperty?.caretakerPhone || "")
-  const [notes, setNotes] = useState(editingProperty?.notes || "")
+  const [name, setName] = useState("")
+  const [type, setType] = useState<PropertyType>("home")
+  const [address, setAddress] = useState("")
+  const [insuranceCompany, setInsuranceCompany] = useState("")
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("")
+  const [insuranceExpiry, setInsuranceExpiry] = useState("")
+  const [registrationExpiry, setRegistrationExpiry] = useState("")
+  const [inspectionExpiry, setInspectionExpiry] = useState("")
+  const [caretakerContactId, setCaretakerContactId] = useState("")
+  const [caretakerName, setCaretakerName] = useState("")
+  const [caretakerPhone, setCaretakerPhone] = useState("")
+  const [notes, setNotes] = useState("")
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingProperty && open) {
+      setName(editingProperty.propertyName || "")
+      setType(editingProperty.propertyType || "home")
+      setAddress(editingProperty.address || "")
+      setInsuranceCompany(editingProperty.insuranceCompany || "")
+      setInsurancePolicyNumber(editingProperty.insurancePolicyNumber || "")
+      setInsuranceExpiry(editingProperty.insuranceExpiry || "")
+      setRegistrationExpiry(editingProperty.registrationExpiry || "")
+      setInspectionExpiry(editingProperty.inspectionExpiry || "")
+      setCaretakerContactId(editingProperty.caretakerContactId || "")
+      setCaretakerName(editingProperty.caretakerName || "")
+      setCaretakerPhone(editingProperty.caretakerPhone || "")
+      setNotes(editingProperty.notes || "")
+    } else if (!open) {
+      // Reset when dialog closes
+      setName("")
+      setType("home")
+      setAddress("")
+      setInsuranceCompany("")
+      setInsurancePolicyNumber("")
+      setInsuranceExpiry("")
+      setRegistrationExpiry("")
+      setInspectionExpiry("")
+      setCaretakerContactId("")
+      setCaretakerName("")
+      setCaretakerPhone("")
+      setNotes("")
+    }
+  }, [editingProperty, open])
+
+  const handleCaretakerChange = (contactId: string) => {
+    setCaretakerContactId(contactId)
+    if (contactId) {
+      const contact = emergencyContacts.find(c => c.id === contactId)
+      if (contact) {
+        setCaretakerName(contact.name)
+        setCaretakerPhone(contact.phone || "")
+      }
+    } else {
+      setCaretakerName("")
+      setCaretakerPhone("")
+    }
+  }
 
   const handleSave = () => {
     if (!name.trim()) return
@@ -295,22 +339,11 @@ function AddPropertyDialog({
       insuranceExpiry: insuranceExpiry || undefined,
       registrationExpiry: registrationExpiry || undefined,
       inspectionExpiry: inspectionExpiry || undefined,
+      caretakerContactId: caretakerContactId || undefined,
       caretakerName: caretakerName.trim() || undefined,
       caretakerPhone: caretakerPhone.trim() || undefined,
       notes: notes.trim() || undefined,
     })
-    // Reset
-    setName("")
-    setType("home")
-    setAddress("")
-    setInsuranceCompany("")
-    setInsurancePolicyNumber("")
-    setInsuranceExpiry("")
-    setRegistrationExpiry("")
-    setInspectionExpiry("")
-    setCaretakerName("")
-    setCaretakerPhone("")
-    setNotes("")
     onOpenChange(false)
   }
 
@@ -427,13 +460,43 @@ function AddPropertyDialog({
 
           <div className="border-t pt-4">
             <h4 className="font-medium text-sm mb-3">Caretaker (while deployed)</h4>
+            {emergencyContacts.length > 0 ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="caretaker-contact">Select from Emergency Contacts</Label>
+                  <Select value={caretakerContactId} onValueChange={handleCaretakerChange}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a contact or enter manually" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None (Enter manually)</SelectItem>
+                      {emergencyContacts.map((contact) => (
+                        <SelectItem key={contact.id} value={contact.id}>
+                          {contact.name} {contact.phone && `- ${contact.phone}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2 mb-3">
+                  Or enter caretaker details manually below
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-3">
+                No emergency contacts found. Add contacts in your Emergency Contacts section.
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="caretaker-name">Name</Label>
                 <Input
                   id="caretaker-name"
                   value={caretakerName}
-                  onChange={(e) => setCaretakerName(e.target.value)}
+                  onChange={(e) => {
+                    setCaretakerName(e.target.value)
+                    setCaretakerContactId("")
+                  }}
                   placeholder="e.g., John Smith"
                 />
               </div>
@@ -442,7 +505,10 @@ function AddPropertyDialog({
                 <Input
                   id="caretaker-phone"
                   value={caretakerPhone}
-                  onChange={(e) => setCaretakerPhone(e.target.value)}
+                  onChange={(e) => {
+                    setCaretakerPhone(e.target.value)
+                    setCaretakerContactId("")
+                  }}
                   placeholder="e.g., (555) 123-4567"
                 />
               </div>
@@ -478,17 +544,54 @@ function AddTaskDialog({
   onOpenChange,
   onSave,
   propertyName,
+  editingTask,
+  emergencyContacts,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (task: Omit<MaintenanceTask, "id" | "propertyId" | "createdAt" | "updatedAt">) => void
   propertyName: string
+  editingTask?: MaintenanceTask | null
+  emergencyContacts: EmergencyContact[]
 }) {
   const [taskName, setTaskName] = useState("")
   const [description, setDescription] = useState("")
   const [frequency, setFrequency] = useState<MaintenanceFrequency>("monthly")
   const [nextDue, setNextDue] = useState("")
+  const [assignedToContactId, setAssignedToContactId] = useState("")
   const [assignedToName, setAssignedToName] = useState("")
+
+  // Populate form when editing
+  useEffect(() => {
+    if (editingTask && open) {
+      setTaskName(editingTask.taskName || "")
+      setDescription(editingTask.description || "")
+      setFrequency(editingTask.frequency || "monthly")
+      setNextDue(editingTask.nextDue || "")
+      setAssignedToContactId(editingTask.assignedToContactId || "")
+      setAssignedToName(editingTask.assignedToName || "")
+    } else if (!open) {
+      // Reset when dialog closes
+      setTaskName("")
+      setDescription("")
+      setFrequency("monthly")
+      setNextDue("")
+      setAssignedToContactId("")
+      setAssignedToName("")
+    }
+  }, [editingTask, open])
+
+  const handleAssigneeChange = (contactId: string) => {
+    setAssignedToContactId(contactId)
+    if (contactId) {
+      const contact = emergencyContacts.find(c => c.id === contactId)
+      if (contact) {
+        setAssignedToName(contact.name)
+      }
+    } else {
+      setAssignedToName("")
+    }
+  }
 
   const handleSave = () => {
     if (!taskName.trim()) return
@@ -497,14 +600,10 @@ function AddTaskDialog({
       description: description.trim() || undefined,
       frequency,
       nextDue: nextDue || undefined,
+      assignedToContactId: assignedToContactId || undefined,
       assignedToName: assignedToName.trim() || undefined,
       isCompleted: false,
     })
-    setTaskName("")
-    setDescription("")
-    setFrequency("monthly")
-    setNextDue("")
-    setAssignedToName("")
     onOpenChange(false)
   }
 
@@ -512,8 +611,10 @@ function AddTaskDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add Maintenance Task</DialogTitle>
-          <DialogDescription>Add a maintenance task for {propertyName}</DialogDescription>
+          <DialogTitle>{editingTask ? "Edit Maintenance Task" : "Add Maintenance Task"}</DialogTitle>
+          <DialogDescription>
+            {editingTask ? "Update the" : "Add a"} maintenance task for {propertyName}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
@@ -562,13 +663,41 @@ function AddTaskDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="assigned-to">Assigned To</Label>
-            <Input
-              id="assigned-to"
-              value={assignedToName}
-              onChange={(e) => setAssignedToName(e.target.value)}
-              placeholder="e.g., Caretaker name or self"
-            />
+            <Label htmlFor="assigned-to">Assign To</Label>
+            {emergencyContacts.length > 0 ? (
+              <>
+                <Select value={assignedToContactId} onValueChange={handleAssigneeChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a contact or enter name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None (Enter name manually)</SelectItem>
+                    {emergencyContacts.map((contact) => (
+                      <SelectItem key={contact.id} value={contact.id}>
+                        {contact.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="assigned-to"
+                  value={assignedToName}
+                  onChange={(e) => {
+                    setAssignedToName(e.target.value)
+                    setAssignedToContactId("")
+                  }}
+                  placeholder="Or enter name directly"
+                  className="mt-2"
+                />
+              </>
+            ) : (
+              <Input
+                id="assigned-to"
+                value={assignedToName}
+                onChange={(e) => setAssignedToName(e.target.value)}
+                placeholder="e.g., Caretaker name or self"
+              />
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -576,7 +705,7 @@ function AddTaskDialog({
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={!taskName.trim()}>
-            Add Task
+            {editingTask ? "Save Changes" : "Add Task"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -587,20 +716,26 @@ function AddTaskDialog({
 export default function PropertyManagerPage() {
   const {
     properties,
+    emergencyContacts,
     isLoaded,
     addProperty,
     updateProperty,
     deleteProperty,
     addMaintenanceTask,
     updateMaintenanceTask,
+    deleteMaintenanceTask,
     getUpcomingMaintenance,
     getExpiringItems,
   } = useProperties()
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingProperty, setEditingProperty] = useState<Property | null>(null)
-  const [taskDialogProperty, setTaskDialogProperty] = useState<Property | null>(null)
+  const [taskDialogState, setTaskDialogState] = useState<{
+    property: Property | null
+    editingTask: MaintenanceTask | null
+  }>({ property: null, editingTask: null })
   const [activeTab, setActiveTab] = useState("all")
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const upcomingMaintenance = getUpcomingMaintenance(30)
   const expiringItems = getExpiringItems(60)
@@ -616,11 +751,67 @@ export default function PropertyManagerPage() {
     }
   }
 
+  const handleSaveTask = (task: Omit<MaintenanceTask, "id" | "propertyId" | "createdAt" | "updatedAt">) => {
+    if (!taskDialogState.property) return
+
+    if (taskDialogState.editingTask) {
+      // Update existing task
+      updateMaintenanceTask(taskDialogState.property.id, taskDialogState.editingTask.id, task)
+    } else {
+      // Add new task
+      addMaintenanceTask(taskDialogState.property.id, task)
+    }
+  }
+
   const handleCompleteTask = (propertyId: string, taskId: string) => {
     updateMaintenanceTask(propertyId, taskId, {
       isCompleted: true,
-      lastCompleted: new Date().toISOString(),
+      lastCompleted: new Date().toISOString().split("T")[0],
     })
+  }
+
+  const handleDeleteTask = (propertyId: string, taskId: string) => {
+    if (confirm("Are you sure you want to delete this maintenance task?")) {
+      deleteMaintenanceTask(propertyId, taskId)
+    }
+  }
+
+  const handleDownloadSummary = async () => {
+    setIsDownloading(true)
+    try {
+      const summaryData: SummaryData = {
+        properties: properties.map(p => ({
+          ...p,
+          maintenanceTasks: p.maintenanceTasks.filter(t => !t.isCompleted)
+        })),
+        vehicles: vehicles.map(v => ({
+          ...v,
+          maintenanceTasks: v.maintenanceTasks.filter(t => !t.isCompleted)
+        })),
+        upcomingTasks: upcomingMaintenance,
+        expiringItems: expiringItems
+      }
+
+      // Generate PDF on client side
+      const doc = <PropertySummaryDocument data={summaryData} />
+      const asPdf = pdf(doc)
+      const blob = await asPdf.toBlob()
+      
+      // Download
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `property-summary-${new Date().toISOString().split('T')[0]}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Failed to generate summary:', error)
+      alert('Failed to generate summary. Please try again.')
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const filteredProperties =
@@ -642,13 +833,14 @@ export default function PropertyManagerPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Header />
       {/* Header */}
       <header className="border-b bg-card">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild>
-                <Link href="/">
+                <Link href="/transitions/deployment/services">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
@@ -659,10 +851,20 @@ export default function PropertyManagerPage() {
                 </p>
               </div>
             </div>
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Property
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleDownloadSummary}
+                disabled={isDownloading || properties.length === 0}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                {isDownloading ? "Generating..." : "Download Summary"}
+              </Button>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Property
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -750,6 +952,7 @@ export default function PropertyManagerPage() {
                         <p className="font-medium text-sm text-foreground">{task.taskName}</p>
                         <p className="text-xs text-muted-foreground">
                           {task.propertyName} - Due: {formatDate(task.nextDue!)}
+                          {task.assignedToName && ` - ${task.assignedToName}`}
                         </p>
                       </div>
                     </div>
@@ -780,8 +983,14 @@ export default function PropertyManagerPage() {
                       setEditingProperty(prop)
                       setIsAddDialogOpen(true)
                     }}
-                    onDelete={() => deleteProperty(prop.id)}
-                    onAddTask={() => setTaskDialogProperty(prop)}
+                    onDelete={() => {
+                      if (confirm("Are you sure you want to delete this property?")) {
+                        deleteProperty(prop.id)
+                      }
+                    }}
+                    onAddTask={() => setTaskDialogState({ property: prop, editingTask: null })}
+                    onEditTask={(task) => setTaskDialogState({ property: prop, editingTask: task })}
+                    onDeleteTask={(taskId) => handleDeleteTask(prop.id, taskId)}
                     onCompleteTask={(taskId) => handleCompleteTask(prop.id, taskId)}
                   />
                 ))}
@@ -802,6 +1011,7 @@ export default function PropertyManagerPage() {
           </TabsContent>
         </Tabs>
       </main>
+      <Footer />
 
       {/* Dialogs */}
       <AddPropertyDialog
@@ -812,16 +1022,19 @@ export default function PropertyManagerPage() {
         }}
         onSave={handleSaveProperty}
         editingProperty={editingProperty}
+        emergencyContacts={emergencyContacts}
       />
 
-      {taskDialogProperty && (
+      {taskDialogState.property && (
         <AddTaskDialog
-          open={!!taskDialogProperty}
+          open={!!taskDialogState.property}
           onOpenChange={(open) => {
-            if (!open) setTaskDialogProperty(null)
+            if (!open) setTaskDialogState({ property: null, editingTask: null })
           }}
-          onSave={(task) => addMaintenanceTask(taskDialogProperty.id, task)}
-          propertyName={taskDialogProperty.propertyName}
+          onSave={handleSaveTask}
+          propertyName={taskDialogState.property.propertyName}
+          editingTask={taskDialogState.editingTask}
+          emergencyContacts={emergencyContacts}
         />
       )}
     </div>

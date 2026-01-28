@@ -156,20 +156,6 @@ const platformServices: PlatformService[] = [
     icon: <Briefcase className="w-6 h-6" />,
     href: "/transitions/deployment/services/career",
   },
-  {
-    title: "Vehicle Storage & Care",
-    description:
-      "Manage vehicles you're storing during deployment. Track storage locations, maintenance needs, and coordinate with friends or services to keep your vehicles in good shape.",
-    features: [
-      "Storage location tracking",
-      "Battery & maintenance alerts",
-      "Caretaker coordination",
-      "Insurance pause reminders",
-      "Return inspection checklist",
-    ],
-    icon: <Car className="w-6 h-6" />,
-    href: "/transitions/deployment/services/property",
-  },
 ]
 
 export function PlatformServices() {
