@@ -9,6 +9,7 @@ import {
   clearCache as clearCacheUtil,
   getCacheStats,
 } from "@/lib/cache-utils"
+import { createClient } from "@/lib/supabase/client"
 
 declare global {
   interface Window {
@@ -16,7 +17,7 @@ declare global {
   }
 }
 
-const GOOGLE_MAPS_API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
+const API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
 const SEARCH_RADIUS = 24140 // 15 miles in meters
 
 interface UseGoogleMapsReturn {
@@ -26,9 +27,10 @@ interface UseGoogleMapsReturn {
   status: "idle" | "searching" | "cached" | "error"
   statusMessage: string
   businesses: Business[]
-  cacheStats: { entries: number; size: string }
+  cacheStats: { entries: number; size: string; userSubmittedCount: number; googleBusinessCount: number }
   searchNearby: (lat: number, lng: number) => Promise<void>
   clearCache: () => void
+  refreshUserSubmissions: () => Promise<void>
 }
 
 export function useGoogleMaps(): UseGoogleMapsReturn {
@@ -37,8 +39,14 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
   const [isSearching, setIsSearching] = useState(false)
   const [status, setStatus] = useState<"idle" | "searching" | "cached" | "error">("idle")
   const [statusMessage, setStatusMessage] = useState("")
-  const [businesses, setBusinesses] = useState<Business[]>([])
-  const [cacheStats, setCacheStatsState] = useState({ entries: 0, size: "0 bytes" })
+  const [googleBusinesses, setGoogleBusinesses] = useState<Business[]>([])
+  const [userSubmittedBusinesses, setUserSubmittedBusinesses] = useState<Business[]>([])
+  const [cacheStats, setCacheStatsState] = useState({ 
+    entries: 0, 
+    size: "0 bytes",
+    userSubmittedCount: 0,
+    googleBusinessCount: 0
+  })
 
   // Load Google Maps script
   useEffect(() => {
@@ -70,7 +78,7 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     }
 
     const script = document.createElement("script")
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,marker&v=weekly`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${API_KEY}&libraries=places,marker&v=weekly`
     script.async = true
     script.defer = true
     script.onload = () => {
@@ -103,10 +111,56 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     }
   }, [])
 
+  // Fetch user-submitted businesses from Supabase
+  const fetchUserSubmittedBusinesses = useCallback(async () => {
+    const supabase = createClient()
+    try {
+      const { data, error } = await supabase
+        .from('business_discounts')
+        .select('*')
+        .eq('status', 'approved')
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null)
+      
+      if (error) {
+        console.error('Error fetching user submitted businesses:', error)
+        return
+      }
+
+      const submittedBusinesses: Business[] = (data || []).map((item) => ({
+        id: `user-${item.id}`,
+        name: item.business_name,
+        address: item.address,
+        lat: item.latitude,
+        lng: item.longitude,
+        category: item.category || 'Other',
+        discount: item.discount_details,
+        source: 'user_submitted' as const,
+      }))
+
+      setUserSubmittedBusinesses(submittedBusinesses)
+    } catch (error) {
+      console.error('Error fetching user submitted businesses:', error)
+    }
+  }, [])
+
+  // Load user-submitted businesses on mount
+  useEffect(() => {
+    fetchUserSubmittedBusinesses()
+  }, [fetchUserSubmittedBusinesses])
+
+  // Combined businesses list
+  const allBusinesses = [...googleBusinesses, ...userSubmittedBusinesses]
+
   // Update cache stats
   const updateCacheStats = useCallback(() => {
-    setCacheStatsState(getCacheStats())
-  }, [])
+    const stats = getCacheStats()
+    setCacheStatsState({
+      ...stats,
+      userSubmittedCount: userSubmittedBusinesses.length,
+      googleBusinessCount: googleBusinesses.length,
+    })
+  }, [userSubmittedBusinesses.length, googleBusinesses.length])
 
   useEffect(() => {
     updateCacheStats()
@@ -119,9 +173,9 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
       // Check cache first
       const cached = getCachedResults(lat, lng)
       if (cached) {
-        setBusinesses(cached.businesses)
+        setGoogleBusinesses(cached.businesses)
         setStatus("cached")
-        setStatusMessage(`Using cached results (${cached.businesses.length} businesses found)`)
+        setStatusMessage(`Using cached results (${cached.businesses.length + userSubmittedBusinesses.length} total businesses)`)
         updateCacheStats()
         return
       }
@@ -173,6 +227,7 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
                         discount: chainInfo.discount,
                         note: chainInfo.note,
                         placeId: place.place_id,
+                        source: 'google' as const,
                       })
                     }
                   })
@@ -195,15 +250,17 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
         // Cache results
         setCachedResults(lat, lng, foundBusinesses)
 
-        setBusinesses(foundBusinesses)
+        setGoogleBusinesses(foundBusinesses)
+        
         setStatus("searching")
-        setStatusMessage(`Found ${foundBusinesses.length} businesses via API`)
+        const totalCount = foundBusinesses.length + userSubmittedBusinesses.length
+        setStatusMessage(`Found ${totalCount} businesses (${foundBusinesses.length} from API, ${userSubmittedBusinesses.length} user-submitted)`)
         updateCacheStats()
 
         // After a brief delay, show as complete
         setTimeout(() => {
           setStatus("idle")
-          setStatusMessage(`${foundBusinesses.length} businesses with military discounts`)
+          setStatusMessage(`${totalCount} businesses with military discounts`)
         }, 2000)
       } catch (error) {
         console.error("Search error:", error)
@@ -213,12 +270,12 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
         setIsSearching(false)
       }
     },
-    [isLoaded, updateCacheStats],
+    [isLoaded, updateCacheStats, userSubmittedBusinesses.length],
   )
 
   const clearCache = useCallback(() => {
     clearCacheUtil()
-    setBusinesses([])
+    setGoogleBusinesses([])
     updateCacheStats()
     setStatus("idle")
     setStatusMessage("Cache cleared")
@@ -230,9 +287,10 @@ export function useGoogleMaps(): UseGoogleMapsReturn {
     isSearching,
     status,
     statusMessage,
-    businesses,
+    businesses: allBusinesses,
     cacheStats,
     searchNearby,
     clearCache,
+    refreshUserSubmissions: fetchUserSubmittedBusinesses,
   }
 }

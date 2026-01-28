@@ -1,72 +1,24 @@
 "use client"
 import { Header } from "@/components/header"
-import { useState } from "react";
-import { Car, FileText, DollarSign, Shield, Handshake, Plane, ChevronRight, Info } from "lucide-react"
+import { useState } from "react"
+import { Car, FileText, Wrench, Shield, Package, Plane, ChevronRight, CreditCard, Scale, Tag, AlertCircle, Map } from "lucide-react"
 import { Card } from "@/components/ui/card"
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography } from "react-simple-maps"
+import { STATES } from "@/lib/types"
 
-const geoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json";
+const geoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
 
 const serviceCategories = [
-  { name: "Driver's License", icon: FileText, description: "Renew or obtain military driver's licenses" },
-  { name: "Vehicle Registration", icon: Car, description: "Register vehicles in your state or overseas" },
-  { name: "Auto Loans", icon: DollarSign, description: "Special military rates for vehicle financing" },
-  { name: "Insurance", icon: Shield, description: "USAA, GEICO Military & specialized coverage" },
-  { name: "Buying/Selling", icon: Handshake, description: "Tips and resources for vehicle transactions" },
-  { name: "Deployment", icon: Plane, description: "Vehicle storage and deployment preparation" },
-]
-
-const states = [
-  { name: "Alabama", abbr: "AL", dmv: "https://www.alea.gov/dps/driver-license" },
-  { name: "Alaska", abbr: "AK", dmv: "https://doa.alaska.gov/dmv/" },
-  { name: "Arizona", abbr: "AZ", dmv: "https://azdot.gov/motor-vehicles" },
-  { name: "Arkansas", abbr: "AR", dmv: "https://www.dfa.arkansas.gov/driver-services/" },
-  { name: "California", abbr: "CA", dmv: "https://www.dmv.ca.gov/" },
-  { name: "Colorado", abbr: "CO", dmv: "https://dmv.colorado.gov/" },
-  { name: "Connecticut", abbr: "CT", dmv: "https://portal.ct.gov/dmv" },
-  { name: "Delaware", abbr: "DE", dmv: "https://www.dmv.de.gov/" },
-  { name: "Florida", abbr: "FL", dmv: "https://www.flhsmv.gov/" },
-  { name: "Georgia", abbr: "GA", dmv: "https://dds.georgia.gov/" },
-  { name: "Hawaii", abbr: "HI", dmv: "https://hidot.hawaii.gov/" },
-  { name: "Idaho", abbr: "ID", dmv: "https://itd.idaho.gov/dmv/" },
-  { name: "Illinois", abbr: "IL", dmv: "https://www.ilsos.gov/" },
-  { name: "Indiana", abbr: "IN", dmv: "https://www.in.gov/bmv/" },
-  { name: "Iowa", abbr: "IA", dmv: "https://iowadot.gov/mvd" },
-  { name: "Kansas", abbr: "KS", dmv: "https://www.ksrevenue.gov/dovindex.html" },
-  { name: "Kentucky", abbr: "KY", dmv: "https://drive.ky.gov/" },
-  { name: "Louisiana", abbr: "LA", dmv: "https://omv.dps.louisiana.gov/" },
-  { name: "Maine", abbr: "ME", dmv: "https://www.maine.gov/sos/bmv/" },
-  { name: "Maryland", abbr: "MD", dmv: "https://mva.maryland.gov/" },
-  { name: "Massachusetts", abbr: "MA", dmv: "https://www.mass.gov/orgs/registry-of-motor-vehicles" },
-  { name: "Michigan", abbr: "MI", dmv: "https://www.michigan.gov/sos" },
-  { name: "Minnesota", abbr: "MN", dmv: "https://dps.mn.gov/divisions/dvs/" },
-  { name: "Mississippi", abbr: "MS", dmv: "https://www.dps.ms.gov/" },
-  { name: "Missouri", abbr: "MO", dmv: "https://dor.mo.gov/motor-vehicle/" },
-  { name: "Montana", abbr: "MT", dmv: "https://dojmt.gov/driving/" },
-  { name: "Nebraska", abbr: "NE", dmv: "https://dmv.ne.gov/" },
-  { name: "Nevada", abbr: "NV", dmv: "https://dmv.nv.gov/" },
-  { name: "New Hampshire", abbr: "NH", dmv: "https://www.nh.gov/safety/divisions/dmv/" },
-  { name: "New Jersey", abbr: "NJ", dmv: "https://www.nj.gov/mvc/" },
-  { name: "New Mexico", abbr: "NM", dmv: "https://www.mvd.newmexico.gov/" },
-  { name: "New York", abbr: "NY", dmv: "https://dmv.ny.gov/" },
-  { name: "North Carolina", abbr: "NC", dmv: "https://www.ncdot.gov/dmv/" },
-  { name: "North Dakota", abbr: "ND", dmv: "https://www.dot.nd.gov/" },
-  { name: "Ohio", abbr: "OH", dmv: "https://bmv.ohio.gov/" },
-  { name: "Oklahoma", abbr: "OK", dmv: "https://www.ok.gov/dps/" },
-  { name: "Oregon", abbr: "OR", dmv: "https://www.oregon.gov/odot/dmv/" },
-  { name: "Pennsylvania", abbr: "PA", dmv: "https://www.dmv.pa.gov/" },
-  { name: "Rhode Island", abbr: "RI", dmv: "https://dmv.ri.gov/" },
-  { name: "South Carolina", abbr: "SC", dmv: "https://www.scdmvonline.com/" },
-  { name: "South Dakota", abbr: "SD", dmv: "https://dps.sd.gov/" },
-  { name: "Tennessee", abbr: "TN", dmv: "https://www.tn.gov/safety/driver-services.html" },
-  { name: "Texas", abbr: "TX", dmv: "https://www.txdmv.gov/" },
-  { name: "Utah", abbr: "UT", dmv: "https://dmv.utah.gov/" },
-  { name: "Vermont", abbr: "VT", dmv: "https://dmv.vermont.gov/" },
-  { name: "Virginia", abbr: "VA", dmv: "https://www.dmv.virginia.gov/" },
-  { name: "Washington", abbr: "WA", dmv: "https://www.dol.wa.gov/" },
-  { name: "West Virginia", abbr: "WV", dmv: "https://transportation.wv.gov/dmv/" },
-  { name: "Wisconsin", abbr: "WI", dmv: "https://wisconsindot.gov/pages/dmv/index.aspx" },
-  { name: "Wyoming", abbr: "WY", dmv: "https://dot.state.wy.us/" },
+  { name: "Driver's License", icon: FileText, id: "drivers-license" },
+  { name: "Buying/Selling a Car", icon: Car, id: "buying-selling" },
+  { name: "Vehicle Maintenance", icon: Wrench, id: "maintenance" },
+  { name: "PCS & Vehicle Shipping", icon: Plane, id: "shipping" },
+  { name: "Deployment & Storage", icon: Package, id: "deployment" },
+  { name: "Car Insurance", icon: Shield, id: "insurance" },
+  { name: "Registrations / ID", icon: CreditCard, id: "registration" },
+  { name: "Legal Protections", icon: Scale, id: "legal" },
+  { name: "Military Discounts", icon: Tag, id: "discounts" },
+  { name: "Emergency & Roadside", icon: AlertCircle, id: "emergency" },
 ]
 
 export default function AutomotivePage() {
@@ -89,7 +41,7 @@ export default function AutomotivePage() {
   };
 
   const handleStateClick = (stateName: string) => {
-    const state = states.find((s) => s.name === stateName)
+    const state = STATES.find((s) => s.name === stateName)
     if (state) {
       window.open(state.dmv, "_blank")
     }
@@ -116,13 +68,15 @@ export default function AutomotivePage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-180px)]">
+      <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] overflow-hidden">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r">
-          <div className="sticky top-20 p-6">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
-              Automotive Services
-            </h2>
+        <aside className="w-full lg:w-80 bg-slate-100 border-r overflow-y-auto">
+          <div className="top-20 p-6">
+            <a href="/services/automotive">
+              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
+                Automotive Services
+              </h2>
+            </a>
             <div className="space-y-3">
               {serviceCategories.map((category) => {
                 const Icon = category.icon
@@ -131,71 +85,27 @@ export default function AutomotivePage() {
                     key={category.name}
                     className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                        <Icon className="h-5 w-5 text-primary" />
+                    <a key={category.name} href={`/services/automotive/${category.id}`}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <Icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                            {category.name}
+                          </h3>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
-                          {category.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground">{category.description}</p>
-                      </div>
-                    </div>
+                    </a>
                   </Card>
                 )
               })}
             </div>
-
-            {/* More Info section */}
-            <Card className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
-              <div className="flex items-center gap-2 mb-3">
-                <Info className="h-5 w-5 text-primary" />
-                <h3 className="font-bold text-slate-900">More Information</h3>
-              </div>
-              <div className="space-y-3 text-sm">
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Military Benefits</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Active duty members may be exempt from certain state requirements and fees.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Deployment Support</h4>
-                  <p className="text-muted-foreground text-xs">
-                    Special provisions for vehicle storage, insurance, and registration during deployment.
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-slate-900 mb-1">Quick Links</h4>
-                  <ul className="space-y-1 text-xs text-muted-foreground">
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://www.usaa.com/" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        USAA Resources
-                      </a>
-                    </li>
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://militaryautosource.com/home" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        Military AutoSource
-                      </a>
-                    </li>
-                    <li className="flex items-center gap-1">
-                      <ChevronRight className="h-3 w-3 text-primary" />
-                      <a href="https://www.navyfederal.org/loans-cards/auto-loans.html" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">
-                        Navy Federal Auto
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </Card>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 relative">
+        <main className="flex-1 relative overflow-auto">
           <div className="relative z-10 p-6 lg:p-12">
             <div className="max-w-6xl mx-auto">
               <div className="text-center mb-8">

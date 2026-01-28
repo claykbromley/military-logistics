@@ -6,11 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { CheckCircle2, Send, PlusCircle, MapPin } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
 
 export interface MissingBusinessSubmission {
   businessName: string
+  category: string
   address: string
   discountDetails: string
   submittedAt: Date
@@ -24,12 +27,13 @@ interface Prediction {
 }
 
 interface FeedbackSectionProps {
-  onSubmit?: SubmitMissingBusiness
-  isMapLoaded?: boolean
+  isMapLoaded: boolean
+  onSubmitSuccess?: () => void
 }
 
-export function FeedbackSection({ onSubmit, isMapLoaded = false }: FeedbackSectionProps) {
+export function FeedbackSection({ isMapLoaded, onSubmitSuccess }: FeedbackSectionProps) {
   const [businessName, setBusinessName] = useState("")
+  const [category, setCategory] = useState("restaurant")
   const [addressInput, setAddressInput] = useState("")
   const [validatedAddress, setValidatedAddress] = useState("")
   const [discountDetails, setDiscountDetails] = useState("")
@@ -98,34 +102,83 @@ export function FeedbackSection({ onSubmit, isMapLoaded = false }: FeedbackSecti
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    const supabase = createClient()
     setIsSubmitting(true)
 
-    const submission: MissingBusinessSubmission = {
-      businessName: businessName.trim(),
-      address: validatedAddress.trim(),
-      discountDetails: discountDetails.trim(),
-      submittedAt: new Date(),
+    try {
+      // Geocode the address to get lat/lng
+      let latitude: number | null = null
+      let longitude: number | null = null
+
+      if (window.google?.maps?.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder()
+        
+        try {
+          const result = await new Promise<google.maps.GeocoderResult>((resolve, reject) => {
+            geocoder.geocode({ address: validatedAddress.trim() }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                resolve(results[0])
+              } else {
+                reject(new Error('Geocoding failed: ' + status))
+              }
+            })
+          })
+
+          latitude = result.geometry.location.lat()
+          longitude = result.geometry.location.lng()
+        } catch (geocodeError) {
+          console.error('Geocoding error:', geocodeError)
+          // Continue with submission even if geocoding fails
+        }
+      }
+
+      const submission = {
+        businessName: businessName.trim(),
+        address: validatedAddress.trim(),
+        discountDetails: discountDetails.trim(),
+        category: category,
+        latitude,
+        longitude,
+        submittedAt: new Date().toISOString(),
+      }
+
+      // Insert into Supabase
+      const { data, error } = await supabase
+        .from('business_discounts')
+        .insert([
+          {
+            business_name: submission.businessName,
+            address: submission.address,
+            discount_details: submission.discountDetails,
+            category: submission.category,
+            latitude: submission.latitude,
+            longitude: submission.longitude,
+            submitted_at: submission.submittedAt,
+            status: 'pending', // Set as pending for review
+          },
+        ])
+        .select()
+
+      if (error) {
+        throw error
+      }
+
+      setIsSubmitting(false)
+      setSubmitted(true)
+
+      // Reset after 3 seconds
+      setTimeout(() => {
+        setSubmitted(false)
+        setBusinessName("")
+        setAddressInput("")
+        setValidatedAddress("")
+        setDiscountDetails("")
+      }, 3000)
+    } catch (error) {
+      console.error('Submission error:', error)
+      setIsSubmitting(false)
+      alert('Failed to submit. Please try again.')
     }
-
-    if (onSubmit) {
-      await onSubmit(submission)
-    } else {
-      // Placeholder: simulate API call when no backend is connected
-      console.log("Missing business submission (no backend connected):", submission)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    }
-
-    setIsSubmitting(false)
-    setSubmitted(true)
-
-    // Reset after 3 seconds
-    setTimeout(() => {
-      setSubmitted(false)
-      setBusinessName("")
-      setAddressInput("")
-      setValidatedAddress("")
-      setDiscountDetails("")
-    }, 3000)
   }
 
   // Form is only valid if business name is filled AND address was selected from autocomplete
@@ -166,6 +219,22 @@ export function FeedbackSection({ onSubmit, isMapLoaded = false }: FeedbackSecti
               placeholder="e.g., Joe's Auto Repair"
               required
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="businessCategory">Category *</Label>
+            <Select value={category} onValueChange={setCategory} required>
+              <SelectTrigger className="w-40 cursor-pointer">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="restaurant">🍽️ Restaurants</SelectItem>
+                <SelectItem value="retail">🛍️ Retail</SelectItem>
+                <SelectItem value="automotive">🚗 Automotive</SelectItem>
+                <SelectItem value="hotel">🏨 Hotel</SelectItem>
+                <SelectItem value="entertainment">🎯 Entertainment</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2" ref={addressContainerRef}>

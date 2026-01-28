@@ -1,13 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Menu, Search, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { LoginModal } from "./login-modal"
-import { SignupModal } from "./signup-modal"
+import { LoginModal } from "../app/auth/login-modal"
+import { SignupModal } from "../app/auth/signup-modal"
 import { SearchModal } from "./search-modal"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import { useUI } from "@/context/ui-context"
+
+type User = {
+  email?: string
+} | null
 
 const branches = [
   { name: "Army", url: "https://www.goarmy.com" },
@@ -25,7 +32,7 @@ const navItems = [
   },
   {
     name: "Transitions",
-    items: ["Enlistment", "Deployment", "PCS", "Leaving the Military"],
+    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation"],
   },
   {
     name: "Discounts/Benefits",
@@ -36,8 +43,8 @@ const navItems = [
     items: ["Appointments", "Tasks", "Reminders", "Calendar"],
   },
   {
-    name: "Marketplace",
-    items: ["Buy", "Sell", "Trade", "Services"],
+    name: "Community",
+    items: ["Marketplace", "Forum"],
   },
   {
     name: "Contact Us",
@@ -47,16 +54,39 @@ const navItems = [
 
 const getItemUrl = (sectionName: string, itemName: string) => {
   const section = sectionName.toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-")
-  const item = itemName.toLowerCase().replace(/\s+/g, "-")
+  const item = itemName.toLowerCase().replace(/\//g, "-").replace(/\s+/g, "-")
   return `/${section}/${item}`
 }
 
 export function Header() {
-  const [showLogin, setShowLogin] = useState(false)
+  const [user, setUser] = useState<User>(null)
+  const { showLogin, setShowLogin } = useUI()
   const [showSignup, setShowSignup] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.refresh()
+  }
 
   return (
     <>
@@ -144,13 +174,21 @@ export function Header() {
                 <Search className="h-5 w-5" />
                 <span className="sr-only">Search</span>
               </Button>
-
-              <Button variant="ghost" size="sm" onClick={() => setShowLogin(true)}>
-                Login
-              </Button>
-              <Button variant="default" size="sm" onClick={() => setShowSignup(true)}>
-                Sign Up
-              </Button>
+            
+              {user?
+              <div>
+                <Button onClick={handleSignOut}>
+                  Sign Out
+                </Button>
+              </div>:
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setShowLogin(true)}>
+                  Login
+                </Button>
+                <Button variant="default" size="sm" onClick={() => setShowSignup(true)}>
+                  Sign Up
+                </Button>
+              </div>}
             </div>
           </div>
 

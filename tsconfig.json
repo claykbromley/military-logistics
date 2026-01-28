@@ -34,7 +34,7 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
-, "app/services/financial/manage-finances/controls-modal.tsx", "components/discount-map.js"  ],
+, "app/services/financial/manage-finances/controls-modal.tsx", "components/discountMap/discount-map.js"  ],
   "exclude": [
     "node_modules"
   ]

@@ -10,28 +10,41 @@ import { FeedbackSection } from "@/components/discountMap/feedback-section"
 import { CacheControls } from "@/components/discountMap/cache-controls"
 import { useGoogleMaps } from "@/hooks/use-google-maps"
 import type { Business } from "@/lib/known-chains"
-import { Shield, Map, List } from "lucide-react"
+import { Map, List } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
-import Head from "next/head"
+import { Footer } from "@/components/footer"
 
 export default function MilitaryDiscountMap() {
-  const [center, setCenter] = useState({ lat: 32.776470, lng: -79.931030 }) // Center of US
+  const [center, setCenter] = useState({ lat: 32.776470, lng: -79.931030 })
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedBusiness, setSelectedBusiness] = useState<Business | null>(null)
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [currentAddress, setCurrentAddress] = useState("United States")
   const [activeTab, setActiveTab] = useState("map")
-  const [selectedCategory, setSelectedCategory] = useState("all"); // Declare selectedCategory
 
-  const { isLoaded, isPlacesLoaded, isSearching, status, statusMessage, businesses, cacheStats, searchNearby, clearCache } =
-    useGoogleMaps()
+  const { 
+    isLoaded, 
+    isPlacesLoaded, 
+    isSearching, 
+    status, 
+    statusMessage, 
+    businesses, 
+    cacheStats, 
+    searchNearby, 
+    clearCache,
+    refreshUserSubmissions 
+  } = useGoogleMaps()
 
   // Filter businesses by selected categories
   const filteredBusinesses =
     selectedCategories.length === 0
       ? businesses
       : businesses.filter((b) => selectedCategories.includes(b.category))
+
+  // Separate user-submitted from Google businesses for display
+  const userSubmittedCount = businesses.filter(b => b.source === 'user_submitted').length
+  const googleBusinessCount = businesses.filter(b => b.source === 'google').length
 
   // Handle search
   const handleSearch = useCallback(
@@ -46,11 +59,9 @@ export default function MilitaryDiscountMap() {
   // Handle map movement
   const handleMapMove = useCallback(
     (newCenter: { lat: number; lng: number }) => {
-      // Only trigger search if map moved significantly (debounced by idle event)
       const distance = Math.sqrt(Math.pow(newCenter.lat - center.lat, 2) + Math.pow(newCenter.lng - center.lng, 2))
 
       if (distance > 0.05) {
-        // ~5km movement threshold
         setCenter(newCenter)
         searchNearby(newCenter.lat, newCenter.lng)
       }
@@ -94,7 +105,6 @@ export default function MilitaryDiscountMap() {
   // Initial search on load
   useEffect(() => {
     if (isLoaded && businesses.length === 0) {
-      // Try to get user's location on initial load
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
@@ -104,7 +114,6 @@ export default function MilitaryDiscountMap() {
             searchNearby(latitude, longitude)
           },
           () => {
-            // If location access denied, search default location
             searchNearby(center.lat, center.lng)
           },
           { enableHighAccuracy: true, timeout: 5000 },
@@ -115,7 +124,6 @@ export default function MilitaryDiscountMap() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <Header />
       <main className="container mx-auto px-4 py-6">
         {/* Search Section */}
@@ -131,12 +139,18 @@ export default function MilitaryDiscountMap() {
             <CategoryFilter selected={selectedCategories} onChange={setSelectedCategories} />
           </div>
 
-          <StatusIndicator status={status} message={statusMessage} cacheStats={cacheStats} />
+          <StatusIndicator 
+            status={status} 
+            message={statusMessage} 
+            cacheStats={{
+              ...cacheStats
+            }} 
+          />
         </div>
 
         {/* Main Content */}
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Map Section - Takes 2 columns on large screens */}
+          {/* Map Section */}
           <div className="lg:col-span-2">
             {/* Mobile Tabs */}
             <div className="lg:hidden mb-4">
@@ -187,7 +201,7 @@ export default function MilitaryDiscountMap() {
             </div>
           </div>
 
-          {/* Results Section - Takes 1 column */}
+          {/* Results Section */}
           <div className="hidden lg:block space-y-6">
             <div className="bg-card rounded-lg border border-border p-4">
               <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
@@ -213,22 +227,14 @@ export default function MilitaryDiscountMap() {
 
         {/* Feedback Section */}
         <div className="mt-8">
-          <FeedbackSection isMapLoaded={isPlacesLoaded} />
+          <FeedbackSection 
+            isMapLoaded={isPlacesLoaded} 
+            onSubmitSuccess={refreshUserSubmissions}
+          />
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="bg-muted border-t border-border mt-12">
-        <div className="container mx-auto px-4 py-6">
-          <div className="text-center text-sm text-muted-foreground">
-            <p className="mb-2">
-              <strong>Disclaimer:</strong> Discounts are subject to change. Always verify with the business before
-              visiting.
-            </p>
-            <p>© {new Date().getFullYear()} Milify. Supporting our military community.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }
