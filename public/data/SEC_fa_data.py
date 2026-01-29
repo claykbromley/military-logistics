@@ -7,10 +7,15 @@
 
 import pandas as pd
 import requests
+from dotenv import load_dotenv
+import os
+
+# Load .env file
+load_dotenv()
 
 file_path = r"C:/Replace/With/File/Name/file.xlsx"  # Replace with the actual path
 df = pd.read_excel(file_path)
-API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
+API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")  # Set your Google Maps API key here
 
 def geocode_address(address):
     url = "https://maps.googleapis.com/maps/api/geocode/json"
