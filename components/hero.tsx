@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 
 export function Hero() {
@@ -25,11 +26,13 @@ export function Hero() {
             Access everything you need in one centralized platform.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
-            <Button size="lg" className="gap-2 bg-navy-600 hover:bg-navy-700 text-white">
-              Get Started <ArrowRight className="h-4 w-4" />
-            </Button>
-            <Button size="lg" variant="outline" className="bg-white/10 text-white hover:bg-white/20 border-white/50">
-              Learn More
+            <Button asChild size="lg">
+              <Link
+                href="/services/command-center"
+                className="flex gap-2 items-center"
+              >
+                Command Center <ArrowRight className="h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </div>

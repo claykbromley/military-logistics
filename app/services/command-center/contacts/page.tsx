@@ -15,7 +15,6 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useContacts, type Contact, useSharedWithMe } from "@/hooks/use-contacts"
-import { createClient } from "@/lib/supabase/client"
 
 function EmergencyContactCard({
   contact,
@@ -477,6 +476,8 @@ export default function EmergencyContactsPage() {
       updates.isEmergencyContact = !contact.isEmergencyContact
       if (!contact.isEmergencyContact) {
         updates.role = "primary"
+      } else {
+        updates.role = "other"
       }
     }
     if (role === "poa") {
@@ -643,8 +644,9 @@ export default function EmergencyContactsPage() {
           <Alert className="mb-6 border-blue-300 bg-blue-50">
             <Info className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
-              <strong>{sharedContacts.length} {sharedContacts.length === 1 ? 'person has' : 'people have'}</strong> listed you as their emergency contact. 
-              View them in the "Shared With You" tab.
+              <div className="flex">
+                <strong className="mr-1">{sharedContacts.length} {sharedContacts.length === 1 ? 'person' : 'people'}</strong> {sharedContacts.length === 1 ? 'has' : 'have'} listed you as their emergency contact. View them in the "Shared With You" tab.
+              </div>
             </AlertDescription>
           </Alert>
         )}

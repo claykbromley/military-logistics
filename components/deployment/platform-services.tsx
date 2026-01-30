@@ -27,7 +27,7 @@ const platformServices: PlatformService[] = [
       "Deployment savings tracker",
     ],
     icon: <DollarSign className="w-6 h-6" />,
-    href: "/transitions/deployment/services/financial",
+    href: "/services/command-center/financial",
     highlight: true,
   },
   {
@@ -42,7 +42,7 @@ const platformServices: PlatformService[] = [
       "Quick-access emergency docs",
     ],
     icon: <FileText className="w-6 h-6" />,
-    href: "/transitions/deployment/services/documents",
+    href: "/services/command-center/documents",
   },
   {
     title: "Property & Vehicle Manager",
@@ -56,7 +56,7 @@ const platformServices: PlatformService[] = [
       "Property inspection checklists",
     ],
     icon: <Home className="w-6 h-6" />,
-    href: "/transitions/deployment/services/property",
+    href: "/services/command-center/property",
   },
   {
     title: "Family Communication Hub",
@@ -70,7 +70,7 @@ const platformServices: PlatformService[] = [
       "Special date reminders",
     ],
     icon: <MessageSquare className="w-6 h-6" />,
-    href: "/transitions/deployment/services/communication",
+    href: "/services/command-center/communication",
   },
   {
     title: "Emergency Contact Network",
@@ -84,7 +84,7 @@ const platformServices: PlatformService[] = [
       "Quick-dial integration",
     ],
     icon: <Users className="w-6 h-6" />,
-    href: "/transitions/deployment/services/contacts",
+    href: "/services/command-center/contacts",
   },
   {
     title: "Deployment Countdown & Calendar",
@@ -98,7 +98,7 @@ const platformServices: PlatformService[] = [
       "Shared family calendar",
     ],
     icon: <Calendar className="w-6 h-6" />,
-    href: "/transitions/deployment/services/calendar",
+    href: "/services/command-center/calendar",
   },
   {
     title: "Pet Care Coordinator",
@@ -112,7 +112,7 @@ const platformServices: PlatformService[] = [
       "Photo updates from caregivers",
     ],
     icon: <PawPrint className="w-6 h-6" />,
-    href: "/transitions/deployment/services/pets",
+    href: "/services/command-center/pets",
   },
   {
     title: "Wellness & Journal",
@@ -126,7 +126,7 @@ const platformServices: PlatformService[] = [
       "Chaplain & counselor finder",
     ],
     icon: <Heart className="w-6 h-6" />,
-    href: "/transitions/deployment/services/wellness",
+    href: "/services/command-center/wellness",
   },
   {
     title: "Legal Ready Center",
@@ -140,7 +140,7 @@ const platformServices: PlatformService[] = [
       "Notary finder",
     ],
     icon: <ShieldCheck className="w-6 h-6" />,
-    href: "/transitions/deployment/services/legal",
+    href: "/services/command-center/legal",
   },
   {
     title: "Career & Benefits Tracker",
@@ -154,7 +154,7 @@ const platformServices: PlatformService[] = [
       "Benefits utilization",
     ],
     icon: <Briefcase className="w-6 h-6" />,
-    href: "/transitions/deployment/services/career",
+    href: "/services/command-center/career",
   },
 ]
 
@@ -172,10 +172,10 @@ export function PlatformServices() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="text-center mb-12">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-balance">
-            Your Personal Deployment Command Center
+            Your Personal Command Center
           </h2>
           <p className="mt-4 text-muted-foreground max-w-2xl mx-auto text-balance">
-            Comprehensive services to help you manage every aspect of life while you're deployed. 
+            Comprehensive services to help you manage every aspect of life. 
             All your critical information in one secure place.
           </p>
         </div>

@@ -18,14 +18,14 @@ export function Hero() {
           <div className="mt-8 flex flex-wrap gap-4 justify-center">
             <a
               href="#checklists"
-              className="inline-flex items-center gap-2 border border-primary-foreground/30 text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/10 transition-colors"
+              className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/90 transition-colors"
             >
               Start Your Checklist
               <ArrowDown className="w-4 h-4" />
             </a>
             <a
-              href="/transitions/deployment/services"
-              className="inline-flex items-center gap-2 bg-primary-foreground text-primary font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/90 transition-colors"
+              href="/services/command-center"
+              className="inline-flex items-center gap-2 border border-primary-foreground/30 text-primary-foreground font-semibold px-6 py-3 rounded-lg hover:bg-primary-foreground/10 transition-colors"
             >
               View Services
             </a>

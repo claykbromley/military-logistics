@@ -132,12 +132,9 @@ export function useDocuments() {
       setIsAuthenticated(!!user)
 
       if (user) {
-        // Check if storage bucket exists
         await checkBucketExists()
         
-        // Load from Supabase - get both owned and shared documents
         try {
-          // Fetch documents owned by user
           const { data: ownedDocs, error: ownedError } = await supabase
             .from("document_vault")
             .select("*")
@@ -145,7 +142,6 @@ export function useDocuments() {
 
           if (ownedError) throw ownedError
 
-          // Fetch documents shared with user's email
           const { data: sharedDocs, error: sharedError } = await supabase
             .from("document_vault")
             .select("*")
@@ -153,13 +149,11 @@ export function useDocuments() {
 
           if (sharedError) throw sharedError
 
-          // Combine and deduplicate documents
           const allDocs = [...(ownedDocs || []), ...(sharedDocs || [])]
           const uniqueDocs = Array.from(
             new Map(allDocs.map(doc => [doc.id, doc])).values()
           )
 
-          // Sort by created_at descending
           uniqueDocs.sort((a, b) => 
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
@@ -170,7 +164,6 @@ export function useDocuments() {
         } catch (error) {
           console.error("Error loading documents from Supabase:", error)
           setSyncError(error instanceof Error ? error.message : "Failed to load")
-          // Fall back to localStorage
           const stored = localStorage.getItem(STORAGE_KEY)
           if (stored) {
             try {
@@ -181,7 +174,6 @@ export function useDocuments() {
           }
         }
       } else {
-        // User logged out - clear all data
         setDocuments([])
         localStorage.removeItem(STORAGE_KEY)
       }
@@ -191,35 +183,21 @@ export function useDocuments() {
 
     loadData()
 
-    // Listen for auth changes and clear data on logout/login
     const supabase = createClient()
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const wasAuthenticated = isAuthenticated
-      const nowAuthenticated = !!session?.user
-      
-      setIsAuthenticated(nowAuthenticated)
+      setIsAuthenticated(!!session?.user)
 
-      // Clear data when logging out or switching users
-      if (event === 'SIGNED_OUT' || (wasAuthenticated && !nowAuthenticated)) {
+      if (event === 'SIGNED_OUT') {
         setDocuments([])
         localStorage.removeItem(STORAGE_KEY)
-        setIsLoaded(true) // Set to true so UI shows empty state instead of loading
-      }
-      
-      // Reload data when signing in or switching users
-      if (event === 'SIGNED_IN' || (!wasAuthenticated && nowAuthenticated)) {
-        setDocuments([])
-        localStorage.removeItem(STORAGE_KEY)
-        setIsLoaded(false)
-        // Trigger reload
-        await loadData()
+        setIsLoaded(true)
       }
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [checkBucketExists]) 
 
   // Save to localStorage when documents change (as cache)
   useEffect(() => {

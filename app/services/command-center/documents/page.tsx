@@ -666,7 +666,7 @@ export default function DocumentVaultPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild>
-                <Link href="/transitions/deployment/services">
+                <Link href="./">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
@@ -747,35 +747,67 @@ export default function DocumentVaultPage() {
         </div>
 
         {/* Critical Documents Alert */}
-        {expiringDocs.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-              <div>
-                <h3 className="font-medium text-amber-800">Documents Expiring Soon</h3>
-                <p className="text-sm text-amber-700 mt-1">
-                  {expiringDocs.length} document{expiringDocs.length !== 1 ? "s" : ""} will expire
-                  in the next 90 days. Review and renew them before deployment.
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {expiringDocs.slice(0, 3).map((doc) => (
-                    <span
-                      key={doc.id}
-                      className="inline-flex items-center px-2 py-1 rounded bg-amber-100 text-amber-800 text-xs"
-                    >
-                      {doc.documentName}
-                    </span>
-                  ))}
-                  {expiringDocs.length > 3 && (
-                    <span className="text-xs text-amber-700">
-                      +{expiringDocs.length - 3} more
-                    </span>
-                  )}
+        {expiringDocs.length > 0 && (() => {
+          const expiredDocs = expiringDocs.filter(doc => 
+            doc.expirationDate && getDaysUntilExpiration(doc.expirationDate) <= 0
+          )
+          const isExpired = expiredDocs.length > 0
+          
+          return (
+            <div className={`rounded-lg p-4 mb-6 ${
+              isExpired 
+                ? "bg-red-50 border border-red-200" 
+                : "bg-amber-50 border border-amber-200"
+            }`}>
+              <div className="flex items-start gap-3">
+                <AlertTriangle className={`w-5 h-5 mt-0.5 ${
+                  isExpired ? "text-red-600" : "text-amber-600"
+                }`} />
+                <div>
+                  <h3 className={`font-medium ${
+                    isExpired ? "text-red-800" : "text-amber-800"
+                  }`}>
+                    {isExpired ? "Documents Expired" : "Documents Expiring Soon"}
+                  </h3>
+                  <p className={`text-sm mt-1 ${
+                    isExpired ? "text-red-700" : "text-amber-700"
+                  }`}>
+                    {isExpired 
+                      ? `${expiredDocs.length} document${expiredDocs.length !== 1 ? "s have" : " has"} expired. Renew immediately.`
+                      : `${expiringDocs.length} document${expiringDocs.length !== 1 ? "s" : ""} will expire in the next 90 days. Review and renew them before deployment.`
+                    }
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {expiringDocs.slice(0, 3).map((doc) => {
+                      const daysLeft = doc.expirationDate ? getDaysUntilExpiration(doc.expirationDate) : 0
+                      const docExpired = daysLeft <= 0
+                      
+                      return (
+                        <span
+                          key={doc.id}
+                          className={`inline-flex items-center px-2 py-1 rounded text-xs ${
+                            docExpired
+                              ? "bg-red-100 text-red-800"
+                              : "bg-amber-100 text-amber-800"
+                          }`}
+                        >
+                          {doc.documentName}
+                        </span>
+                      )
+                    })}
+                    {expiringDocs.length > 3 && (
+                      <span className={`text-xs ${
+                        isExpired ? "text-red-700" : "text-amber-700"
+                      }`}>
+                        +{expiringDocs.length - 3} more
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">

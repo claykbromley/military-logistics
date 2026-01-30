@@ -583,14 +583,14 @@ function AddTaskDialog({
   }, [editingTask, open])
 
   const handleAssigneeChange = (contactId: string) => {
-    setAssignedToContactId(contactId)
-    if (contactId) {
+    if (contactId === "none") {
+      setAssignedToName("")
+    } else {
+      setAssignedToContactId(contactId)
       const contact = emergencyContacts.find(c => c.id === contactId)
       if (contact) {
         setAssignedToName(contact.name)
       }
-    } else {
-      setAssignedToName("")
     }
   }
 
@@ -672,7 +672,7 @@ function AddTaskDialog({
                     <SelectValue placeholder="Choose a contact or enter name" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None (Enter name manually)</SelectItem>
+                    <SelectItem value="none">None (Enter name manually)</SelectItem>
                     {emergencyContacts.map((contact) => (
                       <SelectItem key={contact.id} value={contact.id}>
                         {contact.name}
@@ -841,7 +841,7 @@ export default function PropertyManagerPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild>
-                <Link href="/transitions/deployment/services">
+                <Link href="./">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>

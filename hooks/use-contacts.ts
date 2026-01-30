@@ -67,6 +67,7 @@ export function useContacts() {
           const { data: contactsData, error: contactsError } = await supabase
             .from("emergency_contacts")
             .select("*")
+            .eq("user_id", user.id)
             .order("priority", { ascending: true })
 
           if (contactsError) throw contactsError
@@ -84,7 +85,6 @@ export function useContacts() {
             isEmergencyContact: c.role === "primary" || c.role === "secondary",
             isPoaHolder: c.has_poa || false,
             poaType: c.poa_type || undefined,
-            // Store canAccessAccounts in a metadata field or use role "financial"
             canAccessAccounts: c.can_access_accounts !== undefined ? c.can_access_accounts : c.role === "financial",
             priority: c.priority || 0,
             notes: c.notes || undefined,

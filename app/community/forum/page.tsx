@@ -1,4 +1,5 @@
 import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 import { ShoppingCart } from "lucide-react"
 
 export default function MarketplaceBuyPage() {
@@ -19,6 +20,7 @@ export default function MarketplaceBuyPage() {
           </div>
         </div>
       </main>
+      <Footer />
     </>
   )
 }
