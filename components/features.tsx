@@ -44,6 +44,12 @@ const features = [
     description: "Create and manage your personal and professional tasks with ease.",
     path: "/scheduler/tasks",
   },
+  {
+    icon: Calendar,
+    title: "Calendar",
+    description: "Personalize your schedule and manage all your events in one place.",
+    path: "/scheduler/calendar",
+  },
 ]
 
 export function Features() {
