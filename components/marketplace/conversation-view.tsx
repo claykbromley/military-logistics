@@ -9,15 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Send, User } from "lucide-react"
 import Link from "next/link"
-import type { Conversation, Message, Profile, Listing } from "@/lib/types"
+import type { MarketplaceConversation, MarketplaceMessage, Profile, MarketplaceListing } from "@/lib/types"
 
 interface ConversationViewProps {
-  conversation: Conversation & {
-    listings: Pick<Listing, "id" | "title" | "images" | "price" | "status"> | null
+  conversation: MarketplaceConversation & {
+    listings: Pick<MarketplaceListing, "id" | "title" | "images" | "price" | "status"> | null
     buyer: Pick<Profile, "id" | "display_name" | "military_branch"> | null
     seller: Pick<Profile, "id" | "display_name" | "military_branch"> | null
   }
-  messages: (Message & { sender: Pick<Profile, "id" | "display_name"> | null })[]
+  messages: (MarketplaceMessage & { sender: Pick<Profile, "id" | "display_name"> | null })[]
   userId: string
 }
 
@@ -55,7 +55,7 @@ export function ConversationView({ conversation, messages: initialMessages, user
           filter: `conversation_id=eq.${conversation.id}`,
         },
         async (payload) => {
-          const newMsg = payload.new as Message
+          const newMsg = payload.new as MarketplaceMessage
 
           // Check if message already exists
           const messageExists = messages.some(msg => msg.id === newMsg.id)

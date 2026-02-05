@@ -1,18 +1,3 @@
-export type Category =
-  | "uniforms"
-  | "tactical-gear"
-  | "electronics"
-  | "furniture"
-  | "vehicles"
-  | "household"
-  | "clothing"
-  | "sports"
-  | "other"
-
-export type Condition = "new" | "like-new" | "good" | "fair" | "poor"
-
-export type ListingStatus = "active" | "sold" | "pending" | "inactive"
-
 export type MilitaryBranch =
   | "army"
   | "navy"
@@ -39,62 +24,6 @@ export interface Profile {
   created_at: string
   updated_at: string
 }
-
-export interface Listing {
-  id: string
-  user_id: string
-  title: string
-  description: string | null
-  price: number
-  category: Category
-  condition: Condition
-  location: string
-  latitude: number | null
-  longitude: number | null
-  images: string[]
-  status: ListingStatus
-  created_at: string
-  updated_at: string
-  profiles?: Profile
-}
-
-export interface Message {
-  id: string
-  listing_id: string | null
-  sender_id: string
-  receiver_id: string
-  content: string
-  read: boolean
-  created_at: string
-}
-
-export interface SavedListing {
-  id: string
-  user_id: string
-  listing_id: string
-  created_at: string
-  listings?: Listing
-}
-
-export const CATEGORIES: { value: Category; label: string }[] = [
-  { value: "uniforms", label: "Uniforms & Dress" },
-  { value: "tactical-gear", label: "Tactical Gear" },
-  { value: "electronics", label: "Electronics" },
-  { value: "furniture", label: "Furniture" },
-  { value: "vehicles", label: "Vehicles" },
-  { value: "household", label: "Household Items" },
-  { value: "clothing", label: "Clothing & Apparel" },
-  { value: "sports", label: "Sports & Outdoors" },
-  { value: "other", label: "Other" },
-]
-
-export const CONDITIONS: { value: Condition; label: string }[] = [
-  { value: "new", label: "New" },
-  { value: "like-new", label: "Like New" },
-  { value: "good", label: "Good" },
-  { value: "fair", label: "Fair" },
-  { value: "poor", label: "Poor" },
-]
 
 export const MILITARY_BRANCHES: { value: MilitaryBranch; label: string }[] = [
   { value: "army", label: "Army" },
@@ -200,7 +129,79 @@ export const STATES: { name: string; abbr: string; dmv: string }[] = [
   { name: "Wyoming", abbr: "WY", dmv: "https://dot.state.wy.us/" },
 ]
 
-export interface Profile {
+// MARKETPLACE
+export type MarketplaceCategory =
+  | "uniforms"
+  | "tactical-gear"
+  | "electronics"
+  | "furniture"
+  | "vehicles"
+  | "household"
+  | "clothing"
+  | "sports"
+  | "other"
+
+export type MarketplaceCondition = "new" | "like-new" | "good" | "fair" | "poor"
+
+export type MarketplaceListingStatus = "active" | "sold" | "pending" | "inactive"
+
+export interface MarketplaceListing {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  price: number
+  category: MarketplaceCategory
+  condition: MarketplaceCondition
+  location: string
+  latitude: number | null
+  longitude: number | null
+  images: string[]
+  status: MarketplaceListingStatus
+  created_at: string
+  updated_at: string
+  profiles?: Profile
+}
+
+export interface MarketplaceMessage {
+  id: string
+  listing_id: string | null
+  sender_id: string
+  receiver_id: string
+  content: string
+  read: boolean
+  created_at: string
+}
+
+export interface MarketplaceSavedListing {
+  id: string
+  user_id: string
+  listing_id: string
+  created_at: string
+  listings?: MarketplaceListing
+}
+
+export const MARKETPLACECATEGORIES: { value: MarketplaceCategory; label: string }[] = [
+  { value: "uniforms", label: "Uniforms & Dress" },
+  { value: "tactical-gear", label: "Tactical Gear" },
+  { value: "electronics", label: "Electronics" },
+  { value: "furniture", label: "Furniture" },
+  { value: "vehicles", label: "Vehicles" },
+  { value: "household", label: "Household Items" },
+  { value: "clothing", label: "Clothing & Apparel" },
+  { value: "sports", label: "Sports & Outdoors" },
+  { value: "other", label: "Other" },
+]
+
+export const MARKETPLACECONDITIONS: { value: MarketplaceCondition; label: string }[] = [
+  { value: "new", label: "New" },
+  { value: "like-new", label: "Like New" },
+  { value: "good", label: "Good" },
+  { value: "fair", label: "Fair" },
+  { value: "poor", label: "Poor" },
+]
+
+export interface MarketplaceProfile {
   id: string
   display_name: string | null
   location: string | null
@@ -214,14 +215,14 @@ export interface Profile {
   updated_at: string
 }
 
-export interface Listing {
+export interface MarketplaceListing {
   id: string
   user_id: string
   title: string
   description: string | null
   price: number
-  category: Category
-  condition: Condition
+  category: MarketplaceCategory
+  condition: MarketplaceCondition
   location: string
   city: string | null
   state: string | null
@@ -229,28 +230,28 @@ export interface Listing {
   latitude: number | null
   longitude: number | null
   images: string[]
-  status: ListingStatus
+  status: MarketplaceListingStatus
   created_at: string
   updated_at: string
   profiles?: Profile
   distance?: number
 }
 
-export interface Conversation {
+export interface MarketplaceConversation {
   id: string
   listing_id: string | null
   buyer_id: string
   seller_id: string
   last_message_at: string
   created_at: string
-  listings?: Pick<Listing, "id" | "title" | "images"> | null
+  listings?: Pick<MarketplaceListing, "id" | "title" | "images"> | null
   buyer?: Pick<Profile, "id" | "display_name"> | null
   seller?: Pick<Profile, "id" | "display_name"> | null
-  last_message?: Message | null
+  last_message?: MarketplaceMessage | null
   unread_count: number
 }
 
-export interface Message {
+export interface MarketplaceMessage {
   id: string
   listing_id: string | null
   conversation_id: string | null
@@ -262,18 +263,150 @@ export interface Message {
   sender_profile?: Pick<Profile, "id" | "display_name"> | null
 }
 
-export interface SavedListing {
+export interface MarketplaceSavedListing {
   id: string
   user_id: string
   listing_id: string
   created_at: string
-  listings?: Listing
+  listings?: MarketplaceListing
 }
 
-export interface UserLocation {
+export interface MarketplaceUserLocation {
   city: string
   state: string
   latitude: number
   longitude: number
   nearbyBase?: string
+}
+
+// EMERGENCY CONTACTS AND COMMUNICATION
+export type CommunicationType = "call" | "video" | "email" | "letter" | "message"
+export type ContactRole = "primary" | "secondary" | "medical" | "financial" | "legal" | "other"
+export type EventType = "call" | "video" | "meeting" | "reminder"
+export type EventStatus = "scheduled" | "completed" | "cancelled" | "rescheduled"
+export type InvitationStatus = "pending" | "accepted" | "declined" | "tentative"
+
+export interface Contact {
+  id: string
+  user_id?: string
+  contactName: string
+  relationship?: string
+  phonePrimary?: string
+  phoneSecondary?: string
+  email?: string
+  address?: string
+  timezone?: string
+  role: ContactRole
+  isEmergencyContact: boolean
+  isPoaHolder: boolean
+  poaType?: string
+  canAccessAccounts: boolean
+  priority: number
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CommunicationLog {
+  id: string
+  user_id?: string
+  contactId?: string
+  contactName: string
+  communicationType: CommunicationType
+  direction: "incoming" | "outgoing"
+  communicationDate: string
+  durationMinutes?: number
+  notes?: string
+  createdAt: string
+}
+
+export interface ScheduledEvent {
+  id: string
+  user_id?: string
+  title: string
+  description?: string
+  eventType: EventType
+  startTime: string
+  endTime?: string
+  durationMinutes: number
+  location?: string
+  meetingLink?: string
+  isRecurring: boolean
+  recurrenceRule?: string
+  status: EventStatus
+  notes?: string
+  invitations: EventInvitation[]
+  isInvitee?: boolean
+  myInvitationStatus?: InvitationStatus
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EventInvitation {
+  id: string
+  eventId: string
+  contactId?: string
+  inviteeEmail: string
+  inviteeName?: string
+  status: InvitationStatus
+  responseMessage?: string
+  notifiedAt?: string
+  respondedAt?: string
+  createdAt: string
+}
+
+export interface MessageThread {
+  id: string
+  user_id?: string
+  contactId?: string
+  contactEmail: string
+  contactName?: string
+  subject?: string
+  isArchived: boolean
+  isStarred: boolean
+  lastMessageAt: string
+  unreadCount: number
+  messages: Message[]
+  createdAt: string
+}
+
+export interface Message {
+  id: string
+  threadId: string
+  senderType: "user" | "contact"
+  senderId?: string
+  senderEmail: string
+  senderName?: string
+  recipientEmail?: string
+  content: string
+  contentType: "text" | "html" | "markdown"
+  isRead: boolean
+  readAt?: string
+  attachments: any[]
+  editedAt: string
+  createdAt: string
+}
+
+export interface SharedContact {
+  id: string
+  ownerId: string
+  ownerDisplayName?: string
+  ownerEmail: string
+  ownerPhone: string
+  contactName: string
+  relationship?: string
+  phone?: string
+  contactEmail?: string
+  address?: string
+  role?: string
+  hasPoa: boolean
+  poaType?: string
+  notes?: string
+  priority: number
+  createdAt: string
+  updatedAt: string
+  // User's local edits
+  localDisplayName?: string
+  localRelationship?: string
+  addedToContacts?: boolean
 }

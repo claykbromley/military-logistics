@@ -8,12 +8,12 @@ import { LocationSelector } from "@/components/marketplace/location-selector"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Search, SlidersHorizontal, Plus } from "lucide-react"
-import type { Listing, Category } from "@/lib/types"
+import type { MarketplaceListing, MarketplaceCategory } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 
 interface ListingsGridProps {
-  initialListings: Listing[]
+  initialListings: MarketplaceListing[]
   savedListingIds: string[]
   userId?: string
 }
@@ -33,8 +33,8 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export function ListingsGrid({ initialListings, savedListingIds, userId }: ListingsGridProps) {
   const [user, setUser] = useState<{email?: string}|null>(null)
-  const [listings, setListings] = useState<Listing[]>(initialListings)
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
+  const [listings, setListings] = useState<MarketplaceListing[]>(initialListings)
+  const [selectedCategory, setSelectedCategory] = useState<MarketplaceCategory | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
   const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -65,7 +65,7 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
     })
   }, [selectedCategory, selectedLocation, sortBy, locationCoords])
 
-  const sortListingsByDistance = (listingsToSort: Listing[]) => {
+  const sortListingsByDistance = (listingsToSort: MarketplaceListing[]) => {
     if (!locationCoords) {
       return listingsToSort
     }

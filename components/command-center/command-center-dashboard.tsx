@@ -9,12 +9,12 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { useContacts } from "@/hooks/use-contacts"
+import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 
 export function CommandCenterDashboard() {
-  const { getEmergencyContacts, getPoaHolders, contacts } = useContacts()
+  const { getEmergencyContacts, getPoaHolders, contacts } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
@@ -218,7 +218,7 @@ export function CommandCenterDashboard() {
                 </div>
               </div>
 
-              <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-4 text-white">
+              <div className="bg-purple-600 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm opacity-90 mb-1">Next scheduled call</div>
@@ -479,7 +479,7 @@ export function CommandCenterDashboard() {
           {/* Emergency Contacts */}
           <Link href="/services/command-center/contacts" className="group">
             <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-5 border border-red-200/50 shadow-sm hover:shadow-lg hover:border-red-300 transition-all h-full">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-11 h-11 rounded-xl bg-red-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <Users className="w-5 h-5 text-white" />

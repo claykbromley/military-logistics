@@ -2,12 +2,12 @@
 
 import { ListingCard } from "@/components/marketplace/listing-card"
 import { Heart } from "lucide-react"
-import type { Listing } from "@/lib/types"
+import type { MarketplaceListing } from "@/lib/types"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
 interface SavedListingsProps {
-  listings: Listing[]
+  listings: MarketplaceListing[]
   userId: string
 }
 

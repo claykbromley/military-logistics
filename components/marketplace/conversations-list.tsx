@@ -4,10 +4,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MessageSquare, User } from "lucide-react"
 import Link from "next/link"
-import type { Conversation } from "@/lib/types"
+import type { MarketplaceConversation } from "@/lib/types"
 
 interface ConversationsListProps {
-  conversations: Conversation[]
+  conversations: MarketplaceConversation[]
   userId: string
 }
 

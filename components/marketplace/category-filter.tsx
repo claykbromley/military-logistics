@@ -4,10 +4,10 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { CATEGORIES, type Category } from "@/lib/types"
+import { MARKETPLACECATEGORIES, type MarketplaceCategory } from "@/lib/types"
 import { Shirt, Target, Laptop, Sofa, Car, Home, ShoppingBag, Dumbbell, MoreHorizontal } from "lucide-react"
 
-const categoryIcons: Record<Category, React.ReactNode> = {
+const categoryIcons: Record<MarketplaceCategory, React.ReactNode> = {
   uniforms: <Shirt className="h-4 w-4" />,
   "tactical-gear": <Target className="h-4 w-4" />,
   electronics: <Laptop className="h-4 w-4" />,
@@ -20,8 +20,8 @@ const categoryIcons: Record<Category, React.ReactNode> = {
 }
 
 interface CategoryFilterProps {
-  selectedCategory: Category | null
-  onCategoryChange: (category: Category | null) => void
+  selectedCategory: MarketplaceCategory | null
+  onCategoryChange: (category: MarketplaceCategory | null) => void
 }
 
 export function CategoryFilter({ selectedCategory, onCategoryChange }: CategoryFilterProps) {
@@ -35,7 +35,7 @@ export function CategoryFilter({ selectedCategory, onCategoryChange }: CategoryF
         >
           All
         </Button>
-        {CATEGORIES.map((category) => (
+        {MARKETPLACECATEGORIES.map((category) => (
           <Button
             key={category.value}
             variant={selectedCategory === category.value ? "default" : "outline"}

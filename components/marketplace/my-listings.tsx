@@ -19,10 +19,10 @@ import {
 import { MoreVertical, Plus, Eye, Pencil, Trash2, CheckCircle } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import type { Listing } from "@/lib/types"
+import type { MarketplaceListing } from "@/lib/types"
 
 interface MyListingsProps {
-  listings: Listing[]
+  listings: MarketplaceListing[]
 }
 
 export function MyListings({ listings: initialListings }: MyListingsProps) {

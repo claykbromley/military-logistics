@@ -1,7 +1,7 @@
 "use client"
 
 import { Phone, AlertTriangle, Heart, Shield, Users, FileText } from "lucide-react"
-import { useContacts } from "@/hooks/use-contacts"
+import { useCommunicationHub } from "@/hooks/use-communication-hub"
 
 const emergencyContacts = [
   {
@@ -43,7 +43,7 @@ const emergencyContacts = [
 ]
 
 export function EmergencyContacts() {
-  const { getEmergencyContacts, getPoaHolders, isLoaded } = useContacts()
+  const { getEmergencyContacts, getPoaHolders, isLoaded } = useCommunicationHub()
   
   const emergencyContactsList = isLoaded ? getEmergencyContacts() : []
   const poaHolders = isLoaded ? getPoaHolders() : []

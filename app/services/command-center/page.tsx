@@ -1,7 +1,7 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { ChevronRight } from "lucide-react"
-import { CommandCenterDashboard } from "@/components/command-center-dashboard"
+import { CommandCenterDashboard } from "@/components/command-center/command-center-dashboard"
 
 export default function CommandCenterPage() {
   return (
