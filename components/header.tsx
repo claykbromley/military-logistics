@@ -1,20 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Menu, Search, ChevronDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { LoginModal } from "../app/auth/login-modal"
-import { SignupModal } from "../app/auth/signup-modal"
+import { LoginModal } from "@/app/auth/login-modal"
+import { SignupModal } from "@/app/auth/signup-modal"
 import { SearchModal } from "./search-modal"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import { useUI } from "@/context/ui-context"
-
-type User = {
-  email?: string
-} | null
 
 const branches = [
   { name: "Army", url: "https://www.goarmy.com" },
@@ -59,38 +53,15 @@ const getItemUrl = (sectionName: string, itemName: string) => {
 }
 
 export function Header() {
-  const [user, setUser] = useState<User>(null)
-  const { showLogin, setShowLogin } = useUI()
+  const { user, signOut, showLogin, setShowLogin } = useUI()
   const [showSignup, setShowSignup] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
-  const router = useRouter()
-
-  useEffect(() => {
-    const supabase = createClient()
-
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user)
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
-
-  const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.refresh()
-  }
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2 md:gap-4">
@@ -114,14 +85,13 @@ export function Header() {
                       {navItems.map((section) => (
                         <div key={section.name} className="border-b pb-2">
                           <button
+                            type="button"
                             onClick={() => setExpandedSection(expandedSection === section.name ? null : section.name)}
                             className="flex items-center justify-between w-full py-2 px-2 text-left font-medium text-foreground hover:text-primary transition-colors cursor-pointer"
                           >
                             <span>{section.name}</span>
                             <ChevronDown
-                              className={`h-4 w-4 transition-transform ${
-                                expandedSection === section.name ? "rotate-180" : ""
-                              }`}
+                              className={`h-4 w-4 transition-transform ${expandedSection === section.name ? "rotate-180" : ""}`}
                             />
                           </button>
                           {expandedSection === section.name && (
@@ -174,25 +144,25 @@ export function Header() {
                 <Search className="h-5 w-5" />
                 <span className="sr-only">Search</span>
               </Button>
-            
-              {user?
-              <div>
-                <Button onClick={handleSignOut}>
-                  Sign Out
-                </Button>
-              </div>:
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setShowLogin(true)}>
-                  Login
-                </Button>
-                <Button variant="default" size="sm" onClick={() => setShowSignup(true)}>
-                  Sign Up
-                </Button>
-              </div>}
+
+              {user ? (
+                <div>
+                  <Button onClick={signOut}>Sign Out</Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => setShowLogin(true)}>
+                    Login
+                  </Button>
+                  <Button variant="default" size="sm" onClick={() => setShowSignup(true)}>
+                    Sign Up
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
-          <nav className="hidden md:flex items-center justify-center gap-6 py-3 border-t">
+          <nav className="hidden md:flex items-center justify-center gap-6 py-3 border-t border-border">
             {navItems.map((section) => (
               <div key={section.name} className="relative group">
                 <a
@@ -202,12 +172,12 @@ export function Header() {
                   {section.name}
                   <ChevronDown className="h-3 w-3" />
                 </a>
-                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-56 bg-background border rounded-md shadow-lg py-2 z-50">
+                <div className="absolute left-0 top-full mt-1 hidden group-hover:block w-56 bg-card border border-border rounded-md shadow-lg py-2 z-50">
                   {section.items.map((item) => (
                     <a
                       key={item}
                       href={getItemUrl(section.name, item)}
-                      className="block px-4 py-2 text-sm text-foreground hover:bg-accent hover:text-white transition-colors"
+                      className="block px-4 py-2 text-sm text-foreground hover:bg-accent transition-colors"
                     >
                       {item}
                     </a>
