@@ -1,14 +1,14 @@
 "use client"
 
 import React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { 
   Home, Car, Warehouse, Building2, Plus, ArrowLeft, AlertTriangle, 
   Calendar, Wrench, ChevronDown, Trash2, Edit, User, Shield, 
-  Clock, CheckCircle2, Download, MapPin, FileText, Sparkles
+  Clock, CheckCircle2, Download, MapPin, FileText, Sparkles, ChevronsUpDown, Check
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +19,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { pdf } from '@react-pdf/renderer'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { PropertySummaryDocument, SummaryData } from '@/lib/pdf-generation/property-management'
 import {
   useProperties,
@@ -28,6 +30,7 @@ import {
   type MaintenanceFrequency,
   type EmergencyContact,
 } from "@/hooks/use-properties"
+import { cn } from "@/lib/utils"
 
 const propertyTypes: { value: PropertyType; label: string; icon: React.ReactNode }[] = [
   { value: "home", label: "Home / Residence", icon: <Home className="w-4 h-4" /> },
@@ -96,57 +99,6 @@ function AnimatedBackground() {
           50% { transform: translate(-30px, 30px) scale(1.1); }
         }
       `}</style>
-    </div>
-  )
-}
-
-// Stat card with hover animation
-function StatCard({ 
-  icon, 
-  value, 
-  label, 
-  accent = false,
-  warning = false 
-}: { 
-  icon: React.ReactNode
-  value: number
-  label: string
-  accent?: boolean
-  warning?: boolean
-}) {
-  return (
-    <div className={`
-      group relative overflow-hidden rounded-2xl p-5
-      transition-all duration-300 ease-out
-      hover:scale-[1.02] hover:shadow-lg
-      ${accent 
-        ? 'bg-gradient-to-br from-amber-400 to-amber-500 text-white shadow-amber-200/50 shadow-md' 
-        : warning && value > 0
-          ? 'bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200/50'
-          : 'bg-white/80 backdrop-blur-sm border border-stone-200/50'
-      }
-    `}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className={`text-3xl font-light tracking-tight ${accent ? 'text-white' : 'text-stone-800'}`}>
-            {value}
-          </p>
-          <p className={`text-sm mt-1 ${accent ? 'text-amber-100' : 'text-stone-500'}`}>
-            {label}
-          </p>
-        </div>
-        <div className={`
-          p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110
-          ${accent 
-            ? 'bg-white/20' 
-            : warning && value > 0
-              ? 'bg-rose-200/50 text-rose-600'
-              : 'bg-stone-100 text-stone-400'
-          }
-        `}>
-          {icon}
-        </div>
-      </div>
     </div>
   )
 }
@@ -458,6 +410,8 @@ function AddPropertyDialog({
   const [caretakerName, setCaretakerName] = useState("")
   const [caretakerPhone, setCaretakerPhone] = useState("")
   const [notes, setNotes] = useState("")
+  const [caretakerOpen, setCaretakerOpen] = useState(false)
+  const [caretakerSearch, setCaretakerSearch] = useState("")
 
   useEffect(() => {
     if (editingProperty && open) {
@@ -522,6 +476,19 @@ function AddPropertyDialog({
     })
     onOpenChange(false)
   }
+
+  const filteredEmergencyContacts = useMemo(() => {
+    const q = caretakerSearch.toLowerCase()
+    return emergencyContacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q)
+    ).slice(0,5)
+  }, [emergencyContacts, caretakerSearch])
+
+  const selectedCaretaker = emergencyContacts.find(
+    (c) => c.id === caretakerContactId
+  )
 
   const isVehicle = type === "vehicle"
 
@@ -654,35 +621,94 @@ function AddPropertyDialog({
               <User className="w-4 h-4 text-stone-400" />
               Caretaker (while deployed)
             </h4>
-            {emergencyContacts.length > 0 ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="caretaker-contact" className="text-stone-600 text-sm">
-                    Select from Emergency Contacts
-                  </Label>
-                  <Select value={caretakerContactId} onValueChange={handleCaretakerChange}>
-                    <SelectTrigger className="rounded-xl border-stone-200">
-                      <SelectValue placeholder="Choose a contact or enter manually" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="none" className="rounded-lg">None (Enter manually)</SelectItem>
-                      {emergencyContacts.map((contact) => (
-                        <SelectItem key={contact.id} value={contact.id} className="rounded-lg">
-                          {contact.name} {contact.phone && `- ${contact.phone}`}
-                        </SelectItem>
+            <div className="space-y-2">
+              <Label className="text-stone-600 text-sm">
+                Select from Emergency Contacts
+              </Label>
+
+              <Popover open={caretakerOpen} onOpenChange={setCaretakerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between rounded-xl border-stone-200"
+                  >
+                    {caretakerContactId === "none"
+                      ? "None (Enter manually)"
+                      : selectedCaretaker
+                      ? `${selectedCaretaker.name}${
+                          selectedCaretaker.phone ? ` - ${selectedCaretaker.phone}` : ""
+                        }`
+                      : "Search or choose a contact..."}
+
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent className="w-full p-0 rounded-xl">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Search name or phone..."
+                      value={caretakerSearch}
+                      onValueChange={setCaretakerSearch}
+                    />
+
+                    <CommandEmpty>No contacts found.</CommandEmpty>
+
+                    <CommandGroup className="max-h-60 overflow-auto">
+                      {/* Manual entry option */}
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          handleCaretakerChange("none")
+                          setCaretakerOpen(false)
+                          setCaretakerSearch("")
+                        }}
+                      >
+                        None (Enter manually)
+                        <Check
+                          className={cn(
+                            "ml-auto h-4 w-4",
+                            caretakerContactId === "none" ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                      </CommandItem>
+
+                      {filteredEmergencyContacts.map((contact) => (
+                        <CommandItem
+                          key={contact.id}
+                          value={contact.id}
+                          onSelect={() => {
+                            handleCaretakerChange(contact.id)
+                            setCaretakerOpen(false)
+                            setCaretakerSearch("")
+                          }}
+                        >
+                          {contact.name}
+                          {contact.phone && (
+                            <span className="ml-2 text-stone-400 text-xs">
+                              {contact.phone}
+                            </span>
+                          )}
+
+                          <Check
+                            className={cn(
+                              "ml-auto h-4 w-4",
+                              caretakerContactId === contact.id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                        </CommandItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <p className="text-xs text-stone-400 mt-2 mb-3">
-                  Or enter caretaker details manually below
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-stone-500 mb-3 p-3 bg-stone-50 rounded-xl">
-                No emergency contacts found. Add contacts in your Emergency Contacts section.
-              </p>
-            )}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <p className="text-xs text-stone-400 mt-2 mb-3">
+              Or enter caretaker details manually below
+            </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="caretaker-name" className="text-stone-600 text-sm">Name</Label>
@@ -769,7 +795,9 @@ function AddTaskDialog({
   const [frequency, setFrequency] = useState<MaintenanceFrequency>("monthly")
   const [nextDue, setNextDue] = useState("")
   const [assignedToContactId, setAssignedToContactId] = useState("")
-  const [assignedToName, setAssignedToName] = useState("")
+  const [assignedToName, setAssignedToName] = useState("Myself")
+  const [caretakerOpen, setCaretakerOpen] = useState(false)
+  const [caretakerSearch, setCaretakerSearch] = useState("")
 
   useEffect(() => {
     if (editingTask && open) {
@@ -814,6 +842,15 @@ function AddTaskDialog({
     })
     onOpenChange(false)
   }
+
+  const filteredEmergencyContacts = useMemo(() => {
+    const q = caretakerSearch.toLowerCase()
+    return emergencyContacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone?.toLowerCase().includes(q)
+    ).slice(0,5)
+  }, [emergencyContacts, caretakerSearch])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -876,42 +913,69 @@ function AddTaskDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="assigned-to" className="text-stone-700">Assign To</Label>
-            {emergencyContacts.length > 0 ? (
-              <>
-                <Select value={assignedToContactId} onValueChange={handleAssigneeChange}>
-                  <SelectTrigger className="rounded-xl border-stone-200">
-                    <SelectValue placeholder="Choose a contact or enter name" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="none" className="rounded-lg">None (Enter name manually)</SelectItem>
-                    {emergencyContacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id} className="rounded-lg">
+            <Label className="text-stone-600 text-sm">
+              Assign To
+            </Label>
+
+            <Popover open={caretakerOpen} onOpenChange={setCaretakerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  className="w-full justify-between rounded-xl border-stone-200"
+                >
+                  {assignedToContactId === "none"
+                    ? "None (Enter manually)"
+                    : assignedToName
+                    ? `${assignedToName}`
+                    : "Search or choose a contact..."}
+
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+
+              <PopoverContent className="w-full p-0 rounded-xl">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Search name or phone..."
+                    value={caretakerSearch}
+                    onValueChange={setCaretakerSearch}
+                  />
+
+                  <CommandEmpty>No contacts found.</CommandEmpty>
+
+                  <CommandGroup className="max-h-60 overflow-auto">
+                    {filteredEmergencyContacts.map((contact) => (
+                      <CommandItem
+                        key={contact.id}
+                        value={contact.id}
+                        onSelect={() => {
+                          handleAssigneeChange(contact.id)
+                          setCaretakerOpen(false)
+                          setCaretakerSearch("")
+                        }}
+                      >
                         {contact.name}
-                      </SelectItem>
+                        {contact.phone && (
+                          <span className="ml-2 text-stone-400 text-xs">
+                            {contact.phone}
+                          </span>
+                        )}
+
+                        <Check
+                          className={cn(
+                            "ml-auto h-4 w-4",
+                            assignedToContactId === contact.id
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                      </CommandItem>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  id="assigned-to"
-                  value={assignedToName}
-                  onChange={(e) => {
-                    setAssignedToName(e.target.value)
-                    setAssignedToContactId("")
-                  }}
-                  placeholder="Or enter name directly"
-                  className="mt-2 rounded-xl border-stone-200"
-                />
-              </>
-            ) : (
-              <Input
-                id="assigned-to"
-                value={assignedToName}
-                onChange={(e) => setAssignedToName(e.target.value)}
-                placeholder="e.g., Caretaker name or self"
-                className="rounded-xl border-stone-200"
-              />
-            )}
+                  </CommandGroup>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
         <DialogFooter className="gap-2">

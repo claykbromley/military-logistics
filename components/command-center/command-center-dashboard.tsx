@@ -1,7 +1,8 @@
 "use client"
 
+import { useMemo } from "react"
 import { 
-  DollarSign, FileText, Home, Users, Calendar, MessageSquare, 
+  DollarSign, FileText, Home, Users, Calendar, MessageSquare, History,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink,
@@ -14,7 +15,7 @@ import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 
 export function CommandCenterDashboard() {
-  const { getEmergencyContacts, getPoaHolders, contacts } = useCommunicationHub()
+  const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
@@ -88,6 +89,50 @@ export function CommandCenterDashboard() {
   const soonestExpItemStatus = daysUntil(soonestExpItem?.date)
   const soonestExpDoc = getSoonestByDate(expiringDocuments, "expirationDate")
   const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
+
+  const upcomingCalls = useMemo(() => {
+    const now = Date.now()
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
+    const cutoff = now + THIRTY_DAYS
+
+    return scheduledEvents
+      .filter((e) => e.status === "scheduled" && new Date(e.startTime) >= new Date())
+      .filter((e) => {
+        const start = new Date(e.startTime).getTime()
+        return start <= cutoff
+      })
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+  }, [scheduledEvents])
+
+  const unreadCount = useMemo(() => {
+    return messageThreads
+      .filter(t => !t.isArchived)
+      .reduce((sum, t) => sum + (t.unreadCount || 0), 0)
+  }, [messageThreads])
+
+  function formatEventTime(iso: string) {
+    const date = new Date(iso)
+    const now = new Date()
+
+    const isToday = date.toDateString() === now.toDateString()
+
+    const time = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date)
+
+    if (isToday) return `Today, ${time}`
+
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    }).format(date)
+  }
+
 
   return (
     <section className="py-6 md:py-10">
@@ -190,7 +235,7 @@ export function CommandCenterDashboard() {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-slate-900">Communication Hub</h3>
-                    <p className="text-xs text-slate-600">Stay connected with loved ones</p>
+                    <p className="text-xs text-slate-600">Stay connected with your contacts</p>
                   </div>
                 </div>
               </div>
@@ -198,38 +243,40 @@ export function CommandCenterDashboard() {
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
                   <Video className="w-5 h-5 text-purple-600 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">2</div>
-                  <div className="text-xs text-slate-600">Scheduled calls</div>
+                  <div className="text-2xl font-bold text-slate-900">{upcomingCalls.length}</div>
+                  <div className="text-xs text-slate-600">Scheduled Calls</div>
                 </div>
 
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
                   <MessageSquare className="w-5 h-5 text-blue-600 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">156</div>
+                  <div className="text-2xl font-bold text-slate-900">{unreadCount > 0 ? unreadCount : messageThreads.length}</div>
                   <div className="text-xs text-slate-600 flex items-center gap-1">
-                    Messages
+                    {unreadCount > 0 ? "Unread Messages" : "Total Threads"}
                     <TrendingUp className="w-3 h-3 text-emerald-600" />
                   </div>
                 </div>
 
                 <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
-                  <Star className="w-5 h-5 text-amber-500 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">89</div>
-                  <div className="text-xs text-slate-600">Photos shared</div>
+                  <History className="w-5 h-5 text-amber-500 mb-2" />
+                  <div className="text-2xl font-bold text-slate-900">{communicationLog.length}</div>
+                  <div className="text-xs text-slate-600">Communication Logs</div>
                 </div>
               </div>
 
               <div className="bg-purple-600 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm opacity-90 mb-1">Next scheduled call</div>
-                    <div className="text-xl font-bold">Tomorrow, 7:00 PM EST</div>
-                    <div className="text-sm opacity-75 mt-1">with Sarah & Kids</div>
-                  </div>
+                  {upcomingCalls.length > 0 ?
+                    <div>
+                      <div className="text-sm opacity-90 mb-1">Next scheduled call</div>
+                      <div className="text-xl font-bold">{formatEventTime(upcomingCalls[0].startTime)}</div>
+                      <div className="text-sm opacity-75 mt-1">{upcomingCalls[0].title}</div>
+                    </div>
+                  : <div className="text-xl font-bold">No Upcoming Calls</div>}
                   <Phone className="w-8 h-8 opacity-50" />
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full mt-4 border-purple-300 hover:bg-purple-100" asChild>
+              <Button variant="outline" className="w-full mt-4 border-purple-300 hover:bg-purple-100 hover:text-black-400" asChild>
                 <Link href="/services/command-center/communication">
                   View Communications
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -279,7 +326,7 @@ export function CommandCenterDashboard() {
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full border-cyan-300 hover:bg-cyan-100" asChild>
+              <Button variant="outline" className="w-full border-cyan-300 hover:bg-cyan-100 hover:text-black-400" asChild>
                 <Link href="/services/command-center/calendar">
                   View Calendar
                   <ArrowRight className="w-4 h-4 ml-2" />

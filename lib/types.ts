@@ -313,7 +313,7 @@ export interface CommunicationLog {
   contactId?: string
   contactName: string
   communicationType: CommunicationType
-  direction: "incoming" | "outgoing"
+  direction: "incoming" | "outgoing" | "twoway"
   communicationDate: string
   durationMinutes?: number
   notes?: string
@@ -332,7 +332,6 @@ export interface ScheduledEvent {
   location?: string
   meetingLink?: string
   isRecurring: boolean
-  recurrenceRule?: string
   status: EventStatus
   notes?: string
   invitations: EventInvitation[]
@@ -340,6 +339,10 @@ export interface ScheduledEvent {
   myInvitationStatus?: InvitationStatus
   createdAt: string
   updatedAt: string
+  recurrencePattern?: "daily" | "weekly" | "monthly"
+  recurrenceInterval?: number
+  recurrenceEndDate?: string
+  recurrenceCount?: number
 }
 
 export interface EventInvitation {
@@ -353,6 +356,10 @@ export interface EventInvitation {
   notifiedAt?: string
   respondedAt?: string
   createdAt: string
+}
+
+export interface InvitationWithEvent extends EventInvitation {
+  event: ScheduledEvent
 }
 
 export interface MessageThread {

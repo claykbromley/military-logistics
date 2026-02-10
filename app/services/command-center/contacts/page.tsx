@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { useCommunicationHub } from "@/hooks/use-communication-hub"
+import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { Contact, SharedContact } from "@/lib/types"
 import { format, formatDistanceToNow } from "date-fns"
 
@@ -124,7 +124,7 @@ function EmergencyContactCard({
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Contact
                 </DropdownMenuItem>
-                {showPriority && (
+                {showPriority && contact.isEmergencyContact && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onMoveUp} disabled={isFirst}>
@@ -827,10 +827,13 @@ function QuickMessageDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
   contact: Contact | null
-  onSend: (subject: string, message: string) => void
+  onSend: (subject: string, message: string, attachedFiles: File[]) => void
 }) {
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
 
   useEffect(() => {
     if (open) {
@@ -841,8 +844,21 @@ function QuickMessageDialog({
 
   const handleSend = () => {
     if (!message.trim()) return
-    onSend(subject.trim(), message.trim())
+    onSend(subject.trim(), message.trim(), attachedFiles)
     onOpenChange(false)
+  }
+
+  const handleFileClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return
+    setAttachedFiles((prev) => [...prev, ...Array.from(e.target.files || [])])
+  }
+
+  const removeFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   return (
@@ -876,15 +892,39 @@ function QuickMessageDialog({
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+
+        <input ref={fileInputRef} type="file" multiple hidden onChange={handleFilesSelected} />
+
+        {attachedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {attachedFiles.map((file, i) => (
+              <div key={i} className="relative border rounded-lg p-2 bg-muted text-xs flex items-center gap-2">
+                {file.type.startsWith("image/") ? (
+                  <img src={URL.createObjectURL(file)} className="h-12 w-12 object-cover rounded" />
+                ) : (
+                  <span className="truncate max-w-[120px]">{file.name}</span>
+                )}
+                <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-black text-white rounded-full w-4 h-4 text-[10px]">✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-between">
+          <Button className="mb-2 cursor-pointer" type="button" onClick={handleFileClick}>
+            <Plus className="w-4 h-4 mr-1" />
+            Upload Attachment
           </Button>
-          <Button onClick={handleSend} disabled={!message.trim()}>
-            <Send className="w-4 h-4 mr-2" />
-            Send
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSend} disabled={!message.trim() && attachedFiles.length === 0}>
+              <Send className="w-4 h-4 mr-2" />
+              Send
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )
@@ -895,6 +935,14 @@ function QuickMessageDialog({
 // ============================================
 
 export default function EmergencyContactsPage() {
+  return (
+    <CommunicationHubProvider>
+      <EmergencyContactsPageContent />
+    </CommunicationHubProvider>
+  )
+}
+
+function EmergencyContactsPageContent() {
   const {
     contacts,
     sharedContacts,
@@ -1068,7 +1116,7 @@ export default function EmergencyContactsPage() {
     )
   }
 
-  const handleQuickMessage = async (subject: string, message: string) => {
+  const handleQuickMessage = async (subject: string, message: string, attachedFiles?: File[]) => {
     if (!selectedContact?.email) return
 
     const thread = await createThread(
@@ -1079,7 +1127,7 @@ export default function EmergencyContactsPage() {
     )
 
     if (thread) {
-      await sendMessage(thread.id, message)
+      await sendMessage(thread, message, attachedFiles)
     }
   }
 
@@ -1454,7 +1502,7 @@ export default function EmergencyContactsPage() {
                     onMoveUp={() => handleMovePriority(contact.id, "up")}
                     onMoveDown={() => handleMovePriority(contact.id, "down")}
                     isFirst={index === 0}
-                    isLast={index === filteredContacts.length - 1}
+                    isLast={index === filteredContacts.filter(c => c.isEmergencyContact === true).length - 1}
                     recentActivity={getRecentActivity(contact.id)}
                   />
                 ))}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, createContext, useContext, ReactNode } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { CommunicationType, EventType, EventStatus, InvitationStatus,
          Contact, CommunicationLog, ScheduledEvent, EventInvitation, MessageThread, Message, SharedContact } from "@/lib/types"
@@ -19,7 +19,29 @@ const SHARED_CONTACTS_KEY = "deployment-shared-contacts"
 // HOOK
 // ============================================
 
+const CommunicationHubContext = createContext<ReturnType<typeof useCommunicationHubInternal> | null>(null)
+
+type CommunicationHubProviderProps = {
+  children: ReactNode
+}
+
+export function CommunicationHubProvider({ children }: CommunicationHubProviderProps) {
+  const value = useCommunicationHubInternal()
+
+  return (
+    <CommunicationHubContext.Provider value={value}>
+      {children}
+    </CommunicationHubContext.Provider>
+  )
+}
+
 export function useCommunicationHub() {
+  const ctx = useContext(CommunicationHubContext)
+  if (!ctx) throw new Error("Must be used within CommunicationHubProvider")
+  return ctx
+}
+
+function useCommunicationHubInternal() {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [sharedContacts, setSharedContacts] = useState<SharedContact[]>([])
   const [communicationLog, setCommunicationLog] = useState<CommunicationLog[]>([])
@@ -40,7 +62,7 @@ export function useCommunicationHub() {
     const { data: { user } } = await supabase.auth.getUser()
 
     setIsAuthenticated(!!user)
-    
+
     if (user) {
       setCurrentUser({
         id: user.id,
@@ -88,42 +110,43 @@ export function useCommunicationHub() {
           .order("updated_at", { ascending: true })
 
         if (!sharedError && sharedData) {
-          // Load local edits from localStorage
-          const localEdits = JSON.parse(localStorage.getItem(SHARED_CONTACTS_KEY) || "{}")
-          const localShared: SharedContact[] = sharedData.map((s: any) => ({
-            id: s.id,
-            ownerId: s.profile.id,
-            ownerDisplayName: s.profile.display_name || undefined,
-            ownerEmail: s.profile.email,
-            ownerPhone: s.profile.phone,
-            contactName: s.name,
-            relationship: s.relationship || undefined,
-            phone: s.phone || undefined,
-            contactEmail: s.email || undefined,
-            address: s.address || undefined,
-            role: s.role || undefined,
-            hasPoa: s.has_poa || false,
-            poaType: s.poa_type || undefined,
-            notes: s.notes || undefined,
-            priority: s.priority || 0,
-            createdAt: s.created_at,
-            updatedAt: s.updated_at,
-            // Apply local edits if any
-            localDisplayName: localEdits[s.id]?.localDisplayName,
-            localRelationship: localEdits[s.id]?.localRelationship,
-            addedToContacts: localEdits[s.id]?.addedToContacts || false,
-          }))
+          const localEdits = JSON.parse(
+            localStorage.getItem(SHARED_CONTACTS_KEY) || "{}"
+          )
+
+          const localByEmail = new Map(
+            localContacts.map((c) => [c.email, c])
+          )
+
+          const localShared: SharedContact[] = sharedData.map((s: any) => {
+            const localMatch = localByEmail.get(s.profile.email)
+            const edits = localEdits[s.id] || {}
+
+            return {
+              id: s.id,
+              ownerId: s.profile.id,
+              ownerDisplayName: s.profile.display_name || undefined,
+              ownerEmail: s.profile.email,
+              ownerPhone: s.profile.phone,
+              contactName: s.name,
+              relationship: s.relationship || undefined,
+              phone: s.phone || undefined,
+              contactEmail: s.email || undefined,
+              address: s.address || undefined,
+              role: s.role || undefined,
+              hasPoa: s.has_poa || false,
+              poaType: s.poa_type || undefined,
+              notes: s.notes || undefined,
+              priority: s.priority || 0,
+              createdAt: s.created_at,
+              updatedAt: s.updated_at,
+              localDisplayName: localMatch?.contactName ?? edits.localDisplayName,
+              localRelationship: localMatch?.relationship ?? edits.localRelationship,
+              addedToContacts: (localMatch && true) || false,
+            }
+          })
 
           setSharedContacts(localShared)
-
-          const contactEmails = new Set(localContacts.map(c => c.email))
-
-          const hydratedShared = localShared.map(s => ({
-            ...s,
-            addedToContacts: contactEmails.has(s.contactEmail)
-          }))
-
-          setSharedContacts(hydratedShared)
         }
 
         // Load communication logs
@@ -140,7 +163,7 @@ export function useCommunicationHub() {
           contactId: c.contact_id || undefined,
           contactName: c.contact_name,
           communicationType: c.type as CommunicationType,
-          direction: c.direction || "outgoing",
+          direction: c.direction || "twoway",
           communicationDate: c.communication_date,
           durationMinutes: c.duration_minutes || undefined,
           notes: c.notes || undefined,
@@ -173,7 +196,10 @@ export function useCommunicationHub() {
           location: e.location || undefined,
           meetingLink: e.meeting_link || undefined,
           isRecurring: e.is_recurring || false,
-          recurrenceRule: e.recurrence_rule || undefined,
+          recurrencePattern: e.recurrence_pattern || undefined,
+          recurrenceInterval: e.recurrence_interval || undefined,
+          recurrenceEndDate: e.recurrence_end_date || undefined,
+          recurrenceCount: e.recurrence_count || undefined,
           status: e.status as EventStatus,
           notes: e.notes || undefined,
           invitations: (e.event_invitations || []).map((inv: any) => ({
@@ -538,7 +564,7 @@ export function useCommunicationHub() {
                 contact_id: log.contactId || null,
                 contact_name: contact?.contactName || "Unknown",
                 type: log.communicationType,
-                direction: log.direction || "outgoing",
+                direction: log.direction || "twoway",
                 duration_minutes: log.durationMinutes || null,
                 notes: log.notes || null,
                 communication_date: log.communicationDate,
@@ -554,7 +580,7 @@ export function useCommunicationHub() {
               contactId: data.contact_id || undefined,
               contactName: data.contact_name,
               communicationType: data.type as CommunicationType,
-              direction: data.direction || "outgoing",
+              direction: data.direction || "twoway",
               communicationDate: data.communication_date,
               durationMinutes: data.duration_minutes || undefined,
               notes: data.notes || undefined,
@@ -579,6 +605,104 @@ export function useCommunicationHub() {
       return newLog
     },
     [contacts, isAuthenticated]
+  )
+
+  const updateCommunication = useCallback(
+    async (
+      logId: string,
+      updates: Partial<Omit<CommunicationLog, "id" | "createdAt" | "contactName" | "user_id">>
+    ) => {
+      if (isAuthenticated) {
+        setIsSyncing(true)
+        try {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+
+          if (user) {
+            // Build update data object
+            const updateData: any = {}
+
+            if (updates.contactId !== undefined) {
+              updateData.contact_id = updates.contactId || null
+              // If contact is changing, update contact name too
+              const contact = contacts.find((c) => c.id === updates.contactId)
+              updateData.contact_name = contact?.contactName || "Unknown"
+            }
+            if (updates.communicationType !== undefined) updateData.type = updates.communicationType
+            if (updates.direction !== undefined) updateData.direction = updates.direction
+            if (updates.durationMinutes !== undefined) updateData.duration_minutes = updates.durationMinutes || null
+            if (updates.notes !== undefined) updateData.notes = updates.notes || null
+            if (updates.communicationDate !== undefined) updateData.communication_date = updates.communicationDate
+
+            const { data, error } = await supabase
+              .from("communication_logs")
+              .update(updateData)
+              .eq("id", logId)
+              .eq("user_id", user.id)
+              .select()
+              .single()
+            console.log(data)
+
+            if (error) throw error
+
+            const updatedLog: CommunicationLog = {
+              id: data.id,
+              user_id: data.user_id,
+              contactId: data.contact_id || undefined,
+              contactName: data.contact_name,
+              communicationType: data.type as CommunicationType,
+              direction: data.direction || "twoway",
+              communicationDate: data.communication_date,
+              durationMinutes: data.duration_minutes || undefined,
+              notes: data.notes || undefined,
+              createdAt: data.created_at,
+            }
+
+            setCommunicationLog((prev) =>
+              prev.map((log) => (log.id === logId ? updatedLog : log))
+            )
+            setSyncError(null)
+            return updatedLog
+          }
+        } catch (error) {
+          console.error("Error updating communication log:", error)
+          setSyncError(error instanceof Error ? error.message : "Failed to update")
+          
+          // Optimistic local update on error
+          setCommunicationLog((prev) =>
+            prev.map((log) => {
+              if (log.id === logId) {
+                const contact = updates.contactId ? contacts.find((c) => c.id === updates.contactId) : null
+                return {
+                  ...log,
+                  ...updates,
+                  contactName: contact ? contact.contactName : log.contactName,
+                }
+              }
+              return log
+            })
+          )
+        } finally {
+          setIsSyncing(false)
+        }
+      } else {
+        // Local-only update
+        setCommunicationLog((prev) =>
+          prev.map((log) => {
+            if (log.id === logId) {
+              const contact = updates.contactId ? contacts.find((c) => c.id === updates.contactId) : null
+              return {
+                ...log,
+                ...updates,
+                contactName: contact ? contact.contactName : log.contactName,
+              }
+            }
+            return log
+          })
+        )
+      }
+    },
+    [isAuthenticated, contacts]
   )
 
   const deleteCommunication = useCallback(
@@ -606,9 +730,70 @@ export function useCommunicationHub() {
   // ============================================
   // SCHEDULED EVENTS OPERATIONS
   // ============================================
+  function mapEventFromSupabase(
+    eventData: any,
+    invitationsData: any[]
+  ): ScheduledEvent {
+    return {
+      id: eventData.id,
+      user_id: eventData.user_id,
+      title: eventData.title,
+      description: eventData.description || undefined,
+      eventType: eventData.event_type as EventType,
+      startTime: eventData.start_time,
+      endTime: eventData.end_time || undefined,
+      durationMinutes: eventData.duration_minutes || 30,
+      location: eventData.location || undefined,
+      meetingLink: eventData.meeting_link || undefined,
+      isRecurring: eventData.is_recurring || false,
+      recurrencePattern: eventData.recurrence_pattern || undefined,
+      recurrenceInterval: eventData.recurrence_interval || undefined,
+      recurrenceEndDate: eventData.recurrence_end_date || undefined,
+      recurrenceCount: eventData.recurrence_count || undefined,
+      status: eventData.status as EventStatus,
+      notes: eventData.notes || undefined,
+      invitations: invitationsData.map((inv) => ({
+        id: inv.id,
+        eventId: inv.event_id,
+        contactId: inv.contact_id || undefined,
+        inviteeEmail: inv.invitee_email,
+        inviteeName: inv.invitee_name || undefined,
+        status: inv.status as InvitationStatus,
+        responseMessage: inv.response_message || undefined,
+        notifiedAt: inv.notified_at || undefined,
+        respondedAt: inv.responded_at || undefined,
+        createdAt: inv.created_at,
+      })),
+      createdAt: eventData.created_at,
+      updatedAt: eventData.updated_at,
+    }
+  }
+
+  function getNextOccurrenceDate(
+    currentDate: Date,
+    pattern: "daily" | "weekly" | "monthly",
+    interval: number
+  ): Date {
+    const next = new Date(currentDate)
+    switch (pattern) {
+      case "daily":
+        next.setDate(next.getDate() + interval)
+        break
+      case "weekly":
+        next.setDate(next.getDate() + 7 * interval)
+        break
+      case "monthly":
+        next.setMonth(next.getMonth() + interval)
+        break
+    }
+    return next
+  }
 
   const createEvent = useCallback(
-    async (event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">, invitees: { email: string; name?: string; contactId?: string }[]) => {
+    async (
+      event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
+      invitees: { email: string; name?: string; contactId?: string }[]
+    ) => {
       const now = new Date().toISOString()
       const newEvent: ScheduledEvent = {
         ...event,
@@ -622,43 +807,65 @@ export function useCommunicationHub() {
         setIsSyncing(true)
         try {
           const supabase = createClient()
-          const { data: { user } } = await supabase.auth.getUser()
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
 
           if (user) {
-            // Create event
+            // Build insert payload — ensure mutual exclusivity of end conditions
+            const insertData: any = {
+              user_id: user.id,
+              title: event.title,
+              description: event.description || null,
+              event_type: event.eventType,
+              start_time: event.startTime,
+              end_time: event.endTime || null,
+              duration_minutes: event.durationMinutes || 30,
+              location: event.location || null,
+              meeting_link: event.meetingLink || null,
+              is_recurring: event.isRecurring || false,
+              recurrence_pattern: null,
+              recurrence_interval: null,
+              recurrence_end_date: null,
+              recurrence_count: null,
+              status: event.status || "scheduled",
+              notes: event.notes || null,
+            }
+
+            if (event.isRecurring) {
+              insertData.recurrence_pattern = event.recurrencePattern || "weekly"
+              insertData.recurrence_interval = event.recurrenceInterval || 1
+
+              // Mutually exclusive: only one end condition
+              if (event.recurrenceEndDate) {
+                insertData.recurrence_end_date = event.recurrenceEndDate
+                insertData.recurrence_count = null
+              } else if (event.recurrenceCount) {
+                insertData.recurrence_count = event.recurrenceCount
+                insertData.recurrence_end_date = null
+              }
+            }
+
             const { data: eventData, error: eventError } = await supabase
               .from("scheduled_events")
-              .insert({
-                user_id: user.id,
-                title: event.title,
-                description: event.description || null,
-                event_type: event.eventType,
-                start_time: event.startTime,
-                end_time: event.endTime || null,
-                duration_minutes: event.durationMinutes || 30,
-                location: event.location || null,
-                meeting_link: event.meetingLink || null,
-                is_recurring: event.isRecurring || false,
-                recurrence_rule: event.recurrenceRule || null,
-                status: event.status || "scheduled",
-                notes: event.notes || null,
-              })
+              .insert(insertData)
               .select()
               .single()
 
             if (eventError) throw eventError
 
             // Create invitations
-            const invitationInserts = invitees.map((inv) => ({
-              event_id: eventData.id,
-              contact_id: inv.contactId || null,
-              invitee_email: inv.email,
-              invitee_name: inv.name || null,
-              status: "pending",
-            }))
-
             let invitationsData: any[] = []
-            if (invitationInserts.length > 0) {
+            if (invitees.length > 0) {
+              const invitationInserts = invitees.map((inv) => ({
+                user_id: user.id,
+                event_id: eventData.id,
+                contact_id: inv.contactId || null,
+                invitee_email: inv.email,
+                invitee_name: inv.name || null,
+                status: "pending",
+              }))
+
               const { data: invData, error: invError } = await supabase
                 .from("event_invitations")
                 .insert(invitationInserts)
@@ -668,36 +875,7 @@ export function useCommunicationHub() {
               invitationsData = invData || []
             }
 
-            const createdEvent: ScheduledEvent = {
-              id: eventData.id,
-              user_id: eventData.user_id,
-              title: eventData.title,
-              description: eventData.description || undefined,
-              eventType: eventData.event_type as EventType,
-              startTime: eventData.start_time,
-              endTime: eventData.end_time || undefined,
-              durationMinutes: eventData.duration_minutes || 30,
-              location: eventData.location || undefined,
-              meetingLink: eventData.meeting_link || undefined,
-              isRecurring: eventData.is_recurring || false,
-              recurrenceRule: eventData.recurrence_rule || undefined,
-              status: eventData.status as EventStatus,
-              notes: eventData.notes || undefined,
-              invitations: invitationsData.map((inv) => ({
-                id: inv.id,
-                eventId: inv.event_id,
-                contactId: inv.contact_id || undefined,
-                inviteeEmail: inv.invitee_email,
-                inviteeName: inv.invitee_name || undefined,
-                status: inv.status as InvitationStatus,
-                responseMessage: inv.response_message || undefined,
-                notifiedAt: inv.notified_at || undefined,
-                respondedAt: inv.responded_at || undefined,
-                createdAt: inv.created_at,
-              })),
-              createdAt: eventData.created_at,
-              updatedAt: eventData.updated_at,
-            }
+            const createdEvent = mapEventFromSupabase(eventData, invitationsData)
 
             setScheduledEvents((prev) => [...prev, createdEvent])
             setSyncError(null)
@@ -720,39 +898,182 @@ export function useCommunicationHub() {
   )
 
   const updateEvent = useCallback(
-    async (id: string, updates: Partial<ScheduledEvent>) => {
-      setScheduledEvents((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e))
-      )
-
+    async (
+      eventId: string,
+      updates: Partial<Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">>,
+      invitees?: { email: string; name?: string; contactId?: string }[]
+    ) => {
       if (isAuthenticated) {
         setIsSyncing(true)
         try {
           const supabase = createClient()
-          const dbUpdates: Record<string, unknown> = {}
-          
-          if (updates.title !== undefined) dbUpdates.title = updates.title
-          if (updates.description !== undefined) dbUpdates.description = updates.description || null
-          if (updates.eventType !== undefined) dbUpdates.event_type = updates.eventType
-          if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime
-          if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime || null
-          if (updates.durationMinutes !== undefined) dbUpdates.duration_minutes = updates.durationMinutes
-          if (updates.location !== undefined) dbUpdates.location = updates.location || null
-          if (updates.meetingLink !== undefined) dbUpdates.meeting_link = updates.meetingLink || null
-          if (updates.isRecurring !== undefined) dbUpdates.is_recurring = updates.isRecurring
-          if (updates.recurrenceRule !== undefined) dbUpdates.recurrence_rule = updates.recurrenceRule || null
-          if (updates.status !== undefined) dbUpdates.status = updates.status
-          if (updates.notes !== undefined) dbUpdates.notes = updates.notes || null
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
 
-          const { error } = await supabase.from("scheduled_events").update(dbUpdates).eq("id", id)
-          if (error) throw error
-          setSyncError(null)
+          if (user) {
+            const updateData: any = {
+              updated_at: new Date().toISOString(),
+            }
+
+            if (updates.title !== undefined) updateData.title = updates.title
+            if (updates.description !== undefined) updateData.description = updates.description || null
+            if (updates.eventType !== undefined) updateData.event_type = updates.eventType
+            if (updates.startTime !== undefined) updateData.start_time = updates.startTime
+            if (updates.endTime !== undefined) updateData.end_time = updates.endTime || null
+            if (updates.durationMinutes !== undefined) updateData.duration_minutes = updates.durationMinutes
+            if (updates.location !== undefined) updateData.location = updates.location || null
+            if (updates.meetingLink !== undefined) updateData.meeting_link = updates.meetingLink || null
+            if (updates.status !== undefined) updateData.status = updates.status
+            if (updates.notes !== undefined) updateData.notes = updates.notes || null
+
+            // Handle recurrence — ensure mutual exclusivity of end conditions
+            if (updates.isRecurring !== undefined) {
+              updateData.is_recurring = updates.isRecurring
+
+              if (updates.isRecurring) {
+                if (updates.recurrencePattern !== undefined)
+                  updateData.recurrence_pattern = updates.recurrencePattern || "weekly"
+                if (updates.recurrenceInterval !== undefined)
+                  updateData.recurrence_interval = updates.recurrenceInterval || 1
+
+                // FIX: Enforce mutual exclusivity of end conditions
+                // If recurrenceEndDate is set, clear recurrenceCount and vice versa
+                if (updates.recurrenceEndDate !== undefined) {
+                  updateData.recurrence_end_date = updates.recurrenceEndDate || null
+                  updateData.recurrence_count = null
+                } else if (updates.recurrenceCount !== undefined) {
+                  updateData.recurrence_count = updates.recurrenceCount || null
+                  updateData.recurrence_end_date = null
+                }
+
+                // Handle "never" end type: both null
+                if (!updates.recurrenceEndDate && !updates.recurrenceCount) {
+                  updateData.recurrence_end_date = null
+                  updateData.recurrence_count = null
+                }
+              } else {
+                // Toggled off — clear everything
+                updateData.recurrence_pattern = null
+                updateData.recurrence_interval = null
+                updateData.recurrence_end_date = null
+                updateData.recurrence_count = null
+              }
+            } else {
+              // isRecurring not in updates, but individual recurrence fields may be
+              if (updates.recurrencePattern !== undefined)
+                updateData.recurrence_pattern = updates.recurrencePattern || null
+              if (updates.recurrenceInterval !== undefined)
+                updateData.recurrence_interval = updates.recurrenceInterval || null
+
+              // Enforce mutual exclusivity even for partial updates
+              if (updates.recurrenceEndDate !== undefined) {
+                updateData.recurrence_end_date = updates.recurrenceEndDate || null
+                updateData.recurrence_count = null
+              } else if (updates.recurrenceCount !== undefined) {
+                updateData.recurrence_count = updates.recurrenceCount || null
+                updateData.recurrence_end_date = null
+              }
+            }
+
+            const { data: eventData, error: eventError } = await supabase
+              .from("scheduled_events")
+              .update(updateData)
+              .eq("id", eventId)
+              .eq("user_id", user.id)
+              .select()
+              .single()
+
+            if (eventError) throw eventError
+
+            // Handle invitations — preserve existing statuses
+            let invitationsData: any[] = []
+            if (invitees !== undefined) {
+              const { data: existingInvitations } = await supabase
+                .from("event_invitations")
+                .select("*")
+                .eq("event_id", eventId)
+
+              const existingByEmail = new Map(
+                (existingInvitations || []).map((inv) => [inv.invitee_email, inv])
+              )
+
+              const newInviteeEmails = new Set(invitees.map((i) => i.email))
+
+              // Delete only removed invitees
+              const removedEmails = [...existingByEmail.keys()].filter(
+                (email) => !newInviteeEmails.has(email)
+              )
+              if (removedEmails.length > 0) {
+                await supabase
+                  .from("event_invitations")
+                  .delete()
+                  .eq("event_id", eventId)
+                  .in("invitee_email", removedEmails)
+              }
+
+              // Insert only genuinely new invitees
+              const toInsert = invitees.filter((inv) => !existingByEmail.has(inv.email))
+              if (toInsert.length > 0) {
+                const { error: invError } = await supabase
+                  .from("event_invitations")
+                  .insert(
+                    toInsert.map((inv) => ({
+                      user_id: user.id,
+                      event_id: eventId,
+                      contact_id: inv.contactId || null,
+                      invitee_email: inv.email,
+                      invitee_name: inv.name || null,
+                      status: "pending",
+                    }))
+                  )
+                  .select()
+                if (invError) throw invError
+              }
+
+              // Re-fetch all current invitations
+              const { data: finalInvData } = await supabase
+                .from("event_invitations")
+                .select("*")
+                .eq("event_id", eventId)
+              invitationsData = finalInvData || []
+            } else {
+              const { data: invData } = await supabase
+                .from("event_invitations")
+                .select("*")
+                .eq("event_id", eventId)
+              invitationsData = invData || []
+            }
+
+            const updatedEvent = mapEventFromSupabase(eventData, invitationsData)
+
+            setScheduledEvents((prev) =>
+              prev.map((e) => (e.id === eventId ? updatedEvent : e))
+            )
+            setSyncError(null)
+            return updatedEvent
+          }
         } catch (error) {
           console.error("Error updating event:", error)
           setSyncError(error instanceof Error ? error.message : "Failed to update")
+          setScheduledEvents((prev) =>
+            prev.map((e) =>
+              e.id === eventId
+                ? { ...e, ...updates, updatedAt: new Date().toISOString() }
+                : e
+            )
+          )
         } finally {
           setIsSyncing(false)
         }
+      } else {
+        setScheduledEvents((prev) =>
+          prev.map((e) =>
+            e.id === eventId
+              ? { ...e, ...updates, updatedAt: new Date().toISOString() }
+              : e
+          )
+        )
       }
     },
     [isAuthenticated]
@@ -778,6 +1099,78 @@ export function useCommunicationHub() {
       }
     },
     [isAuthenticated]
+  )
+
+  const completeRecurringEvent = useCallback(
+    async (eventId: string) => {
+      const event = scheduledEvents.find((e) => e.id === eventId)
+      if (!event) return
+
+      // Mark the current event as completed
+      await updateEvent(eventId, { status: "completed" })
+
+      // If it's recurring, create the next occurrence
+      if (event.isRecurring && event.recurrencePattern) {
+        const nextStart = getNextOccurrenceDate(
+          new Date(event.startTime),
+          event.recurrencePattern,
+          event.recurrenceInterval || 1
+        )
+
+        // Check if we've exceeded the end conditions
+        if (event.recurrenceEndDate && nextStart > new Date(event.recurrenceEndDate)) {
+          return // Past end date, don't create another
+        }
+
+        if (event.recurrenceCount) {
+          // Count how many completed events in this series exist
+          const seriesTitle = event.title
+          const completedInSeries = scheduledEvents.filter(
+            (e) =>
+              e.title === seriesTitle &&
+              e.isRecurring &&
+              e.status === "completed" &&
+              e.recurrencePattern === event.recurrencePattern
+          ).length + 1 // +1 for the one we just completed
+
+          if (completedInSeries >= event.recurrenceCount) {
+            return // Reached max occurrences
+          }
+        }
+
+        const durationMs = (event.durationMinutes || 30) * 60000
+        const nextEnd = new Date(nextStart.getTime() + durationMs)
+
+        // Gather existing invitee info
+        const invitees = event.invitations.map((inv) => ({
+          email: inv.inviteeEmail,
+          name: inv.inviteeName,
+          contactId: inv.contactId,
+        }))
+
+        await createEvent(
+          {
+            title: event.title,
+            description: event.description,
+            eventType: event.eventType,
+            startTime: nextStart.toISOString(),
+            endTime: nextEnd.toISOString(),
+            durationMinutes: event.durationMinutes,
+            location: event.location,
+            meetingLink: event.meetingLink,
+            isRecurring: true,
+            recurrencePattern: event.recurrencePattern,
+            recurrenceInterval: event.recurrenceInterval,
+            recurrenceEndDate: event.recurrenceEndDate,
+            recurrenceCount: event.recurrenceCount,
+            status: "scheduled",
+            notes: event.notes,
+          },
+          invitees
+        )
+      }
+    },
+    [scheduledEvents, updateEvent, createEvent]
   )
 
   const addEventInvitee = useCallback(
@@ -1451,6 +1844,23 @@ export function useCommunicationHub() {
     [addContact]
   )
 
+  const addNonContactToMyContacts = useCallback(
+    async (name: string, email: string) => {
+      const newContact = await addContact({
+        contactName: name,
+        relationship: "In a message thread with me",
+        email: email,
+        role: "other",
+        isEmergencyContact: false,
+        isPoaHolder: false,
+        canAccessAccounts: false,
+        priority: 0,
+      })
+      return newContact
+    },
+    [addContact]
+  )
+
   const refreshSharedContacts = useCallback(async () => {
     if (!isAuthenticated) return
 
@@ -1530,6 +1940,58 @@ export function useCommunicationHub() {
       }
     },
     [contacts, deleteContact, reorderEmergencyPriorities]
+  )
+
+  const respondToInvitation = useCallback(
+    async (invitationId: string, status: InvitationStatus, responseMessage?: string) => {
+      const now = new Date().toISOString()
+
+      if (isAuthenticated) {
+        setIsSyncing(true)
+        try {
+          const supabase = createClient()
+          const { data: { user } } = await supabase.auth.getUser()
+
+          if (user) {
+            const { error } = await supabase
+              .from("event_invitations")
+              .update({
+                status,
+                response_message: responseMessage || null,
+                responded_at: now,
+              })
+              .eq("id", invitationId)
+
+            if (error) throw error
+          }
+
+          setSyncError(null)
+        } catch (error) {
+          console.error("Error responding to invitation:", error)
+          setSyncError(error instanceof Error ? error.message : "Failed to respond")
+        } finally {
+          setIsSyncing(false)
+        }
+      }
+
+      // Update local state regardless of auth
+      setScheduledEvents((prev) =>
+        prev.map((event) => ({
+          ...event,
+          invitations: event.invitations.map((inv) =>
+            inv.id === invitationId
+              ? {
+                  ...inv,
+                  status,
+                  responseMessage,
+                  respondedAt: now,
+                }
+              : inv
+          ),
+        }))
+      )
+    },
+    [isAuthenticated]
   )
 
   // ============================================
@@ -1683,10 +2145,12 @@ export function useCommunicationHub() {
     // Shared contacts operations
     updateSharedContactLocal,
     addSharedContactToMyContacts,
+    addNonContactToMyContacts,
     refreshSharedContacts,
     
     // Communication log operations
     addCommunication,
+    updateCommunication,
     deleteCommunication,
     
     // Event operations
@@ -1694,6 +2158,7 @@ export function useCommunicationHub() {
     updateEvent,
     deleteEvent,
     addEventInvitee,
+    completeRecurringEvent,
     
     // Message operations
     createThread,
@@ -1713,6 +2178,7 @@ export function useCommunicationHub() {
     getContactThreads,
     getUnreadCount,
     reorderEmergencyPriorities,
+    respondToInvitation,
     exportToPDF,
     refreshData: loadAllData,
   }
