@@ -10,9 +10,9 @@ import {
   isSameMonth,
   isSameDay,
   isToday,
-  parseISO,
 } from "date-fns"
 import type { CalendarEvent } from "@/lib/calendar-types"
+import { getEventColor, HOLIDAY_STYLE } from "@/lib/event-colors"
 import { cn } from "@/lib/utils"
 
 interface MonthViewProps {
@@ -86,8 +86,7 @@ export function MonthView({
                   "inline-flex h-6 w-6 md:h-7 md:w-7 items-center justify-center rounded-full text-xs md:text-sm",
                   !inMonth && "text-muted-foreground/50",
                   inMonth && "text-foreground",
-                  today &&
-                    "bg-primary text-primary-foreground font-bold",
+                  today && "bg-primary text-primary-foreground font-bold",
                   selected && !today && "font-semibold"
                 )}
               >
@@ -98,23 +97,37 @@ export function MonthView({
                 {holidays.slice(0, 1).map((event) => (
                   <div
                     key={event.id}
-                    className="truncate rounded px-1 py-px text-[10px] md:text-xs font-medium bg-holiday-muted text-holiday-foreground border border-holiday-border"
+                    className={cn(
+                      "truncate rounded px-1 py-px text-[10px] md:text-xs font-medium border",
+                      HOLIDAY_STYLE.bg,
+                      HOLIDAY_STYLE.text,
+                      HOLIDAY_STYLE.border
+                    )}
                     title={event.title}
                   >
                     {event.title}
                   </div>
                 ))}
-                {userEvents.slice(0, 2).map((event) => (
-                  <div
-                    key={event.id}
-                    className="truncate rounded px-1 py-px text-[10px] md:text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-                    title={event.title}
-                  >
-                    {event.is_all_day
-                      ? event.title
-                      : `${event.start_time} ${event.title}`}
-                  </div>
-                ))}
+                {userEvents.slice(0, 2).map((event) => {
+                  const ec = getEventColor(event.color)
+                  return (
+                    <div
+                      key={event.id}
+                      className={cn(
+                        "flex items-center gap-1 truncate rounded px-1 py-px text-[10px] md:text-xs font-medium border",
+                        ec.bg,
+                        ec.text,
+                        ec.border
+                      )}
+                      title={event.title}
+                    >
+                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", ec.dot)} />
+                      {event.is_all_day
+                        ? event.title
+                        : `${event.start_time} ${event.title}`}
+                    </div>
+                  )
+                })}
                 {dayEvents.length > 3 && (
                   <span className="text-[10px] text-muted-foreground pl-1">
                     +{dayEvents.length - 3} more

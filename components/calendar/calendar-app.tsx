@@ -171,6 +171,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
               is_all_day: data.is_all_day,
               start_time: data.start_time || null,
               end_time: data.end_time || null,
+              color: data.color,
             })
             .eq("id", editingEvent.id)
             .select()
@@ -203,6 +204,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
               is_all_day: data.is_all_day,
               start_time: data.start_time || null,
               end_time: data.end_time || null,
+              color: data.color,
               user_id: user.id,
             })
             .select()

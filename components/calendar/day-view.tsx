@@ -2,6 +2,7 @@
 
 import { format } from "date-fns"
 import type { CalendarEvent } from "@/lib/calendar-types"
+import { getEventColor, HOLIDAY_STYLE } from "@/lib/event-colors"
 import { cn } from "@/lib/utils"
 
 interface DayViewProps {
@@ -13,6 +14,7 @@ interface DayViewProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const HOUR_HEIGHT = 64
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number)
@@ -58,24 +60,29 @@ export function DayView({
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             All Day
           </span>
-          {allDayEvents.map((event) => (
-            <button
-              key={event.id}
-              type="button"
-              onClick={() => {
-                if (!event.is_holiday && isLoggedIn) onEditEvent(event)
-              }}
-              className={cn(
-                "text-left rounded px-3 py-1.5 text-sm font-medium",
-                event.is_holiday
-                  ? "bg-holiday-muted text-holiday-foreground border border-holiday-border"
-                  : "bg-primary/10 text-primary border border-primary/20",
-                !event.is_holiday && isLoggedIn && "cursor-pointer hover:bg-primary/20"
-              )}
-            >
-              {event.title}
-            </button>
-          ))}
+          {allDayEvents.map((event) => {
+            const isHoliday = !!event.is_holiday
+            const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color)
+            return (
+              <button
+                key={event.id}
+                type="button"
+                onClick={() => {
+                  if (!isHoliday && isLoggedIn) onEditEvent(event)
+                }}
+                className={cn(
+                  "text-left rounded px-3 py-1.5 text-sm font-medium border",
+                  style.bg,
+                  style.text,
+                  style.border,
+                  !isHoliday && isLoggedIn && "cursor-pointer",
+                  !isHoliday && isLoggedIn && style.bgHover
+                )}
+              >
+                {event.title}
+              </button>
+            )
+          })}
         </div>
       )}
 
@@ -90,7 +97,8 @@ export function DayView({
           return (
             <div
               key={hour}
-              className="flex border-b border-border h-16 cursor-pointer hover:bg-accent/30 transition-colors"
+              className="flex border-b border-border cursor-pointer hover:bg-accent/30 transition-colors"
+              style={{ height: `${HOUR_HEIGHT}px` }}
               onClick={() => onClickHour(hour)}
             >
               <div className="w-16 shrink-0 flex items-start justify-end pr-3 pt-1 border-r border-border">
@@ -106,12 +114,13 @@ export function DayView({
               </div>
               <div className="flex-1 relative px-2">
                 {eventsThisHour.map((event) => {
+                  const ec = getEventColor(event.color)
                   const startMin = timeToMinutes(event.start_time!)
                   const endMin = timeToMinutes(event.end_time!)
                   const duration = Math.max(endMin - startMin, 15)
                   const offsetMin = startMin % 60
-                  const top = (offsetMin / 60) * 64
-                  const height = Math.min((duration / 60) * 64, 128)
+                  const top = (offsetMin / 60) * HOUR_HEIGHT
+                  const height = (duration / 60) * HOUR_HEIGHT
 
                   return (
                     <button
@@ -121,17 +130,28 @@ export function DayView({
                         e.stopPropagation()
                         if (isLoggedIn) onEditEvent(event)
                       }}
-                      className="absolute left-2 right-2 rounded-md px-2 py-1 text-xs font-medium bg-primary/15 text-primary border border-primary/25 overflow-hidden hover:bg-primary/25 transition-colors z-10"
+                      className={cn(
+                        "absolute left-2 right-2 rounded-md px-2 py-1 text-xs font-medium border overflow-hidden transition-colors z-10",
+                        ec.bg,
+                        ec.text,
+                        ec.border,
+                        ec.bgHover
+                      )}
                       style={{
                         top: `${top}px`,
-                        height: `${height}px`,
+                        height: `${Math.max(height, 20)}px`,
                         minHeight: "20px",
                       }}
                     >
-                      <span className="font-semibold">{event.title}</span>
-                      <span className="ml-1 text-primary/70">
-                        {event.start_time} - {event.end_time}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn("h-2 w-2 rounded-full shrink-0", ec.dot)} />
+                        <span className="font-semibold truncate">{event.title}</span>
+                      </div>
+                      {height >= 32 && (
+                        <span className="text-[10px] opacity-70 ml-3.5">
+                          {event.start_time} - {event.end_time}
+                        </span>
+                      )}
                     </button>
                   )
                 })}

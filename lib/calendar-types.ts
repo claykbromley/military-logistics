@@ -21,4 +21,5 @@ export interface EventFormData {
   is_all_day: boolean
   start_time: string
   end_time: string
+  color: string
 }

@@ -15,7 +15,9 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import type { CalendarEvent, EventFormData } from "@/lib/calendar-types"
-import { Trash2 } from "lucide-react"
+import { EVENT_COLORS } from "@/lib/event-colors"
+import { Trash2, Check } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface EventFormDialogProps {
   open: boolean
@@ -40,6 +42,7 @@ export function EventFormDialog({
   const [isAllDay, setIsAllDay] = useState(false)
   const [startTime, setStartTime] = useState("09:00")
   const [endTime, setEndTime] = useState("10:00")
+  const [color, setColor] = useState("sky")
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -50,6 +53,7 @@ export function EventFormDialog({
       setIsAllDay(existingEvent.is_all_day)
       setStartTime(existingEvent.start_time || "09:00")
       setEndTime(existingEvent.end_time || "10:00")
+      setColor(existingEvent.color || "sky")
     } else {
       setTitle("")
       setStartDate(initialDate || "")
@@ -57,6 +61,7 @@ export function EventFormDialog({
       setIsAllDay(false)
       setStartTime("09:00")
       setEndTime("10:00")
+      setColor("sky")
     }
     setError(null)
   }, [existingEvent, initialDate, open])
@@ -93,6 +98,7 @@ export function EventFormDialog({
       is_all_day: isAllDay,
       start_time: isAllDay ? "" : startTime,
       end_time: isAllDay ? "" : endTime,
+      color,
     })
   }
 
@@ -122,6 +128,33 @@ export function EventFormDialog({
               onChange={(e) => setTitle(e.target.value)}
               required
             />
+          </div>
+
+          {/* Color picker */}
+          <div className="flex flex-col gap-2">
+            <Label>Color</Label>
+            <div className="flex flex-wrap gap-2">
+              {EVENT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  type="button"
+                  onClick={() => setColor(c.value)}
+                  className={cn(
+                    "relative h-8 w-8 rounded-full transition-all",
+                    c.dot,
+                    color === c.value
+                      ? "ring-2 ring-offset-2 ring-foreground/40 ring-offset-card scale-110"
+                      : "hover:scale-110 opacity-70 hover:opacity-100"
+                  )}
+                  title={c.name}
+                  aria-label={`Select ${c.name} color`}
+                >
+                  {color === c.value && (
+                    <Check className="absolute inset-0 m-auto h-4 w-4 text-white" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">

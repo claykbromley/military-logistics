@@ -8,6 +8,7 @@ import {
   isToday,
 } from "date-fns"
 import type { CalendarEvent } from "@/lib/calendar-types"
+import { getEventColor, HOLIDAY_STYLE } from "@/lib/event-colors"
 import { cn } from "@/lib/utils"
 
 interface WeekViewProps {
@@ -20,6 +21,7 @@ interface WeekViewProps {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i)
+const HOUR_HEIGHT = 48
 
 function getEventsForDate(events: CalendarEvent[], date: Date): CalendarEvent[] {
   const dateStr = format(date, "yyyy-MM-dd")
@@ -97,29 +99,34 @@ export function WeekView({
                   key={day.toISOString()}
                   className="border-r border-border px-0.5 py-1 flex flex-col gap-0.5 min-h-[28px]"
                 >
-                  {allDayEvents.map((event) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      onClick={() => {
-                        if (event.is_holiday) {
-                          onSelectDate(day)
-                        } else if (isLoggedIn) {
-                          onEditEvent(event)
-                        }
-                      }}
-                      className={cn(
-                        "truncate rounded px-1 py-px text-[10px] font-medium text-left",
-                        event.is_holiday
-                          ? "bg-holiday-muted text-holiday-foreground border border-holiday-border"
-                          : "bg-primary/10 text-primary border border-primary/20",
-                        !event.is_holiday && isLoggedIn && "cursor-pointer hover:bg-primary/20"
-                      )}
-                      title={event.title}
-                    >
-                      {event.title}
-                    </button>
-                  ))}
+                  {allDayEvents.map((event) => {
+                    const isHoliday = !!event.is_holiday
+                    const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color)
+                    return (
+                      <button
+                        key={event.id}
+                        type="button"
+                        onClick={() => {
+                          if (isHoliday) {
+                            onSelectDate(day)
+                          } else if (isLoggedIn) {
+                            onEditEvent(event)
+                          }
+                        }}
+                        className={cn(
+                          "truncate rounded px-1 py-px text-[10px] font-medium text-left border",
+                          style.bg,
+                          style.text,
+                          style.border,
+                          !isHoliday && isLoggedIn && "cursor-pointer",
+                          !isHoliday && isLoggedIn && style.bgHover
+                        )}
+                        title={event.title}
+                      >
+                        {event.title}
+                      </button>
+                    )
+                  })}
                 </div>
               )
             })}
@@ -159,12 +166,13 @@ export function WeekView({
                   onClick={() => onSelectDate(day)}
                 >
                   {eventsThisHour.map((event) => {
+                    const ec = getEventColor(event.color)
                     const startMin = timeToMinutes(event.start_time!)
                     const endMin = timeToMinutes(event.end_time!)
                     const offsetMin = startMin % 60
                     const duration = Math.max(endMin - startMin, 15)
-                    const top = (offsetMin / 60) * 48
-                    const height = Math.min((duration / 60) * 48, 96)
+                    const top = (offsetMin / 60) * HOUR_HEIGHT
+                    const height = (duration / 60) * HOUR_HEIGHT
 
                     return (
                       <button
@@ -174,11 +182,24 @@ export function WeekView({
                           e.stopPropagation()
                           if (isLoggedIn) onEditEvent(event)
                         }}
-                        className="absolute left-0.5 right-0.5 rounded px-1 text-[10px] font-medium bg-primary/15 text-primary border border-primary/25 overflow-hidden hover:bg-primary/25 transition-colors z-10"
-                        style={{ top: `${top}px`, height: `${height}px`, minHeight: "16px" }}
+                        className={cn(
+                          "absolute left-0.5 right-0.5 rounded px-1 text-[10px] font-medium border overflow-hidden transition-colors z-10",
+                          ec.bg,
+                          ec.text,
+                          ec.border,
+                          ec.bgHover
+                        )}
+                        style={{
+                          top: `${top}px`,
+                          height: `${Math.max(height, 16)}px`,
+                          minHeight: "16px",
+                        }}
                         title={`${event.start_time} - ${event.end_time}: ${event.title}`}
                       >
-                        {event.title}
+                        <span className="flex items-center gap-1">
+                          <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", ec.dot)} />
+                          {event.title}
+                        </span>
                       </button>
                     )
                   })}
