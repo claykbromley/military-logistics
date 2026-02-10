@@ -68,7 +68,7 @@ export function DayView({
               className={cn(
                 "text-left rounded px-3 py-1.5 text-sm font-medium",
                 event.is_holiday
-                  ? "bg-orange-100 text-orange-800 border border-orange-200"
+                  ? "bg-holiday-muted text-holiday-foreground border border-holiday-border"
                   : "bg-primary/10 text-primary border border-primary/20",
                 !event.is_holiday && isLoggedIn && "cursor-pointer hover:bg-primary/20"
               )}

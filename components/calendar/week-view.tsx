@@ -111,7 +111,7 @@ export function WeekView({
                       className={cn(
                         "truncate rounded px-1 py-px text-[10px] font-medium text-left",
                         event.is_holiday
-                          ? "bg-orange-100 text-orange-800 border border-orange-200"
+                          ? "bg-holiday-muted text-holiday-foreground border border-holiday-border"
                           : "bg-primary/10 text-primary border border-primary/20",
                         !event.is_holiday && isLoggedIn && "cursor-pointer hover:bg-primary/20"
                       )}

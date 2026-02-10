@@ -98,7 +98,7 @@ export function MonthView({
                 {holidays.slice(0, 1).map((event) => (
                   <div
                     key={event.id}
-                    className="truncate rounded px-1 py-px text-[10px] md:text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200"
+                    className="truncate rounded px-1 py-px text-[10px] md:text-xs font-medium bg-holiday-muted text-holiday-foreground border border-holiday-border"
                     title={event.title}
                   >
                     {event.title}

@@ -66,19 +66,16 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
         .order("start_date", { ascending: true })
 
       if (error) {
-        console.log("[v0] fetchEvents error:", error.message)
         return
       }
-
-      console.log("[v0] fetchEvents received events:", data?.length ?? 0)
       setUserEvents(
         (data ?? []).map((e: CalendarEvent) => ({
           ...e,
           id: String(e.id),
         }))
       )
-    } catch (err) {
-      console.error("[v0] Failed to fetch events", err)
+    } catch {
+      // Fetch failed
     }
   }, [currentDate])
 
@@ -160,7 +157,6 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
 
   const handleSaveEvent = useCallback(
     async (data: EventFormData) => {
-      console.log("[v0] handleSaveEvent called with:", data, "editing:", !!editingEvent)
       const supabase = createClient()
 
       try {
@@ -181,11 +177,8 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
             .single()
 
           if (error) {
-            console.error("[v0] Failed to update event:", error.message)
             return
           }
-
-          console.log("[v0] Updated event:", updated.id)
           setUserEvents((prev) =>
             prev.map((e) =>
               e.id === String(editingEvent.id)
@@ -197,7 +190,6 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
           // Get the current user for user_id
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) {
-            console.error("[v0] No authenticated user")
             return
           }
 
@@ -217,15 +209,12 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
             .single()
 
           if (error) {
-            console.error("[v0] Failed to create event:", error.message)
             return
           }
-
-          console.log("[v0] Created event:", created.id)
           setUserEvents((prev) => [...prev, { ...created, id: String(created.id) }])
         }
-      } catch (err) {
-        console.error("[v0] Error saving event:", err)
+      } catch {
+        // Event save failed
       }
       setShowEventForm(false)
       setEditingEvent(null)
@@ -244,14 +233,11 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
         .eq("id", editingEvent.id)
 
       if (error) {
-        console.error("[v0] Failed to delete event:", error.message)
         return
       }
-
-      console.log("[v0] Deleted event:", editingEvent.id)
       setUserEvents((prev) => prev.filter((e) => e.id !== editingEvent.id))
-    } catch (err) {
-      console.error("[v0] Error deleting event:", err)
+    } catch {
+      // Event delete failed
     }
     setShowEventForm(false)
     setEditingEvent(null)

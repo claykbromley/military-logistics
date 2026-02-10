@@ -39,10 +39,10 @@ export function DayEventsPanel({
           {holidays.map((event) => (
             <div
               key={event.id}
-              className="flex items-center gap-2 rounded-md bg-orange-50 px-3 py-2 text-sm border border-orange-200"
+              className="flex items-center gap-2 rounded-md bg-holiday-muted px-3 py-2 text-sm border border-holiday-border"
             >
-              <Star className="h-3.5 w-3.5 shrink-0 text-orange-500" />
-              <span className="font-medium text-orange-800">
+              <Star className="h-3.5 w-3.5 shrink-0 text-holiday" />
+              <span className="font-medium text-holiday-foreground">
                 {event.title}
               </span>
             </div>
