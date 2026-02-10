@@ -2,27 +2,20 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import {
-  addMonths,
-  subMonths,
-  addWeeks,
-  subWeeks,
   addDays,
   subDays,
   format,
   startOfMonth,
-  endOfMonth,
   getYear,
 } from "date-fns"
 import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  CalendarDays,
   LogIn,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { MonthView } from "./month-view"
-import { WeekView } from "./week-view"
+import { MiniMonthCalendar } from "./mini-month-calendar"
 import { DayView } from "./day-view"
 import { DayEventsPanel } from "./day-events-panel"
 import { EventFormDialog } from "./event-form-dialog"
@@ -30,10 +23,8 @@ import { getFederalHolidays } from "@/lib/federal-holidays"
 import { createClient } from "@/lib/supabase/client"
 import type {
   CalendarEvent,
-  CalendarView,
   EventFormData,
 } from "@/lib/calendar-types"
-import { cn } from "@/lib/utils"
 
 interface CalendarAppProps {
   isLoggedIn: boolean
@@ -41,9 +32,8 @@ interface CalendarAppProps {
 }
 
 export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
-  const [currentDate, setCurrentDate] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
-  const [view, setView] = useState<CalendarView>("month")
+  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [miniMonth, setMiniMonth] = useState(startOfMonth(new Date()))
   const [userEvents, setUserEvents] = useState<CalendarEvent[]>([])
   const [showEventForm, setShowEventForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
@@ -54,7 +44,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
   const fetchEvents = useCallback(async () => {
     try {
       const supabase = createClient()
-      const year = getYear(currentDate)
+      const year = getYear(selectedDate)
       const start = `${year - 1}-01-01`
       const end = `${year + 1}-12-31`
 
@@ -65,9 +55,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
         .lte("start_date", end)
         .order("start_date", { ascending: true })
 
-      if (error) {
-        return
-      }
+      if (error) return
       setUserEvents(
         (data ?? []).map((e: CalendarEvent) => ({
           ...e,
@@ -77,9 +65,8 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
     } catch {
       // Fetch failed
     }
-  }, [currentDate])
+  }, [selectedDate])
 
-  // Fetch on login and when the visible year range changes
   useEffect(() => {
     if (isLoggedIn) {
       fetchEvents()
@@ -89,56 +76,43 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
     }
   }, [isLoggedIn, fetchEvents])
 
-  // Get holidays for the visible range (current year + possibly adjacent years)
+  // Get holidays for visible range
   const holidays = useMemo(() => {
-    const year = getYear(currentDate)
+    const year = getYear(selectedDate)
     return [
       ...getFederalHolidays(year - 1),
       ...getFederalHolidays(year),
       ...getFederalHolidays(year + 1),
     ]
-  }, [currentDate])
+  }, [selectedDate])
 
   const allEvents = useMemo(() => {
-    if (isLoggedIn) {
-      return [...holidays, ...userEvents]
-    }
+    if (isLoggedIn) return [...holidays, ...userEvents]
     return holidays
   }, [holidays, userEvents, isLoggedIn])
 
+  // Events for the selected day
+  const selectedDateEvents = useMemo(() => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd")
+    return allEvents.filter(
+      (e) => dateStr >= e.start_date && dateStr <= e.end_date
+    )
+  }, [selectedDate, allEvents])
+
   // Navigation
-  const goBack = useCallback(() => {
-    if (view === "month") setCurrentDate((d) => subMonths(d, 1))
-    else if (view === "week") setCurrentDate((d) => subWeeks(d, 1))
-    else setCurrentDate((d) => subDays(d, 1))
-  }, [view])
-
-  const goForward = useCallback(() => {
-    if (view === "month") setCurrentDate((d) => addMonths(d, 1))
-    else if (view === "week") setCurrentDate((d) => addWeeks(d, 1))
-    else setCurrentDate((d) => addDays(d, 1))
-  }, [view])
-
+  const goPrev = useCallback(() => setSelectedDate((d) => subDays(d, 1)), [])
+  const goNext = useCallback(() => setSelectedDate((d) => addDays(d, 1)), [])
   const goToday = useCallback(() => {
-    setCurrentDate(new Date())
-    setSelectedDate(new Date())
+    const now = new Date()
+    setSelectedDate(now)
+    setMiniMonth(startOfMonth(now))
   }, [])
 
   // Event management
-  const handleSelectDate = useCallback(
-    (date: Date) => {
-      setSelectedDate(date)
-      if (view === "month") {
-        // If clicking a date in month view, just select it
-      }
-    },
-    [view]
-  )
-
   const handleCreateEvent = useCallback(
     (date?: Date) => {
       if (!isLoggedIn) return
-      const d = date || selectedDate || new Date()
+      const d = date || selectedDate
       setInitialFormDate(format(d, "yyyy-MM-dd"))
       setEditingEvent(null)
       setShowEventForm(true)
@@ -155,13 +129,51 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
     [isLoggedIn]
   )
 
+  const handleToggleComplete = useCallback(
+    async (event: CalendarEvent) => {
+      if (!isLoggedIn || event.is_holiday) return
+      const supabase = createClient()
+      const newCompleted = !event.completed
+
+      // Optimistic update
+      setUserEvents((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, completed: newCompleted } : e
+        )
+      )
+
+      try {
+        const { error } = await supabase
+          .from("calendar_events")
+          .update({ completed: newCompleted })
+          .eq("id", event.id)
+
+        if (error) {
+          // Revert on error
+          setUserEvents((prev) =>
+            prev.map((e) =>
+              e.id === event.id ? { ...e, completed: !newCompleted } : e
+            )
+          )
+        }
+      } catch {
+        // Revert on error
+        setUserEvents((prev) =>
+          prev.map((e) =>
+            e.id === event.id ? { ...e, completed: !newCompleted } : e
+          )
+        )
+      }
+    },
+    [isLoggedIn]
+  )
+
   const handleSaveEvent = useCallback(
     async (data: EventFormData) => {
       const supabase = createClient()
 
       try {
         if (editingEvent) {
-          // Update existing event directly in Supabase
           const { data: updated, error } = await supabase
             .from("calendar_events")
             .update({
@@ -177,9 +189,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
             .select()
             .single()
 
-          if (error) {
-            return
-          }
+          if (error) return
           setUserEvents((prev) =>
             prev.map((e) =>
               e.id === String(editingEvent.id)
@@ -188,13 +198,11 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
             )
           )
         } else {
-          // Get the current user for user_id
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) {
-            return
-          }
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+          if (!user) return
 
-          // Create new event directly in Supabase
           const { data: created, error } = await supabase
             .from("calendar_events")
             .insert({
@@ -210,13 +218,14 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
             .select()
             .single()
 
-          if (error) {
-            return
-          }
-          setUserEvents((prev) => [...prev, { ...created, id: String(created.id) }])
+          if (error) return
+          setUserEvents((prev) => [
+            ...prev,
+            { ...created, id: String(created.id) },
+          ])
         }
       } catch {
-        // Event save failed
+        // Save failed
       }
       setShowEventForm(false)
       setEditingEvent(null)
@@ -234,56 +243,79 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
         .delete()
         .eq("id", editingEvent.id)
 
-      if (error) {
-        return
-      }
+      if (error) return
       setUserEvents((prev) => prev.filter((e) => e.id !== editingEvent.id))
     } catch {
-      // Event delete failed
+      // Delete failed
     }
     setShowEventForm(false)
     setEditingEvent(null)
   }, [editingEvent])
 
-  // Get events for selected date
-  const selectedDateEvents = useMemo(() => {
-    if (!selectedDate) return []
-    const dateStr = format(selectedDate, "yyyy-MM-dd")
-    return allEvents.filter(
-      (e) => dateStr >= e.start_date && dateStr <= e.end_date
-    )
-  }, [selectedDate, allEvents])
-
-  // Title for current view
-  const viewTitle = useMemo(() => {
-    if (view === "month") return format(currentDate, "MMMM yyyy")
-    if (view === "week") {
-      const start = format(
-        new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-          currentDate.getDate() - currentDate.getDay()
-        ),
-        "MMM d"
-      )
-      const end = format(
-        new Date(
-          currentDate.getFullYear(),
-          currentDate.getMonth(),
-          currentDate.getDate() + (6 - currentDate.getDay())
-        ),
-        "MMM d, yyyy"
-      )
-      return `${start} - ${end}`
-    }
-    return format(currentDate, "EEEE, MMMM d, yyyy")
-  }, [currentDate, view])
+  // When selecting a date from mini calendar, update mini month too
+  const handleSelectDate = useCallback((date: Date) => {
+    setSelectedDate(date)
+    setMiniMonth(startOfMonth(date))
+  }, [])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3 border-b border-border bg-card">
-        <div className="flex items-center gap-1">
+    <div className="flex h-full">
+      {/* Left sidebar: mini calendar + event list */}
+      <aside className="hidden md:flex w-72 lg:w-80 flex-col border-r border-border bg-card shrink-0">
+        {/* Create event button */}
+        <div className="p-4 pb-2">
+          {isLoggedIn ? (
+            <Button
+              onClick={() => handleCreateEvent()}
+              className="w-full gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              New Event
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={onLoginClick}
+              className="w-full gap-2 bg-transparent"
+            >
+              <LogIn className="h-4 w-4" />
+              Sign in to add events
+            </Button>
+          )}
+        </div>
+
+        {/* Mini month calendar */}
+        <div className="px-4 pb-3">
+          <MiniMonthCalendar
+            currentMonth={miniMonth}
+            selectedDate={selectedDate}
+            events={allEvents}
+            onSelectDate={handleSelectDate}
+            onChangeMonth={setMiniMonth}
+          />
+        </div>
+
+        <div className="border-t border-border" />
+
+        {/* Selected day event list */}
+        <div className="flex-1 overflow-auto p-4">
+          <h3 className="text-sm font-semibold text-foreground mb-3">
+            {format(selectedDate, "EEEE, MMMM d")}
+          </h3>
+          <DayEventsPanel
+            date={selectedDate}
+            events={selectedDateEvents}
+            isLoggedIn={isLoggedIn}
+            onEditEvent={handleEditEvent}
+            onToggleComplete={handleToggleComplete}
+          />
+        </div>
+      </aside>
+
+      {/* Main content: day time grid */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Toolbar */}
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-card shrink-0">
           <Button
             variant="outline"
             size="sm"
@@ -292,131 +324,56 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
           >
             Today
           </Button>
-          <Button variant="ghost" size="icon" onClick={goBack} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={goPrev} className="h-8 w-8">
             <ChevronLeft className="h-4 w-4" />
-            <span className="sr-only">Previous</span>
+            <span className="sr-only">Previous day</span>
           </Button>
-          <Button variant="ghost" size="icon" onClick={goForward} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={goNext} className="h-8 w-8">
             <ChevronRight className="h-4 w-4" />
-            <span className="sr-only">Next</span>
+            <span className="sr-only">Next day</span>
           </Button>
-        </div>
+          <h2 className="text-base font-bold text-foreground text-balance">
+            {format(selectedDate, "EEEE, MMMM d, yyyy")}
+          </h2>
 
-        <h2 className="text-lg font-bold text-foreground min-w-[180px] text-balance">
-          {viewTitle}
-        </h2>
-
-        <div className="flex items-center gap-1 ml-auto">
-          {/* View switcher */}
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {(["month", "week", "day"] as CalendarView[]).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className={cn(
-                  "px-3 py-1.5 text-xs font-medium capitalize transition-colors",
-                  view === v
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-card text-foreground hover:bg-accent"
-                )}
-              >
-                {v}
-              </button>
-            ))}
-          </div>
-
-          {isLoggedIn ? (
-            <Button
-              size="sm"
-              onClick={() => handleCreateEvent()}
-              className="ml-2 gap-1.5"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">New Event</span>
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onLoginClick}
-              className="ml-2 gap-1.5 bg-transparent"
-            >
-              <LogIn className="h-4 w-4" />
-              <span className="hidden sm:inline">Sign in to add events</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Calendar view */}
-        <div className="flex-1 flex flex-col overflow-auto">
-          {view === "month" && (
-            <MonthView
-              currentDate={currentDate}
-              events={allEvents}
-              selectedDate={selectedDate}
-              onSelectDate={(date) => {
-                handleSelectDate(date)
-                if (isLoggedIn) {
-                  // Double-click could create an event, single click selects
-                }
-              }}
-            />
-          )}
-          {view === "week" && (
-            <WeekView
-              currentDate={currentDate}
-              events={allEvents}
-              selectedDate={selectedDate}
-              onSelectDate={handleSelectDate}
-              isLoggedIn={isLoggedIn}
-              onEditEvent={handleEditEvent}
-            />
-          )}
-          {view === "day" && (
-            <DayView
-              currentDate={selectedDate || currentDate}
-              events={allEvents}
-              isLoggedIn={isLoggedIn}
-              onEditEvent={handleEditEvent}
-              onClickHour={(hour) => {
-                if (isLoggedIn) {
-                  setInitialFormDate(
-                    format(selectedDate || currentDate, "yyyy-MM-dd")
-                  )
-                  setEditingEvent(null)
-                  setShowEventForm(true)
-                }
-              }}
-            />
-          )}
-        </div>
-
-        {/* Side panel - shows on month view for selected day */}
-        {view === "month" && selectedDate && (
-          <aside className="hidden lg:flex w-72 flex-col border-l border-border bg-card p-4 overflow-auto">
-            <DayEventsPanel
-              date={selectedDate}
-              events={selectedDateEvents}
-              isLoggedIn={isLoggedIn}
-              onEditEvent={handleEditEvent}
-            />
-            {isLoggedIn && (
+          {/* Mobile create button */}
+          <div className="ml-auto md:hidden">
+            {isLoggedIn ? (
+              <Button size="sm" onClick={() => handleCreateEvent()} className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                New
+              </Button>
+            ) : (
               <Button
                 size="sm"
                 variant="outline"
-                className="mt-4 gap-1.5 bg-transparent"
-                onClick={() => handleCreateEvent(selectedDate)}
+                onClick={onLoginClick}
+                className="gap-1.5 bg-transparent"
               >
-                <Plus className="h-4 w-4" />
-                Add Event
+                <LogIn className="h-4 w-4" />
+                Sign in
               </Button>
             )}
-          </aside>
-        )}
+          </div>
+        </div>
+
+        {/* Day time grid */}
+        <div className="flex-1 overflow-auto">
+          <DayView
+            currentDate={selectedDate}
+            events={allEvents}
+            isLoggedIn={isLoggedIn}
+            onEditEvent={handleEditEvent}
+            onToggleComplete={handleToggleComplete}
+            onClickHour={(hour) => {
+              if (isLoggedIn) {
+                setInitialFormDate(format(selectedDate, "yyyy-MM-dd"))
+                setEditingEvent(null)
+                setShowEventForm(true)
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* Event form dialog */}

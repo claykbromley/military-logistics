@@ -9,10 +9,9 @@ export interface CalendarEvent {
   is_holiday?: boolean
   user_id?: string
   color?: string
+  completed?: boolean
   created_at?: string
 }
-
-export type CalendarView = "month" | "week" | "day"
 
 export interface EventFormData {
   title: string

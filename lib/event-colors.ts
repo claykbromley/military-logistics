@@ -92,8 +92,24 @@ export const HOLIDAY_STYLE = {
   dot: "bg-primary",
 }
 
+// Gold dot for user events on mini calendar
+export const GOLD_DOT = "bg-amber-500 dark:bg-amber-400"
+
+// Completed event overlay styling
+export const COMPLETED_STYLE = {
+  overlay: "opacity-50",
+  title: "line-through",
+}
+
 export function getEventColor(colorValue?: string): EventColor {
   return (
     EVENT_COLORS.find((c) => c.value === colorValue) || EVENT_COLORS[0]
   )
+}
+
+/** Format time to military format HH:MM (strip seconds if present) */
+export function formatMilitaryTime(time?: string | null): string {
+  if (!time) return ""
+  // Handle HH:MM:SS or HH:MM
+  return time.slice(0, 5)
 }
