@@ -6,13 +6,13 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Heart, MapPin } from "lucide-react"
-import type { Listing } from "@/lib/types"
+import type { MarketplaceListing } from "@/lib/types"
 import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { useState } from "react"
 
 interface ListingCardProps {
-  listing: Listing
+  listing: MarketplaceListing
   isSaved?: boolean
   userId?: string
 }

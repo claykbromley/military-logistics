@@ -11,12 +11,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { ArrowLeft, Heart, MapPin, MessageSquare, User, Calendar, Tag } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import type { Listing, Profile } from "@/lib/types"
+import type { MarketplaceListing, MarketplaceProfile } from "@/lib/types"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
-import { CATEGORIES, CONDITIONS } from "@/lib/types"
+import { MARKETPLACECATEGORIES, MARKETPLACECONDITIONS } from "@/lib/types"
 
 interface ListingDetailProps {
-  listing: Listing & { profiles: Profile | null }
+  listing: MarketplaceListing & { profiles: MarketplaceProfile | null }
   user: SupabaseUser | null
   isSaved: boolean
 }
@@ -145,8 +145,8 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
     poor: "bg-red-100 text-red-800",
   }
 
-  const categoryLabel = CATEGORIES.find((c) => c.value === listing.category)?.label || listing.category
-  const conditionLabel = CONDITIONS.find((c) => c.value === listing.condition)?.label || listing.condition
+  const categoryLabel = MARKETPLACECATEGORIES.find((c) => c.value === listing.category)?.label || listing.category
+  const conditionLabel = MARKETPLACECONDITIONS.find((c) => c.value === listing.condition)?.label || listing.condition
   const locationDisplay = listing.city && listing.state ? `${listing.city}, ${listing.state}` : listing.location
 
   return (

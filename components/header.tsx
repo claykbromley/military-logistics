@@ -22,7 +22,7 @@ const branches = [
 const navItems = [
   {
     name: "Services",
-    items: ["Automotive", "Employment", "Financial", "Legal", "Medical"],
+    items: ["Command Center", "Automotive", "Employment", "Financial", "Legal", "Medical"],
   },
   {
     name: "Transitions",
@@ -34,7 +34,7 @@ const navItems = [
   },
   {
     name: "Scheduler",
-    items: ["Appointments", "Tasks", "Reminders", "Calendar"],
+    items: ["Calendar", "Appointments", "Tasks", "Reminders"],
   },
   {
     name: "Community",

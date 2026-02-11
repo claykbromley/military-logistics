@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Header } from "@/components/header"
-import { CATEGORIES, CONDITIONS, MilitaryBase } from "@/lib/types"
+import { MARKETPLACECATEGORIES, MARKETPLACECONDITIONS, MilitaryBase } from "@/lib/types"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, ImagePlus, X, MapPin, Building } from "lucide-react"
 import Link from "next/link"
@@ -406,7 +406,7 @@ export default function NewListingPage() {
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((category) => (
+                      {MARKETPLACECATEGORIES.map((category) => (
                         <SelectItem key={category.value} value={category.value}>
                           {category.label}
                         </SelectItem>
@@ -427,7 +427,7 @@ export default function NewListingPage() {
                       <SelectValue placeholder="Select condition" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CONDITIONS.map((condition) => (
+                      {MARKETPLACECONDITIONS.map((condition) => (
                         <SelectItem key={condition.value} value={condition.value}>
                           {condition.label}
                         </SelectItem>

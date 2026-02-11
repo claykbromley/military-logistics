@@ -1,13 +1,13 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { Briefcase, BookOpen, CircleAlert, ChevronRight, Building, Heart, DollarSign, Scale, Landmark, FileText, Baby, Plane } from "lucide-react"
+import { BookOpen, CircleAlert, CircleCheck, ChevronRight, Building, Heart, DollarSign, Scale, Landmark, FileText, Baby, Plane } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { ResourceCard } from "@/components/deployment/resource-card"
 
 const serviceCategories = [
-  { name: "Services", icon: Briefcase, description: "Manage your life during deployment" },
-  { name: "Resources", icon: BookOpen, description: "Access external resources available to you" },
-  { name: "Emergency Contacts", icon: CircleAlert, description: "Have emergency contacts readily available" },
+  { name: "Checklist", icon: CircleCheck, link: "/transitions/deployment", description: "Make sure you are ready for deployment" },
+  { name: "Resources", icon: BookOpen, link: "/transitions/deployment/resources", description: "Access external resources available to you" },
+  { name: "Emergency Contacts", icon: CircleAlert, link: "/transitions/deployment/emergency-contacts", description: "Have emergency contacts readily available" },
 ]
 
 const resources = [
@@ -112,7 +112,7 @@ export default function DeploymentResourcesPage() {
                     key={category.name}
                     className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
                   >
-                    <a key={category.name} href={`/transitions/deployment/${category.name.toLowerCase().replace(/\s+/g, "-")}`}>
+                    <a key={category.name} href={category.link}>
                       <div className="flex items-start gap-3">
                         <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                           <Icon className="h-5 w-5 text-primary" />

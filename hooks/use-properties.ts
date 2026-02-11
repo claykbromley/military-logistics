@@ -104,15 +104,33 @@ export function useProperties() {
 
   // Load emergency contacts
   const loadEmergencyContacts = useCallback(async (supabase: ReturnType<typeof createClient>) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {return []}
+
     const { data, error } = await supabase
       .from("emergency_contacts")
       .select("*")
+      .eq("user_id", user.id)
       .order("priority", { ascending: false })
+
+    const { data: myData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single()
+    console.log(myData)
 
     if (error) {
       console.error("Failed to load emergency contacts:", error)
       return []
     }
+
+    data.unshift({
+      id: 0,
+      name: "Myself",
+      phone: myData.phone,
+      email: myData.email
+    })
 
     return (data || []).map((c: Record<string, any>) => ({
       id: c.id,
@@ -620,6 +638,8 @@ export function useProperties() {
             updates.isCompleted = false // Reset completion status for recurring task
           } else if (!updates.lastCompleted) {
             dbUpdates.completed_date = new Date().toISOString().split("T")[0]
+          } else if (task && task.frequency === "one_time") {
+            deleteMaintenanceTask(propertyId, taskId)
           }
         }
       }
