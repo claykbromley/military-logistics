@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils"
 import { InvitationsInbox } from "@/components/command-center/event-invitations"
 
 // Shared unified modal
-import { EventFormDialog } from "@/components/calendar/event-form-dialog"
+import { EventFormDialogComm } from "@/components/calendar/event-form-dialog-comm"
 import type { CalendarEvent, EventFormData, RecurrenceConfig } from "@/lib/calendar-types"
 import { formatMilitaryTime } from "@/lib/event-colors"
 
@@ -257,7 +257,7 @@ export function ScheduleEventDialog({
     : undefined
 
   return (
-    <EventFormDialog
+    <EventFormDialogComm
       open={open}
       onClose={() => onOpenChange(false)}
       onSave={handleSave}
@@ -917,7 +917,7 @@ export function ScheduleTab() {
       </TabsContent>
 
       {/* Unified Event Modal -- shared with the calendar */}
-      <EventFormDialog
+      <EventFormDialogComm
         open={isEventDialogOpen}
         onClose={() => {
           setIsEventDialogOpen(false)
