@@ -532,7 +532,7 @@ export function ScheduleTab() {
       const { data } = await supabase
         .from("calendar_events")
         .select("*")
-        .in("event_type", ["meeting", "call", "video"])
+        //.in("event_type", ["meeting", "call", "video"])
         .order("start_date", { ascending: true })
 
       if (data) {
@@ -669,7 +669,7 @@ export function ScheduleTab() {
       .filter((e) => {
         const start = new Date(e.startTime).getTime()
         return start <= cutoff
-      })
+      }).filter((e) => e.eventType === "call" || e.eventType === "meeting" || e.eventType === "video")
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
   }, [allEvents])
 
@@ -805,6 +805,8 @@ export function ScheduleTab() {
     )
   }
 
+  //console.log("Events #: "+upcomingEvents.length)
+  console.log(upcomingEvents) 
   return (
     <>
       <TabsContent value="schedule" className="space-y-6">
