@@ -6,7 +6,9 @@ import {
   subDays,
   format,
   startOfMonth,
+  endOfMonth,
   getYear,
+  parseISO,
 } from "date-fns"
 import {
   ChevronLeft,
@@ -21,6 +23,7 @@ import { DayEventsPanel } from "./day-events-panel"
 import { EventFormDialog } from "./event-form-dialog"
 import { getFederalHolidays } from "@/lib/federal-holidays"
 import { createClient } from "@/lib/supabase/client"
+import { expandRecurringEvent } from "@/lib/recurrence-utils"
 import type {
   CalendarEvent,
   EventFormData,
@@ -40,7 +43,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
   const [initialFormDate, setInitialFormDate] = useState<string>("")
   const fetchedRef = useRef(false)
 
-  // Fetch events from Supabase directly via browser client
+  // Fetch events from both calendar_events and scheduled_events tables
   const fetchEvents = useCallback(async () => {
     try {
       const supabase = createClient()
@@ -48,20 +51,67 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
       const start = `${year - 1}-01-01`
       const end = `${year + 1}-12-31`
 
-      const { data, error } = await supabase
+      // Fetch calendar_events
+      const { data: calData } = await supabase
         .from("calendar_events")
         .select("*")
         .gte("end_date", start)
         .lte("start_date", end)
         .order("start_date", { ascending: true })
 
-      if (error) return
-      setUserEvents(
-        (data ?? []).map((e: CalendarEvent) => ({
-          ...e,
-          id: String(e.id),
-        }))
-      )
+      const calEvents: CalendarEvent[] = (calData ?? []).map((e: any) => ({
+        ...e,
+        id: String(e.id),
+        event_type: e.event_type || "event",
+        recurrence: e.recurrence || null,
+        source: "calendar" as const,
+        source_id: String(e.id),
+      }))
+
+      // Fetch scheduled_events and convert to CalendarEvent format
+      const { data: schedData } = await supabase
+        .from("scheduled_events")
+        .select("*")
+        .gte("start_time", `${start}T00:00:00`)
+        .lte("start_time", `${end}T23:59:59`)
+        .order("start_time", { ascending: true })
+
+      const schedEvents: CalendarEvent[] = (schedData ?? []).map((e: any) => {
+        const startDt = e.start_time ? parseISO(e.start_time) : new Date()
+        const endDt = e.end_time ? parseISO(e.end_time) : startDt
+        const dateStr = format(startDt, "yyyy-MM-dd")
+        const endDateStr = format(endDt, "yyyy-MM-dd")
+        return {
+          id: `sched_${e.id}`,
+          title: e.title,
+          start_date: dateStr,
+          end_date: endDateStr,
+          is_all_day: e.is_all_day || false,
+          start_time: e.is_all_day ? null : format(startDt, "HH:mm"),
+          end_time: e.is_all_day ? null : format(endDt, "HH:mm"),
+          color: e.event_type === "call" ? "amber" : e.event_type === "video" ? "teal" : "violet",
+          completed: e.status === "completed",
+          user_id: e.user_id,
+          event_type: e.event_type || "meeting",
+          description: e.description || null,
+          meeting_link: e.meeting_link || null,
+          location: e.location || null,
+          is_recurring: e.is_recurring || false,
+          recurrence: e.is_recurring && e.recurrence_pattern
+            ? {
+                type: e.recurrence_pattern,
+                interval: e.recurrence_interval || 1,
+                endType: e.recurrence_end_date ? "date" : e.recurrence_count ? "count" : "never",
+                endDate: e.recurrence_end_date || undefined,
+                endCount: e.recurrence_count || undefined,
+              }
+            : null,
+          source: "scheduled" as const,
+          source_id: String(e.id),
+        } as CalendarEvent
+      })
+
+      setUserEvents([...calEvents, ...schedEvents])
     } catch {
       // Fetch failed
     }
@@ -87,9 +137,18 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
   }, [selectedDate])
 
   const allEvents = useMemo(() => {
-    if (isLoggedIn) return [...holidays, ...userEvents]
-    return holidays
-  }, [holidays, userEvents, isLoggedIn])
+    if (!isLoggedIn) return holidays
+    // Expand any recurring events for a 3-year window around current view
+    const year = getYear(selectedDate)
+    const rangeStart = `${year - 1}-01-01`
+    const rangeEnd = `${year + 1}-12-31`
+    const expanded = userEvents.flatMap((event) =>
+      event.is_recurring && event.recurrence && event.recurrence.type !== "none"
+        ? expandRecurringEvent(event, rangeStart, rangeEnd)
+        : [event]
+    )
+    return [...holidays, ...expanded]
+  }, [holidays, userEvents, isLoggedIn, selectedDate])
 
   // Events for the selected day
   const selectedDateEvents = useMemo(() => {
@@ -143,18 +202,19 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
       )
 
       try {
-        const { error } = await supabase
-          .from("calendar_events")
-          .update({ completed: newCompleted })
-          .eq("id", event.id)
-
-        if (error) {
-          // Revert on error
-          setUserEvents((prev) =>
-            prev.map((e) =>
-              e.id === event.id ? { ...e, completed: !newCompleted } : e
-            )
-          )
+        if (event.source === "scheduled") {
+          const newStatus = newCompleted ? "completed" : "scheduled"
+          const { error } = await supabase
+            .from("scheduled_events")
+            .update({ status: newStatus })
+            .eq("id", event.source_id)
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from("calendar_events")
+            .update({ completed: newCompleted })
+            .eq("id", event.source_id || event.id)
+          if (error) throw error
         }
       } catch {
         // Revert on error
@@ -172,31 +232,79 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
     async (data: EventFormData) => {
       const supabase = createClient()
 
+      // Build the payload with all unified fields
+      const recurrence =
+        data.is_recurring && data.recurrence?.type !== "none"
+          ? data.recurrence
+          : null
+
+      const payload = {
+        title: data.title,
+        start_date: data.start_date,
+        end_date: data.end_date,
+        is_all_day: data.is_all_day,
+        start_time: data.start_time || null,
+        end_time: data.end_time || null,
+        color: data.color,
+        event_type: data.event_type || "event",
+        description: data.description || null,
+        meeting_link: data.meeting_link || null,
+        location: data.location || null,
+        is_recurring: data.is_recurring || false,
+        recurrence: recurrence,
+      }
+
       try {
         if (editingEvent) {
-          const { data: updated, error } = await supabase
-            .from("calendar_events")
-            .update({
-              title: data.title,
-              start_date: data.start_date,
-              end_date: data.end_date,
-              is_all_day: data.is_all_day,
-              start_time: data.start_time || null,
-              end_time: data.end_time || null,
-              color: data.color,
-            })
-            .eq("id", editingEvent.id)
-            .select()
-            .single()
+          // Editing a calendar_events row
+          if (editingEvent.source === "scheduled") {
+            // For scheduled_events, update via scheduled_events table
+            const realId = editingEvent.source_id
+            const startDt = data.start_date + "T" + (data.start_time || "00:00") + ":00"
+            const endDt = data.end_date + "T" + (data.end_time || "23:59") + ":00"
+            const { error } = await supabase
+              .from("scheduled_events")
+              .update({
+                title: data.title,
+                description: data.description || null,
+                event_type: data.event_type || "meeting",
+                start_time: startDt,
+                end_time: endDt,
+                meeting_link: data.meeting_link || null,
+                location: data.location || null,
+                is_recurring: data.is_recurring || false,
+                recurrence_pattern: recurrence?.type || null,
+                recurrence_interval: recurrence?.interval || null,
+                recurrence_end_date: recurrence?.endDate || null,
+                recurrence_count: recurrence?.endCount || null,
+              })
+              .eq("id", realId)
+            if (error) return
+          } else {
+            const { data: updated, error } = await supabase
+              .from("calendar_events")
+              .update(payload)
+              .eq("id", editingEvent.source_id || editingEvent.id)
+              .select()
+              .single()
 
-          if (error) return
-          setUserEvents((prev) =>
-            prev.map((e) =>
-              e.id === String(editingEvent.id)
-                ? { ...updated, id: String(updated.id) }
-                : e
+            if (error) return
+            setUserEvents((prev) =>
+              prev.map((e) =>
+                e.id === String(editingEvent.id) ||
+                e.source_id === editingEvent.source_id
+                  ? {
+                      ...updated,
+                      id: String(updated.id),
+                      source: "calendar" as const,
+                      source_id: String(updated.id),
+                    }
+                  : e
+              )
             )
-          )
+          }
+          // Refresh all events
+          await fetchEvents()
         } else {
           const {
             data: { user },
@@ -206,13 +314,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
           const { data: created, error } = await supabase
             .from("calendar_events")
             .insert({
-              title: data.title,
-              start_date: data.start_date,
-              end_date: data.end_date,
-              is_all_day: data.is_all_day,
-              start_time: data.start_time || null,
-              end_time: data.end_time || null,
-              color: data.color,
+              ...payload,
               user_id: user.id,
             })
             .select()
@@ -221,7 +323,12 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
           if (error) return
           setUserEvents((prev) => [
             ...prev,
-            { ...created, id: String(created.id) },
+            {
+              ...created,
+              id: String(created.id),
+              source: "calendar" as const,
+              source_id: String(created.id),
+            },
           ])
         }
       } catch {
@@ -230,7 +337,7 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
       setShowEventForm(false)
       setEditingEvent(null)
     },
-    [editingEvent]
+    [editingEvent, fetchEvents]
   )
 
   const handleDeleteEvent = useCallback(async () => {
@@ -238,13 +345,23 @@ export function CalendarApp({ isLoggedIn, onLoginClick }: CalendarAppProps) {
     const supabase = createClient()
 
     try {
-      const { error } = await supabase
-        .from("calendar_events")
-        .delete()
-        .eq("id", editingEvent.id)
+      const table =
+        editingEvent.source === "scheduled"
+          ? "scheduled_events"
+          : "calendar_events"
+      const realId = editingEvent.source_id || editingEvent.id
 
+      const { error } = await supabase.from(table).delete().eq("id", realId)
       if (error) return
-      setUserEvents((prev) => prev.filter((e) => e.id !== editingEvent.id))
+
+      // Remove all occurrences of this event (including recurrence expansions)
+      setUserEvents((prev) =>
+        prev.filter(
+          (e) =>
+            e.id !== editingEvent.id &&
+            e.source_id !== realId
+        )
+      )
     } catch {
       // Delete failed
     }

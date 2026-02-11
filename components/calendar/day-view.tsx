@@ -4,7 +4,16 @@ import { format } from "date-fns"
 import type { CalendarEvent } from "@/lib/calendar-types"
 import { getEventColor, HOLIDAY_STYLE, COMPLETED_STYLE, formatMilitaryTime } from "@/lib/event-colors"
 import { cn } from "@/lib/utils"
-import { CheckCircle2, Circle, Star } from "lucide-react"
+import { CheckCircle2, Circle, Star, Users, Phone, Video, Repeat } from "lucide-react"
+
+function EventTypeIcon({ type }: { type?: string }) {
+  switch (type) {
+    case "meeting": return <Users className="h-3 w-3 shrink-0" />
+    case "call": return <Phone className="h-3 w-3 shrink-0" />
+    case "video": return <Video className="h-3 w-3 shrink-0" />
+    default: return null
+  }
+}
 
 interface DayViewProps {
   currentDate: Date
@@ -54,7 +63,7 @@ export function DayView({
           </span>
           {allDayEvents.map((event) => {
             const isHoliday = !!event.is_holiday
-            const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color)
+            const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color ?? undefined)
             const isCompleted = !isHoliday && !!event.completed
 
             return (
@@ -131,7 +140,7 @@ export function DayView({
               </div>
               <div className="flex-1 relative px-2">
                 {eventsThisHour.map((event) => {
-                  const ec = getEventColor(event.color)
+                  const ec = getEventColor(event.color ?? undefined)
                   const startMin = timeToMinutes(event.start_time!)
                   const endMin = timeToMinutes(event.end_time!)
                   const duration = Math.max(endMin - startMin, 15)
@@ -187,11 +196,13 @@ export function DayView({
                         )}
                       >
                         <span className={cn(
-                          "text-xs font-semibold truncate",
+                          "text-xs font-semibold truncate flex items-center gap-1",
                           ec.text,
                           isCompleted && COMPLETED_STYLE.title
                         )}>
+                          <EventTypeIcon type={event.event_type} />
                           {event.title}
+                          {event.is_recurring && <Repeat className="h-2.5 w-2.5 shrink-0 opacity-60" />}
                         </span>
                         {height >= 36 && (
                           <span className={cn("text-[10px] tabular-nums", ec.text, "opacity-70")}>

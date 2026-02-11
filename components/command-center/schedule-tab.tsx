@@ -1,23 +1,12 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import {
   Plus, Repeat, Clock, Phone, Video, Users, Trash2, Edit,
-  Calendar, Mail, ChevronsUpDown, CalendarPlus, MoreVertical,
-  Check, X, ExternalLink, Bell, MapPin, Link as LinkIcon,
-  AlertCircle, ChevronRight, SkipForward,
+  Calendar, Bell, MoreVertical, Check, ExternalLink, MapPin,
+  Link as LinkIcon, AlertCircle, ChevronRight, SkipForward,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader,
-  DialogTitle, DialogFooter,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
 import { TabsContent } from "@/components/ui/tabs"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -26,14 +15,58 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScheduledEvent, EventType } from "@/lib/types"
 import { useCommunicationHub } from "@/hooks/use-communication-hub"
-import { format, isToday, isTomorrow, isThisWeek, addHours } from "date-fns"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem,
-} from "@/components/ui/command"
+import { createClient } from "@/lib/supabase/client"
+import { format, isToday, isTomorrow, isThisWeek, addHours, parseISO } from "date-fns"
 import { cn } from "@/lib/utils"
 import { InvitationsInbox } from "@/components/command-center/event-invitations"
-import { Switch } from "@/components/ui/switch"
+
+// Shared unified modal
+import { EventFormDialog } from "@/components/calendar/event-form-dialog"
+import type { CalendarEvent, EventFormData, RecurrenceConfig } from "@/lib/calendar-types"
+import { formatMilitaryTime } from "@/lib/event-colors"
+
+// ============================================
+// HELPER: Convert a calendar_events row into ScheduledEvent shape
+// ============================================
+
+function calendarEventToScheduled(row: any): ScheduledEvent {
+  const startTime = row.start_time
+    ? `${row.start_date}T${row.start_time.slice(0, 5)}:00`
+    : `${row.start_date}T00:00:00`
+  const endTime = row.end_time
+    ? `${row.end_date || row.start_date}T${row.end_time.slice(0, 5)}:00`
+    : `${row.end_date || row.start_date}T23:59:00`
+
+  const startDt = new Date(startTime)
+  const endDt = new Date(endTime)
+  const durationMs = endDt.getTime() - startDt.getTime()
+  const durationMinutes = Math.max(Math.round(durationMs / 60000), 1)
+
+  const rec = row.recurrence as any | null
+
+  return {
+    id: `cal_${row.id}`,
+    user_id: row.user_id,
+    title: row.title,
+    description: row.description || undefined,
+    eventType: (row.event_type || "meeting") as EventType,
+    startTime: startDt.toISOString(),
+    endTime: endDt.toISOString(),
+    durationMinutes,
+    location: row.location || undefined,
+    meetingLink: row.meeting_link || undefined,
+    isRecurring: row.is_recurring || false,
+    recurrencePattern: rec?.type || undefined,
+    recurrenceInterval: rec?.interval || undefined,
+    recurrenceEndDate: rec?.endDate || undefined,
+    recurrenceCount: rec?.endCount || undefined,
+    status: row.completed ? "completed" : "scheduled",
+    notes: undefined,
+    invitations: [],
+    createdAt: row.created_at,
+    updatedAt: row.created_at,
+  }
+}
 
 // ============================================
 // CONSTANTS
@@ -64,10 +97,10 @@ function getInitials(name: string): string {
 
 function formatEventDate(dateStr: string): string {
   const date = new Date(dateStr)
-  if (isToday(date)) return `Today at ${format(date, "h:mm a")}`
-  if (isTomorrow(date)) return `Tomorrow at ${format(date, "h:mm a")}`
-  if (isThisWeek(date)) return format(date, "EEEE 'at' h:mm a")
-  return format(date, "MMM d 'at' h:mm a")
+  if (isToday(date)) return `Today at ${format(date, "HH:mm")}`
+  if (isTomorrow(date)) return `Tomorrow at ${format(date, "HH:mm")}`
+  if (isThisWeek(date)) return format(date, "EEEE 'at' HH:mm")
+  return format(date, "MMM d 'at' HH:mm")
 }
 
 function getRecurrenceSummary(event: ScheduledEvent): string | null {
@@ -76,25 +109,110 @@ function getRecurrenceSummary(event: ScheduledEvent): string | null {
   const interval = event.recurrenceInterval || 1
   const pattern = event.recurrencePattern || "weekly"
 
-  let summary = `Every ${interval > 1 ? interval + " " : ""}${
-    pattern === "daily"
-      ? interval > 1 ? "days" : "day"
-      : pattern === "weekly"
-        ? interval > 1 ? "weeks" : "week"
-        : interval > 1 ? "months" : "month"
-  }`
+  let summary = `Every ${interval > 1 ? interval + " " : ""}${pattern === "daily"
+    ? interval > 1 ? "days" : "day"
+    : pattern === "weekly"
+      ? interval > 1 ? "weeks" : "week"
+      : interval > 1 ? "months" : "month"
+    }`
 
   if (event.recurrenceEndDate) {
     summary += ` until ${format(new Date(event.recurrenceEndDate + "T00:00:00"), "MMM d, yyyy")}`
   } else if (event.recurrenceCount) {
-    summary += ` · ${event.recurrenceCount} occurrences`
+    summary += ` \u00B7 ${event.recurrenceCount} occurrences`
   }
 
   return summary
 }
 
 // ============================================
-// SCHEDULE EVENT DIALOG
+// CONVERSION HELPERS
+// ============================================
+
+/** Convert a ScheduledEvent from the hub into a CalendarEvent for the unified modal */
+function scheduledToCalendar(event: ScheduledEvent): CalendarEvent {
+  const startDt = parseISO(event.startTime)
+  const endDt = event.endTime ? parseISO(event.endTime) : startDt
+  return {
+    id: `sched_${event.id}`,
+    title: event.title,
+    start_date: format(startDt, "yyyy-MM-dd"),
+    end_date: format(endDt, "yyyy-MM-dd"),
+    is_all_day: false,
+    start_time: format(startDt, "HH:mm"),
+    end_time: format(endDt, "HH:mm"),
+    color: event.eventType === "call" ? "amber" : event.eventType === "video" ? "teal" : "violet",
+    completed: event.status === "completed",
+    event_type: event.eventType as any,
+    description: event.description || undefined,
+    meeting_link: event.meetingLink || undefined,
+    location: event.location || undefined,
+    is_recurring: event.isRecurring || false,
+    recurrence: event.isRecurring && event.recurrencePattern
+      ? {
+          type: event.recurrencePattern as any,
+          interval: event.recurrenceInterval || 1,
+          endType: event.recurrenceEndDate ? "date" : event.recurrenceCount ? "count" : "never",
+          endDate: event.recurrenceEndDate
+            ? format(new Date(event.recurrenceEndDate + "T00:00:00"), "yyyy-MM-dd")
+            : undefined,
+          endCount: event.recurrenceCount || undefined,
+        }
+      : undefined,
+    source: "scheduled",
+    source_id: event.id,
+  }
+}
+
+/** Convert EventFormData from the unified modal into the shape the hub expects */
+function formDataToScheduledPayload(data: EventFormData): any {
+  const startTime = new Date(`${data.start_date}T${data.start_time || "00:00"}`).toISOString()
+  const endTime = new Date(`${data.end_date}T${data.end_time || "23:59"}`).toISOString()
+  const durationMs = new Date(endTime).getTime() - new Date(startTime).getTime()
+  const durationMinutes = Math.max(Math.round(durationMs / 60000), 1)
+
+  const recurrence: RecurrenceConfig | null =
+    data.is_recurring && data.recurrence?.type !== "none" ? data.recurrence : null
+
+  const payload: any = {
+    title: data.title,
+    description: data.description?.trim() || undefined,
+    eventType: data.event_type || "meeting",
+    startTime,
+    endTime,
+    durationMinutes,
+    location: data.location?.trim() || undefined,
+    meetingLink: data.meeting_link?.trim() || undefined,
+    isRecurring: data.is_recurring || false,
+    status: "scheduled" as const,
+  }
+
+  if (data.is_recurring && recurrence) {
+    payload.recurrencePattern = recurrence.type
+    payload.recurrenceInterval = recurrence.interval || 1
+    if (recurrence.endType === "date" && recurrence.endDate) {
+      payload.recurrenceEndDate = new Date(recurrence.endDate).toISOString()
+      payload.recurrenceCount = undefined
+    } else if (recurrence.endType === "count") {
+      payload.recurrenceCount = recurrence.endCount || 10
+      payload.recurrenceEndDate = undefined
+    } else {
+      payload.recurrenceEndDate = undefined
+      payload.recurrenceCount = undefined
+    }
+  } else {
+    payload.recurrencePattern = undefined
+    payload.recurrenceInterval = undefined
+    payload.recurrenceEndDate = undefined
+    payload.recurrenceCount = undefined
+  }
+
+  return payload
+}
+
+// ============================================
+// SCHEDULE EVENT DIALOG WRAPPER
+// (Exported for use on the communication page header)
 // ============================================
 
 export function ScheduleEventDialog({
@@ -119,541 +237,34 @@ export function ScheduleEventDialog({
   contacts: Array<{ id: string; name: string; email?: string }>
   editingEvent?: ScheduledEvent | null
 }) {
-  const [title, setTitle] = useState("")
-  const [description, setDescription] = useState("")
-  const [eventType, setEventType] = useState<EventType>("call")
-  const [date, setDate] = useState("")
-  const [time, setTime] = useState("")
-  const [duration, setDuration] = useState("30")
-  const [location, setLocation] = useState("")
-  const [meetingLink, setMeetingLink] = useState("")
-  const [notes, setNotes] = useState("")
-  const [emails, setEmails] = useState<string[]>([])
-  const [pickerOpen, setPickerOpen] = useState(false)
-  const [search, setSearch] = useState("")
+  // Convert ScheduledEvent -> CalendarEvent for the unified modal
+  const calEvent = editingEvent ? scheduledToCalendar(editingEvent) : null
 
-  // Recurring event states
-  const [isRecurring, setIsRecurring] = useState(false)
-  const [recurrencePattern, setRecurrencePattern] = useState<"daily" | "weekly" | "monthly">("weekly")
-  const [recurrenceInterval, setRecurrenceInterval] = useState("1")
-  const [recurrenceEndType, setRecurrenceEndType] = useState<"never" | "date" | "count">("never")
-  const [recurrenceEndDate, setRecurrenceEndDate] = useState("")
-  const [recurrenceCount, setRecurrenceCount] = useState("10")
-
-  useEffect(() => {
+  const handleSave = (data: EventFormData) => {
+    const payload = formDataToScheduledPayload(data)
     if (editingEvent) {
-      setTitle(editingEvent.title)
-      setDescription(editingEvent.description || "")
-      setEventType(editingEvent.eventType)
-      const eventDate = new Date(editingEvent.startTime)
-      setDate(format(eventDate, "yyyy-MM-dd"))
-      setTime(format(eventDate, "HH:mm"))
-      setDuration(editingEvent.durationMinutes.toString())
-      setLocation(editingEvent.location || "")
-      setMeetingLink(editingEvent.meetingLink || "")
-      setNotes(editingEvent.notes || "")
-      setEmails(editingEvent.invitations.map((i) => i.inviteeEmail))
-
-      // Load recurrence data
-      setIsRecurring(editingEvent.isRecurring || false)
-      setRecurrencePattern(editingEvent.recurrencePattern || "weekly")
-      setRecurrenceInterval((editingEvent.recurrenceInterval || 1).toString())
-
-      // FIX: Correctly determine end type from data
-      if (editingEvent.recurrenceEndDate) {
-        setRecurrenceEndType("date")
-        setRecurrenceEndDate(format(new Date(editingEvent.recurrenceEndDate + "T00:00:00"), "yyyy-MM-dd"))
-        setRecurrenceCount("10") // reset the other
-      } else if (editingEvent.recurrenceCount) {
-        setRecurrenceEndType("count")
-        setRecurrenceCount(editingEvent.recurrenceCount.toString())
-        setRecurrenceEndDate("") // reset the other
-      } else {
-        setRecurrenceEndType("never")
-        setRecurrenceEndDate("")
-        setRecurrenceCount("10")
-      }
-    } else if (open) {
-      const now = new Date()
-      const nextHour = addHours(now, 1)
-      nextHour.setMinutes(0, 0, 0)
-      setTitle("")
-      setDescription("")
-      setEventType("call")
-      setDate(format(nextHour, "yyyy-MM-dd"))
-      setTime(format(nextHour, "HH:mm"))
-      setDuration("30")
-      setLocation("")
-      setMeetingLink("")
-      setNotes("")
-      setEmails([])
-      setIsRecurring(false)
-      setRecurrencePattern("weekly")
-      setRecurrenceInterval("1")
-      setRecurrenceEndType("never")
-      setRecurrenceEndDate("")
-      setRecurrenceCount("10")
-    }
-  }, [editingEvent, open])
-
-  const filteredContacts = useMemo(() => {
-    const q = search.toLowerCase()
-    return contacts.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.email?.toLowerCase().includes(q)
-    )
-  }, [contacts, search])
-
-  const addEmail = (email: string) => {
-    const trimmed = email.trim().toLowerCase()
-    if (trimmed && !emails.includes(trimmed)) {
-      setEmails((prev) => [...prev, trimmed])
-    }
-  }
-
-  const removeEmail = (email: string) => {
-    setEmails(emails.filter((e) => e !== email))
-  }
-
-  const handleSave = () => {
-    if (!title || !date || !time) return
-
-    const startTime = new Date(`${date}T${time}`).toISOString()
-    const durationMinutes = parseInt(duration) || 30
-    const endTime = new Date(
-      new Date(startTime).getTime() + durationMinutes * 60000
-    ).toISOString()
-
-    const invitees: { email: string; name?: string; contactId?: string }[] = []
-    emails.forEach((email) => {
-      const contact = contacts.find((c) => c.email === email || c.id === email)
-      if (contact?.email) {
-        invitees.push({
-          email: contact.email,
-          name: contact.name,
-          contactId: contact.id,
-        })
-      } else if (email.includes("@")) {
-        invitees.push({ email })
-      }
-    })
-
-    const eventData: any = {
-      title,
-      description: description.trim() || undefined,
-      eventType,
-      startTime,
-      endTime,
-      durationMinutes,
-      location: location.trim() || undefined,
-      meetingLink: meetingLink.trim() || undefined,
-      isRecurring,
-      status: "scheduled" as const,
-      notes: notes.trim() || undefined,
-    }
-
-    // FIX: Build recurrence fields with mutual exclusivity
-    if (isRecurring) {
-      eventData.recurrencePattern = recurrencePattern
-      eventData.recurrenceInterval = parseInt(recurrenceInterval) || 1
-
-      // Only set the active end type; explicitly null the other
-      if (recurrenceEndType === "date" && recurrenceEndDate) {
-        eventData.recurrenceEndDate = new Date(recurrenceEndDate).toISOString()
-        eventData.recurrenceCount = undefined
-      } else if (recurrenceEndType === "count") {
-        eventData.recurrenceCount = parseInt(recurrenceCount) || 10
-        eventData.recurrenceEndDate = undefined
-      } else {
-        // "never" — clear both
-        eventData.recurrenceEndDate = undefined
-        eventData.recurrenceCount = undefined
-      }
+      onUpdate(editingEvent.id, payload, [])
     } else {
-      // Not recurring — clear all recurrence fields
-      eventData.recurrencePattern = undefined
-      eventData.recurrenceInterval = undefined
-      eventData.recurrenceEndDate = undefined
-      eventData.recurrenceCount = undefined
+      onSave(payload, [])
     }
-
-    if (editingEvent) {
-      onUpdate(editingEvent.id, eventData, invitees)
-    } else {
-      onSave(eventData, invitees)
-    }
-
-    onOpenChange(false)
   }
 
-  const recurrenceSummaryText = useMemo(() => {
-    if (!isRecurring) return null
-
-    const interval = parseInt(recurrenceInterval) || 1
-    let summary = `Repeats every ${interval > 1 ? interval + " " : ""}${
-      recurrencePattern === "daily"
-        ? interval > 1 ? "days" : "day"
-        : recurrencePattern === "weekly"
-          ? interval > 1 ? "weeks" : "week"
-          : interval > 1 ? "months" : "month"
-    }`
-    if (recurrenceEndType === "date" && recurrenceEndDate) {
-      summary += ` until ${format(new Date(recurrenceEndDate + "T00:00:00"), "MMM d, yyyy")}`
-    } else if (recurrenceEndType === "count") {
-      summary += ` for ${recurrenceCount} occurrences`
-    }
-    return summary
-  }, [isRecurring, recurrenceInterval, recurrencePattern, recurrenceEndType, recurrenceEndDate, recurrenceCount])
+  const handleDelete = editingEvent
+    ? () => {
+        // Parent will handle deletion via its own mechanism
+        onOpenChange(false)
+      }
+    : undefined
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarPlus className="w-5 h-5 text-indigo-500" />
-            {editingEvent ? "Edit Event" : "Schedule New Event"}
-          </DialogTitle>
-          <DialogDescription>
-            Schedule calls, meetings, and reminders with your contacts
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-6 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Event Title *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Weekly check-in call"
-              className="text-base"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Event Type</Label>
-            <div className="grid grid-cols-4 gap-2">
-              {(["call", "video", "meeting", "reminder"] as EventType[]).map((type) => {
-                const Icon = eventTypeIcons[type]
-                const isSelected = eventType === type
-                return (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setEventType(type)}
-                    className={`flex flex-col items-center gap-2 p-3 rounded-lg border-2 transition-all ${
-                      isSelected
-                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20"
-                        : "border-border hover:border-indigo-300"
-                    }`}
-                  >
-                    <Icon className={`w-5 h-5 ${isSelected ? "text-indigo-600" : "text-muted-foreground"}`} />
-                    <span className={`text-xs capitalize ${isSelected ? "text-indigo-600 font-medium" : "text-muted-foreground"}`}>
-                      {type}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="date">Date *</Label>
-              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="time">Time *</Label>
-              <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="duration">Duration</Label>
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger id="duration">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">15 min</SelectItem>
-                  <SelectItem value="30">30 min</SelectItem>
-                  <SelectItem value="45">45 min</SelectItem>
-                  <SelectItem value="60">1 hour</SelectItem>
-                  <SelectItem value="90">1.5 hours</SelectItem>
-                  <SelectItem value="120">2 hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Recurring Event Section */}
-          <div className="space-y-4 p-4 border rounded-lg bg-muted/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Repeat className="w-4 h-4 text-indigo-500" />
-                <Label htmlFor="recurring" className="cursor-pointer font-medium">
-                  Recurring Event
-                </Label>
-              </div>
-              <Switch id="recurring" checked={isRecurring} onCheckedChange={setIsRecurring} />
-            </div>
-
-            {isRecurring && (
-              <div className="space-y-4 pt-2">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="pattern">Repeat Pattern</Label>
-                    <Select value={recurrencePattern} onValueChange={(v: any) => setRecurrencePattern(v)}>
-                      <SelectTrigger id="pattern">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="interval">Repeat Every</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        id="interval"
-                        type="number"
-                        min="1"
-                        max="30"
-                        value={recurrenceInterval}
-                        onChange={(e) => setRecurrenceInterval(e.target.value)}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-muted-foreground">
-                        {recurrencePattern === "daily"
-                          ? parseInt(recurrenceInterval) > 1 ? "days" : "day"
-                          : recurrencePattern === "weekly"
-                          ? parseInt(recurrenceInterval) > 1 ? "weeks" : "week"
-                          : parseInt(recurrenceInterval) > 1 ? "months" : "month"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <Label>Ends</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        id="never"
-                        name="endType"
-                        checked={recurrenceEndType === "never"}
-                        onChange={() => setRecurrenceEndType("never")}
-                        className="w-4 h-4"
-                      />
-                      <Label htmlFor="never" className="cursor-pointer font-normal">Never</Label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        id="onDate"
-                        name="endType"
-                        checked={recurrenceEndType === "date"}
-                        onChange={() => setRecurrenceEndType("date")}
-                        className="w-4 h-4"
-                      />
-                      <Label htmlFor="onDate" className="cursor-pointer font-normal">On</Label>
-                      <Input
-                        type="date"
-                        value={recurrenceEndDate}
-                        onChange={(e) => {
-                          setRecurrenceEndDate(e.target.value)
-                          setRecurrenceEndType("date")
-                        }}
-                        disabled={recurrenceEndType !== "date"}
-                        className="flex-1"
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        id="afterCount"
-                        name="endType"
-                        checked={recurrenceEndType === "count"}
-                        onChange={() => setRecurrenceEndType("count")}
-                        className="w-4 h-4"
-                      />
-                      <Label htmlFor="afterCount" className="cursor-pointer font-normal">After</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="365"
-                        value={recurrenceCount}
-                        onChange={(e) => {
-                          setRecurrenceCount(e.target.value)
-                          setRecurrenceEndType("count")
-                        }}
-                        disabled={recurrenceEndType !== "count"}
-                        className="w-20"
-                      />
-                      <span className="text-sm text-muted-foreground">occurrences</span>
-                    </div>
-                  </div>
-                </div>
-
-                {recurrenceSummaryText && (
-                  <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
-                    <p className="text-sm text-indigo-900 dark:text-indigo-100">
-                      <Calendar className="w-4 h-4 inline mr-1.5" />
-                      {recurrenceSummaryText}
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {(eventType === "meeting" || eventType === "video") && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="location">
-                  <MapPin className="w-3 h-3 inline mr-1" />
-                  Location
-                </Label>
-                <Input
-                  id="location"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Address or room name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="meetingLink">
-                  <LinkIcon className="w-3 h-3 inline mr-1" />
-                  Meeting Link
-                </Label>
-                <Input
-                  id="meetingLink"
-                  value={meetingLink}
-                  onChange={(e) => setMeetingLink(e.target.value)}
-                  placeholder="https://zoom.us/..."
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What's this event about?"
-              rows={2}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Invitations
-            </Label>
-
-            <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between h-10">
-                  <span className="text-muted-foreground font-normal">Search name or type email…</span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-
-              <PopoverContent className="w-full p-0">
-                <Command shouldFilter={false}>
-                  <CommandInput
-                    placeholder="Type name or email and press Enter…"
-                    value={search}
-                    onValueChange={setSearch}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && search.trim()) {
-                        addEmail(search)
-                        setSearch("")
-                        setPickerOpen(false)
-                      }
-                    }}
-                  />
-                  <CommandEmpty>
-                    Press Enter to add &ldquo;{search}&rdquo;
-                  </CommandEmpty>
-                  <CommandGroup className="max-h-60 overflow-auto">
-                    {filteredContacts.map((contact) => (
-                      <CommandItem
-                        key={contact.id}
-                        onSelect={() => {
-                          addEmail(contact.email || "")
-                          setSearch("")
-                          setPickerOpen(false)
-                        }}
-                      >
-                        {contact.name}
-                        <span className="ml-2 text-muted-foreground text-xs">{contact.email}</span>
-                        <Check
-                          className={cn(
-                            "ml-auto h-4 w-4",
-                            emails.includes(contact.email || "") ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
-            {emails.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Shared with
-                </Label>
-                <div className="space-y-1.5">
-                  {emails.map((email) => (
-                    <div
-                      key={email}
-                      className="flex items-center justify-between p-2.5 border rounded-xl bg-muted/20"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center">
-                          <Mail className="w-3.5 h-3.5 text-accent" />
-                        </div>
-                        <span className="text-sm">{email}</span>
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => removeEmail(email)}>
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any additional notes..."
-              rows={2}
-            />
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={!title || !date || !time}>
-            {editingEvent ? "Save Changes" : "Schedule Event"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <EventFormDialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      onSave={handleSave}
+      onDelete={handleDelete}
+      existingEvent={calEvent}
+      initialDate={format(new Date(), "yyyy-MM-dd")}
+    />
   )
 }
 
@@ -676,8 +287,8 @@ function EventCard({
   onComplete: () => void
   compact?: boolean
 }) {
-  const Icon = eventTypeIcons[event.eventType]
-  const colorClass = eventTypeColors[event.eventType]
+  const Icon = eventTypeIcons[event.eventType] || Calendar
+  const colorClass = eventTypeColors[event.eventType] || ""
   const isPast = new Date(event.startTime) < new Date()
   const isCompleted = event.status === "completed"
 
@@ -735,7 +346,7 @@ function EventCard({
               {formatEventDate(event.startTime)}
               {event.durationMinutes && (
                 <span className="text-muted-foreground/60">
-                  · {event.durationMinutes}m
+                  {" \u00B7 "}{event.durationMinutes}m
                 </span>
               )}
             </p>
@@ -752,6 +363,18 @@ function EventCard({
                 <MapPin className="w-3 h-3" />
                 {event.location}
               </p>
+            )}
+
+            {event.meetingLink && !compact && (
+              <a
+                href={event.meetingLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
+              >
+                <LinkIcon className="w-3 h-3" />
+                Join meeting
+              </a>
             )}
 
             {totalInvited > 0 && !compact && (
@@ -791,7 +414,7 @@ function EventCard({
                   {event.isRecurring ? (
                     <>
                       <SkipForward className="w-4 h-4 mr-2" />
-                      Complete &amp; Create Next
+                      {"Complete & Create Next"}
                     </>
                   ) : (
                     <>
@@ -854,21 +477,15 @@ function getNextFutureOccurrence(
   const endDate = event.recurrenceEndDate ? new Date(event.recurrenceEndDate) : null
 
   let candidate = new Date(event.startTime)
-
-  // Step forward until we pass `now`
-  // Safety cap to prevent infinite loops (max 1000 iterations ≈ ~3 years of daily)
   let iterations = 0
   while (candidate <= now && iterations < 1000) {
     candidate = advanceByInterval(candidate, pattern, interval)
     iterations++
   }
 
-  // Check end-date limit
   if (endDate && candidate > endDate) return null
 
-  // Check occurrence-count limit
   if (event.recurrenceCount) {
-    // Count how many events in this series already exist (completed or scheduled)
     const seriesCount = allEvents.filter(
       (e) =>
         e.title === event.title &&
@@ -899,14 +516,57 @@ export function ScheduleTab() {
     respondToInvitation,
   } = useCommunicationHub()
 
-  // Check if completeRecurringEvent exists on the hook
   const hub = useCommunicationHub()
   const completeRecurringEvent = hub.completeRecurringEvent
 
   const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
-  const [editingEvent, setEditingEvent] = useState<ScheduledEvent | null>(null)
+  const [editingHubEvent, setEditingHubEvent] = useState<ScheduledEvent | null>(null)
   const [showAllPast, setShowAllPast] = useState(false)
   const [advancedIds, setAdvancedIds] = useState<Set<string>>(new Set())
+  const [calendarMeetings, setCalendarMeetings] = useState<ScheduledEvent[]>([])
+
+  // Fetch meetings/calls/videos from calendar_events table
+  const fetchCalendarMeetings = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("calendar_events")
+        .select("*")
+        .in("event_type", ["meeting", "call", "video"])
+        .order("start_date", { ascending: true })
+
+      if (data) {
+        setCalendarMeetings(data.map(calendarEventToScheduled))
+      }
+    } catch {
+      // Fetch failed silently
+    }
+  }, [])
+
+  // Fetch on mount and re-fetch when hub events change (in case save triggers both tables)
+  useEffect(() => {
+    if (isLoaded) {
+      fetchCalendarMeetings()
+    }
+  }, [isLoaded, fetchCalendarMeetings, scheduledEvents])
+
+  // Merge hub events + calendar meetings, deduplicating by title+startTime
+  const allEvents = useMemo(() => {
+    const hubIds = new Set(scheduledEvents.map((e) => e.id))
+    // Only add calendar events that don't already exist in scheduled_events
+    // We detect duplicates by matching title + approximate start time
+    const extras = calendarMeetings.filter((ce) => {
+      const ceStart = new Date(ce.startTime).getTime()
+      return !scheduledEvents.some((se) => {
+        const seStart = new Date(se.startTime).getTime()
+        return se.title === ce.title && Math.abs(seStart - ceStart) < 60000
+      })
+    })
+    return [...scheduledEvents, ...extras]
+  }, [scheduledEvents, calendarMeetings])
+
+  // Convert the editing hub event into a CalendarEvent for the unified modal
+  const editingCalEvent = editingHubEvent ? scheduledToCalendar(editingHubEvent) : null
 
   const contactOptions = contacts.map((c) => ({
     id: c.id,
@@ -919,8 +579,6 @@ export function ScheduleTab() {
 
     const now = new Date()
 
-    // Find recurring events that are past and still "scheduled"
-    // (i.e., the user never completed them — time just passed)
     const pastRecurring = scheduledEvents.filter(
       (e) =>
         e.isRecurring &&
@@ -932,12 +590,10 @@ export function ScheduleTab() {
 
     if (pastRecurring.length === 0) return
 
-    // For each, check if a future scheduled sibling already exists
     const advance = async () => {
       const newAdvancedIds = new Set(advancedIds)
 
       for (const event of pastRecurring) {
-        // Check if there's already a future scheduled event in the same series
         const hasFutureSibling = scheduledEvents.some(
           (e) =>
             e.id !== event.id &&
@@ -949,7 +605,6 @@ export function ScheduleTab() {
         )
 
         if (hasFutureSibling) {
-          // Mark current as completed since it's past and a future one exists
           newAdvancedIds.add(event.id)
           await updateEvent(event.id, { status: "completed" })
           continue
@@ -958,16 +613,13 @@ export function ScheduleTab() {
         const nextDate = getNextFutureOccurrence(event, scheduledEvents, now)
 
         if (!nextDate) {
-          // Series has ended — just mark as completed
           newAdvancedIds.add(event.id)
           await updateEvent(event.id, { status: "completed" })
           continue
         }
 
-        // Mark the past occurrence as completed
         await updateEvent(event.id, { status: "completed" })
 
-        // Create the next future occurrence
         const durationMs = (event.durationMinutes || 30) * 60000
         const nextEnd = new Date(nextDate.getTime() + durationMs)
 
@@ -1007,28 +659,26 @@ export function ScheduleTab() {
     advance()
   }, [isLoaded, scheduledEvents, isSyncing])
 
-  // Upcoming: scheduled + in the future
   const upcomingEvents = useMemo(() => {
     const now = Date.now()
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
     const cutoff = now + THIRTY_DAYS
 
-    return scheduledEvents
+    return allEvents
       .filter((e) => e.status === "scheduled" && new Date(e.startTime) >= new Date())
       .filter((e) => {
         const start = new Date(e.startTime).getTime()
         return start <= cutoff
       })
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-  }, [scheduledEvents])
+  }, [allEvents])
 
-  // Past / completed events, grouped by recurring series
   const pastEvents = useMemo(() => {
     const now = Date.now()
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
     const cutoff = now - THIRTY_DAYS
 
-    return scheduledEvents
+    return allEvents
       .filter((e) => e.status === "completed" || (e.status === "cancelled") || (e.status !== "scheduled") || new Date(e.startTime) < new Date())
       .filter((e) => !(e.status === "scheduled" && new Date(e.startTime) >= new Date()))
       .filter((e) => {
@@ -1036,24 +686,40 @@ export function ScheduleTab() {
         return start >= cutoff
       })
       .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-  }, [scheduledEvents])
+  }, [allEvents])
 
   const visiblePastEvents = showAllPast ? pastEvents : pastEvents.slice(0, 6)
 
-  // Handlers
-  const handleCreateEvent = async (
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await createEvent(event, invitees)
+  // Unified modal save handler -- writes to both scheduled_events (via hub) and calendar_events
+  const handleUnifiedSave = async (data: EventFormData) => {
+    const payload = formDataToScheduledPayload(data)
+
+    // Build invitees from the editing event (preserve existing ones)
+    const invitees = editingHubEvent
+      ? editingHubEvent.invitations.map((inv) => ({
+          email: inv.inviteeEmail,
+          name: inv.inviteeName,
+          contactId: inv.contactId,
+        }))
+      : []
+
+    if (editingHubEvent) {
+      await updateEvent(editingHubEvent.id, payload, invitees)
+    } else {
+      await createEvent(payload, invitees)
+    }
+
+    setIsEventDialogOpen(false)
+    setEditingHubEvent(null)
+    // Re-fetch calendar meetings so newly created events appear
+    fetchCalendarMeetings()
   }
 
-  const handleUpdateEvent = async (
-    eventId: string,
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await updateEvent(eventId, event, invitees)
+  const handleDeleteFromModal = async () => {
+    if (!editingHubEvent) return
+    await deleteEvent(editingHubEvent.id)
+    setIsEventDialogOpen(false)
+    setEditingHubEvent(null)
   }
 
   const handleDeleteEvent = async (id: string) => {
@@ -1066,17 +732,14 @@ export function ScheduleTab() {
     const event = scheduledEvents.find((e) => e.id === id)
     if (!event) return
 
-    // Mark current as completed
     await updateEvent(id, { status: "completed" })
 
-    // For recurring events, create the next occurrence
     if (event.isRecurring && event.recurrencePattern) {
       const now = new Date()
       const nextDate = getNextFutureOccurrence(event, scheduledEvents, now)
 
-      if (!nextDate) return // Series ended
+      if (!nextDate) return
 
-      // Check if a future sibling already exists (maybe auto-advance already created one)
       const hasFutureSibling = scheduledEvents.some(
         (e) =>
           e.id !== event.id &&
@@ -1122,12 +785,12 @@ export function ScheduleTab() {
 
   const myInvitations = useMemo(() => {
     if (!currentUser?.email) return []
-    return scheduledEvents.flatMap((event) =>
+    return allEvents.flatMap((event) =>
       event.invitations
         .filter((inv) => inv.inviteeEmail === currentUser.email)
         .map((inv) => inv)
     )
-  }, [scheduledEvents, currentUser])
+  }, [allEvents, currentUser])
 
   const pendingCount = myInvitations.filter((i) => i.status === "pending").length
 
@@ -1145,122 +808,123 @@ export function ScheduleTab() {
   return (
     <>
       <TabsContent value="schedule" className="space-y-6">
-        {/* Upcoming Events */}
-        {upcomingEvents.length > 0 ? (
-          <>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {upcomingEvents.length}
-                </span>
+          {/* Upcoming Events */}
+          {upcomingEvents.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">Upcoming Events</h2>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {upcomingEvents.length}
+                  </span>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => { setEditingHubEvent(null); setIsEventDialogOpen(true) }}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Event
+                </Button>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setIsEventDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Event
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {upcomingEvents.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    user={currentUser?.id || ""}
+                    onEdit={() => {
+                      setEditingHubEvent(event)
+                      setIsEventDialogOpen(true)
+                    }}
+                    onDelete={() => handleDeleteEvent(event.id)}
+                    onComplete={() => handleCompleteEvent(event.id)}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16 bg-card border rounded-2xl">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-4">
+                <Calendar className="w-8 h-8 text-indigo-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No upcoming events</h3>
+              <p className="text-muted-foreground mb-6">
+                Schedule calls, meetings, and reminders with your contacts
+              </p>
+              <Button onClick={() => { setEditingHubEvent(null); setIsEventDialogOpen(true) }}>
+                <Calendar className="w-4 h-4 mr-2" />
+                Schedule Your First Event
               </Button>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {upcomingEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  user={currentUser?.id || ""}
-                  onEdit={() => {
-                    setEditingEvent(event)
-                    setIsEventDialogOpen(true)
-                  }}
-                  onDelete={() => handleDeleteEvent(event.id)}
-                  onComplete={() => handleCompleteEvent(event.id)}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-16 bg-card border rounded-2xl">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-4">
-              <Calendar className="w-8 h-8 text-indigo-600" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No upcoming events</h3>
-            <p className="text-muted-foreground mb-6">
-              Schedule calls, meetings, and reminders with your contacts
-            </p>
-            <Button onClick={() => setIsEventDialogOpen(true)}>
-              <CalendarPlus className="w-4 h-4 mr-2" />
-              Schedule Your First Event
-            </Button>
-          </div>
-        )}
+          )}
 
-        {/* Past / Completed Events */}
-        {pastEvents.length > 0 && (
-          <div className="mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-foreground">Past Events (Last 30 Days)</h2>
-                <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {pastEvents.length}
-                </span>
+          {/* Past / Completed Events */}
+          {pastEvents.length > 0 && (
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">Past Events (Last 30 Days)</h2>
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {pastEvents.length}
+                  </span>
+                </div>
+                {pastEvents.length > 6 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllPast((v) => !v)}
+                    className="text-muted-foreground"
+                  >
+                    {showAllPast ? "Show less" : `Show all ${pastEvents.length}`}
+                    <ChevronRight className={cn("w-4 h-4 ml-1 transition-transform", showAllPast && "rotate-90")} />
+                  </Button>
+                )}
               </div>
-              {pastEvents.length > 6 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAllPast((v) => !v)}
-                  className="text-muted-foreground"
-                >
-                  {showAllPast ? "Show less" : `Show all ${pastEvents.length}`}
-                  <ChevronRight className={cn("w-4 h-4 ml-1 transition-transform", showAllPast && "rotate-90")} />
-                </Button>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {visiblePastEvents.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    user={currentUser?.id || ""}
+                    compact
+                    onEdit={() => {
+                      setEditingHubEvent(event)
+                      setIsEventDialogOpen(true)
+                    }}
+                    onDelete={() => handleDeleteEvent(event.id)}
+                    onComplete={() => { }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invitations */}
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-4">
+              <h2 className="text-lg font-semibold text-foreground">My Invitations</h2>
+              {pendingCount > 0 && (
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 text-xs font-bold">
+                  {pendingCount} pending
+                </span>
               )}
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {visiblePastEvents.map((event) => (
-                <EventCard
-                  key={event.id}
-                  event={event}
-                  user={currentUser?.id || ""}
-                  compact
-                  onEdit={() => {
-                    setEditingEvent(event)
-                    setIsEventDialogOpen(true)
-                  }}
-                  onDelete={() => handleDeleteEvent(event.id)}
-                  onComplete={() => {}}
-                />
-              ))}
-            </div>
+            <InvitationsInbox
+              invitations={myInvitations}
+              events={allEvents}
+              onRespond={respondToInvitation}
+            />
           </div>
-        )}
-
-        {/* Invitations */}
-        <div className="mt-8">
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-lg font-semibold text-foreground">My Invitations</h2>
-            {pendingCount > 0 && (
-              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 text-xs font-bold">
-                {pendingCount} pending
-              </span>
-            )}
-          </div>
-          <InvitationsInbox
-            invitations={myInvitations}
-            events={scheduledEvents}
-            onRespond={respondToInvitation}
-          />
-        </div>
       </TabsContent>
 
-      <ScheduleEventDialog
+      {/* Unified Event Modal -- shared with the calendar */}
+      <EventFormDialog
         open={isEventDialogOpen}
-        onOpenChange={(open) => {
-          setIsEventDialogOpen(open)
-          if (!open) setEditingEvent(null)
+        onClose={() => {
+          setIsEventDialogOpen(false)
+          setEditingHubEvent(null)
         }}
-        onSave={handleCreateEvent}
-        onUpdate={handleUpdateEvent}
-        contacts={contactOptions}
-        editingEvent={editingEvent}
+        onSave={handleUnifiedSave}
+        onDelete={editingHubEvent ? handleDeleteFromModal : undefined}
+        existingEvent={editingCalEvent}
+        initialDate={format(new Date(), "yyyy-MM-dd")}
       />
 
       {/* Sync indicator */}

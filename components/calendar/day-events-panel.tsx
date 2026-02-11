@@ -2,9 +2,18 @@
 
 import type { CalendarEvent } from "@/lib/calendar-types"
 import { format, parseISO } from "date-fns"
-import { Clock, Star, Pencil, CheckCircle2, Circle } from "lucide-react"
+import { Clock, Star, Pencil, CheckCircle2, Circle, Video, Phone, Users, Repeat, Link2, MapPin } from "lucide-react"
 import { getEventColor, HOLIDAY_STYLE, COMPLETED_STYLE, formatMilitaryTime } from "@/lib/event-colors"
 import { cn } from "@/lib/utils"
+
+function EventTypeIcon({ type }: { type?: string }) {
+  switch (type) {
+    case "meeting": return <Users className="h-3 w-3" />
+    case "call": return <Phone className="h-3 w-3" />
+    case "video": return <Video className="h-3 w-3" />
+    default: return null
+  }
+}
 
 interface DayEventsPanelProps {
   date: Date
@@ -62,7 +71,7 @@ export function DayEventsPanel({
             Events
           </span>
           {userEvents.map((event) => {
-            const ec = getEventColor(event.color)
+            const ec = getEventColor(event.color ?? undefined)
             const isCompleted = !!event.completed
 
             return (
@@ -96,12 +105,18 @@ export function DayEventsPanel({
                 )}
 
                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
-                  <span className={cn(
-                    "font-medium truncate",
-                    ec.text,
-                    isCompleted && COMPLETED_STYLE.title
-                  )}>
-                    {event.title}
+                  <span className="flex items-center gap-1.5">
+                    <EventTypeIcon type={event.event_type} />
+                    <span className={cn(
+                      "font-medium truncate",
+                      ec.text,
+                      isCompleted && COMPLETED_STYLE.title
+                    )}>
+                      {event.title}
+                    </span>
+                    {event.is_recurring && (
+                      <Repeat className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    )}
                   </span>
                   {event.is_all_day ? (
                     <span className="text-xs text-muted-foreground">All day</span>
@@ -116,6 +131,24 @@ export function DayEventsPanel({
                       {format(parseISO(event.start_date), "MMM d")} -{" "}
                       {format(parseISO(event.end_date), "MMM d")}
                     </span>
+                  )}
+                  {event.location && (
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      {event.location}
+                    </span>
+                  )}
+                  {event.meeting_link && (
+                    <a
+                      href={event.meeting_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-xs text-accent hover:underline truncate"
+                    >
+                      <Link2 className="h-3 w-3 shrink-0" />
+                      Join meeting
+                    </a>
                   )}
                 </div>
 

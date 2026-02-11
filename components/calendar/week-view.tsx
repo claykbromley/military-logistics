@@ -101,7 +101,7 @@ export function WeekView({
                 >
                   {allDayEvents.map((event) => {
                     const isHoliday = !!event.is_holiday
-                    const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color)
+                    const style = isHoliday ? HOLIDAY_STYLE : getEventColor(event.color ?? undefined)
                     return (
                       <button
                         key={event.id}
@@ -166,7 +166,7 @@ export function WeekView({
                   onClick={() => onSelectDate(day)}
                 >
                   {eventsThisHour.map((event) => {
-                    const ec = getEventColor(event.color)
+                    const ec = getEventColor(event.color ?? undefined)
                     const startMin = timeToMinutes(event.start_time!)
                     const endMin = timeToMinutes(event.end_time!)
                     const offsetMin = startMin % 60

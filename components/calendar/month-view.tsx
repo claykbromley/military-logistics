@@ -109,7 +109,7 @@ export function MonthView({
                   </div>
                 ))}
                 {userEvents.slice(0, 2).map((event) => {
-                  const ec = getEventColor(event.color)
+                  const ec = getEventColor(event.color ?? undefined)
                   return (
                     <div
                       key={event.id}
