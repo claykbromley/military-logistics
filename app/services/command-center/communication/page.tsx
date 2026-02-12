@@ -11,8 +11,14 @@ import { Badge } from "@/components/ui/badge"
 import { CommunicationLog, ScheduledEvent } from "@/lib/types"
 import { useCommunicationHub,CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { MessagesTab } from "@/components/command-center/messages-tab"
-import { ScheduleTab, ScheduleEventDialog } from "@/components/command-center/schedule-tab"
+import { ScheduleTab, } from "@/components/command-center/schedule-tab"
 import { LogTab, AddCommunicationDialog } from "@/components/command-center/log-tab"
+import { EntryModal } from "@/components/calendar/entry-modal";
+import {
+  format,
+  addDays,
+} from "date-fns";
+import type { CalendarEntry, EntryFormData } from "@/app/scheduler/calendar/types";
 
 export default function CommunicationHubPage() {
   return (
@@ -42,6 +48,9 @@ function CommunicationHubPageContent() {
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<CommunicationLog | null>(null)
   const [editingEvent, setEditingEvent] = useState<ScheduledEvent | null>(null)
+    const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
+    const [formData, setFormData] = useState<EntryFormData>(getDefaultFormData());
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // View states
   const [activeTab, setActiveTab] = useState("schedule")
@@ -94,6 +103,65 @@ function CommunicationHubPageContent() {
     )
   }
 
+  function entryToFormData(entry: CalendarEntry): EntryFormData {
+  const startDt = new Date(entry.start_time);
+  const endDt = entry.end_time ? new Date(entry.end_time) : startDt;
+  
+  return {
+    type: entry.type,
+    title: entry.title,
+    description: entry.description || "",
+    color: entry.color,
+    start_date: format(startDt, "yyyy-MM-dd"),
+    start_time: entry.all_day ? "" : format(startDt, "HH:mm"),
+    end_date: format(endDt, "yyyy-MM-dd"),
+    end_time: entry.all_day ? "" : format(endDt, "HH:mm"),
+    all_day: entry.all_day,
+    is_recurring: entry.is_recurring,
+    recurrence_freq: entry.recurrence_freq || "weekly",
+    recurrence_interval: entry.recurrence_interval || 1,
+    recurrence_days: entry.recurrence_days || [],
+    recurrence_end: entry.recurrence_end ? format(new Date(entry.recurrence_end), "yyyy-MM-dd") : "",
+    location: entry.location || "",
+  };
+}
+  
+  function getDefaultFormData(date?: string): EntryFormData {
+    const now = new Date();
+    const startDate = date || format(now, "yyyy-MM-dd");
+    
+    return {
+      type: "event",
+      title: "",
+      description: "",
+      color: "#3b82f6",
+      start_date: startDate,
+      start_time: format(now, "HH:mm"),
+      end_date: startDate,
+      end_time: format(addDays(now, 0), "HH:mm"),
+      all_day: false,
+      is_recurring: false,
+      recurrence_freq: "weekly",
+      recurrence_interval: 1,
+      recurrence_days: [],
+      recurrence_end: "",
+      location: "",
+    };
+  }
+  
+
+  const openModal = (entry?: CalendarEntry) => {
+      if (entry) {
+        setEditingEntry(entry);
+        setFormData(entryToFormData(entry));
+      } else {
+        setEditingEntry(null);
+        setFormData(getDefaultFormData());
+      }
+      setShowDeleteConfirm(false);
+      setIsEventDialogOpen(true);
+    };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
       <Header />
@@ -136,7 +204,7 @@ function CommunicationHubPageContent() {
               </Button>
               <Button
                 className="bg-white text-primary hover:bg-white/90 cursor-pointer"
-                onClick={() => setIsEventDialogOpen(true)}
+                onClick={() => openModal()}
               >
                 <CalendarPlus className="w-4 h-4 mr-2" />
                 Schedule Event
@@ -241,7 +309,20 @@ function CommunicationHubPageContent() {
         editingLog={editingLog}
       />
 
-      <ScheduleEventDialog
+      {/* <EntryModal
+        open={isEventDialogOpen}
+        editingEntry={editingEntry}
+        formData={formData}
+        saving={isSyncing}
+        showDeleteConfirm={showDeleteConfirm}
+        onFormChange={setFormData}
+        onSave={handleSave}
+        onDelete={handleDeleteFromModal}
+        onClose={closeModal}
+        onShowDeleteConfirm={setShowDeleteConfirm}
+      /> */}
+
+      {/* <ScheduleEventDialog
         open={isEventDialogOpen}
         onOpenChange={(open) => {
           setIsEventDialogOpen(open)
@@ -251,7 +332,7 @@ function CommunicationHubPageContent() {
         onUpdate={handleUpdateEvent}
         contacts={contactOptions}
         editingEvent={editingEvent}
-      />
+      /> */}
 
       {/* Sync indicator */}
       {isSyncing && (
