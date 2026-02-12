@@ -101,7 +101,7 @@ export function EventFormDialogComm({
   existingEvent,
 }: EventFormDialogProps) {
   const [title, setTitle] = useState("")
-  const [eventType, setEventType] = useState<UnifiedEventType>("event")
+  const [eventType, setEventType] = useState<UnifiedEventType>("meeting")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [isAllDay, setIsAllDay] = useState(false)
@@ -138,7 +138,7 @@ export function EventFormDialogComm({
     if (open) {
       if (existingEvent) {
         setTitle(existingEvent.title)
-        setEventType(existingEvent.event_type || "event")
+        setEventType(existingEvent.event_type || "meeting")
         setStartDate(existingEvent.start_date)
         setEndDate(existingEvent.end_date)
         setIsAllDay(existingEvent.is_all_day)
@@ -165,7 +165,7 @@ export function EventFormDialogComm({
         }
       } else {
         setTitle("")
-        setEventType("event")
+        setEventType("meeting")
         setStartDate(initialDate || "")
         setEndDate(initialDate || "")
         setIsAllDay(false)
