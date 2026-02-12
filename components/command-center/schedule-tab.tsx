@@ -801,12 +801,12 @@ export function ScheduleTab() {
         const start = new Date(e.startTime).getTime();
         return start >= cutoff;
       })
-      // .filter(
-      //   (e) =>
-      //     e.eventType === "call" ||
-      //     e.eventType === "meeting" ||
-      //     e.eventType === "video",
-      // )
+      .filter(
+        (e) =>
+          e.eventType === "call" ||
+          e.eventType === "meeting" ||
+          e.eventType === "video",
+      )
       .sort(
         (a, b) =>
           new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
