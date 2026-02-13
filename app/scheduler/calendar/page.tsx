@@ -6,26 +6,26 @@ import { useUI } from "@/context/ui-context"
 import { Header } from "@/components/header"
 import { CalendarDays, CheckSquare } from "lucide-react"
 
-import type { CalendarEntry, CalendarView, EntryFormData } from "./types"
+import type { CalendarEntry, CalendarView } from "./types"
 import { MONTH_NAMES, MONTH_NAMES_SHORT, DAY_NAMES_FULL } from "./constants"
 import {
   isSameDay,
   getWeekDays,
   expandRecurring,
   defaultFormData,
-  toLocalDateStr,
-  toLocalTimeStr,
 } from "./utils"
 
-import { CalendarToolbar } from "../../../components/calendar/calendar-toolbar"
-import { MiniCalendar } from "../../../components/calendar/mini-calendar"
-import { DayDetailPanel } from "../../../components/calendar/day-detail-panel"
-import { MonthView } from "../../../components/calendar/month-view"
-import { WeekView } from "../../../components/calendar/week-view"
-import { DayView } from "../../../components/calendar/day-view"
-import { YearView } from "../../../components/calendar/year-view"
-import { EntryModal } from "../../../components/calendar/entry-modal"
-import { IcalModal } from "../../../components/calendar/ical-modal"
+import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
+import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
+
+import { CalendarToolbar } from "@/components/calendar/calendar-toolbar"
+import { MiniCalendar } from "@/components/calendar/mini-calendar"
+import { DayDetailPanel } from "@/components/calendar/day-detail-panel"
+import { MonthView } from "@/components/calendar/month-view"
+import { WeekView } from "@/components/calendar/week-view"
+import { DayView } from "@/components/calendar/day-view"
+import { YearView } from "@/components/calendar/year-view"
+import { IcalModal } from "@/components/calendar/ical-modal"
 
 export default function CalendarPage() {
   const { user, setShowLogin } = useUI()
@@ -38,13 +38,6 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [entries, setEntries] = useState<CalendarEntry[]>([])
   const [loading, setLoading] = useState(false)
-
-  // Modal state
-  const [showModal, setShowModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null)
-  const [formData, setFormData] = useState<EntryFormData>(defaultFormData())
-  const [saving, setSaving] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // iCal state
   const [icalToken, setIcalToken] = useState<string | null>(null)
@@ -177,99 +170,75 @@ export default function CalendarPage() {
     [getEntriesForDay]
   )
 
-  // ── CRUD ────────────────────────────────────────────────
-
-  const openCreateModal = (date?: Date) => {
-    if (!user) { setShowLogin(true); return }
-    setEditingEntry(null)
-    setFormData(defaultFormData(date))
-    setShowModal(true)
-    setShowDeleteConfirm(false)
-  }
-
-  const openEditModal = (entry: CalendarEntry) => {
-    if (!user) { setShowLogin(true); return }
-    setEditingEntry(entry)
-    const s = new Date(entry.start_time)
-    const e = entry.end_time ? new Date(entry.end_time) : new Date(s.getTime() + 3600000)
-    setFormData({
-      type: entry.type, title: entry.title,
-      description: entry.description || "", color: entry.color,
-      start_date: toLocalDateStr(s), start_time: toLocalTimeStr(s),
-      end_date: toLocalDateStr(e), end_time: toLocalTimeStr(e),
-      all_day: entry.all_day, is_recurring: entry.is_recurring,
-      recurrence_freq: entry.recurrence_freq || "weekly",
-      recurrence_interval: entry.recurrence_interval || 1,
-      recurrence_days: entry.recurrence_days || [],
-      recurrence_end: entry.recurrence_end ? toLocalDateStr(new Date(entry.recurrence_end)) : "",
-      location: entry.location || "",
-    })
-    setShowModal(true)
-    setShowDeleteConfirm(false)
-  }
-
-  const handleSave = async () => {
-    if (!user || !formData.title.trim()) return
-    setSaving(true)
-    try {
-      const startDT = formData.all_day
-        ? new Date(`${formData.start_date}T00:00:00`)
-        : new Date(`${formData.start_date}T${formData.start_time}:00`)
-      const endDT = formData.all_day
-        ? new Date(`${formData.end_date}T23:59:59`)
-        : new Date(`${formData.end_date}T${formData.end_time}:00`)
-
-      const payload: any = {
-        user_id: userId, type: formData.type,
-        title: formData.title.trim(),
-        description: formData.description.trim() || null,
-        color: formData.color,
-        start_time: startDT.toISOString(),
-        end_time: formData.type === "task" && !formData.all_day ? null : endDT.toISOString(),
-        all_day: formData.all_day,
-        is_recurring: formData.is_recurring,
-        recurrence_freq: formData.is_recurring ? formData.recurrence_freq : null,
-        recurrence_interval: formData.is_recurring ? formData.recurrence_interval : 1,
-        recurrence_days: formData.is_recurring && formData.recurrence_freq === "weekly" ? formData.recurrence_days : null,
-        recurrence_end: formData.is_recurring && formData.recurrence_end ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString() : null,
-        location: formData.type === "event" ? (formData.location.trim() || null) : null,
-      }
-
-      if (editingEntry) {
-        const { error } = await supabase.from("calendar_entries").update(payload).eq("id", editingEntry.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from("calendar_entries").insert(payload)
-        if (error) throw error
-      }
-      setShowModal(false)
-      await fetchEntries()
-    } catch (err) { console.error("Save failed:", err) }
-    finally { setSaving(false) }
-  }
-
-  const handleDelete = async () => {
-    if (!editingEntry) return
-    setSaving(true)
-    try {
-      const { error } = await supabase.from("calendar_entries").delete().eq("id", editingEntry.id)
-      if (error) throw error
-      setShowModal(false)
-      await fetchEntries()
-    } catch (err) { console.error("Delete failed:", err) }
-    finally { setSaving(false) }
-  }
-
-  const toggleComplete = async (entry: CalendarEntry) => {
-    if (!user) return
-    try {
-      const { error } = await supabase.from("calendar_entries").update({ is_completed: !entry.is_completed }).eq("id", entry.id)
-      if (error) throw error
-      await fetchEntries()
-    } catch (err) { console.error("Toggle failed:", err) }
-  }
-
   // ── Render ──────────────────────────────────────────────
+  // Wrap everything in EntryModalProvider so all children
+  // (toolbar, views, side panel, chips) can call useEntryModal().open()
+
+  return (
+    <EntryModalProvider
+      userId={userId}
+      onAuthRequired={() => setShowLogin(true)}
+      onMutate={fetchEntries}
+    >
+      <CalendarPageInner
+        currentDate={currentDate}
+        setCurrentDate={setCurrentDate}
+        view={view}
+        setView={setView}
+        selectedDate={selectedDate}
+        setSelectedDate={setSelectedDate}
+        loading={loading}
+        headerTitle={headerTitle}
+        hasUser={!!user}
+        timeGridRef={timeGridRef}
+        icalUrl={icalUrl}
+        showIcalModal={showIcalModal}
+        setShowIcalModal={setShowIcalModal}
+        getEntriesForDay={getEntriesForDay}
+        getAllDayEntries={getAllDayEntries}
+        getTimedEntries={getTimedEntries}
+        onPrev={() => navigate(-1)}
+        onNext={() => navigate(1)}
+        onToday={goToToday}
+      />
+    </EntryModalProvider>
+  )
+}
+
+// ─── Inner component (has access to useEntryModal) ────────
+
+interface CalendarPageInnerProps {
+  currentDate: Date
+  setCurrentDate: (d: Date) => void
+  view: CalendarView
+  setView: (v: CalendarView) => void
+  selectedDate: Date
+  setSelectedDate: (d: Date) => void
+  loading: boolean
+  headerTitle: string
+  hasUser: boolean
+  timeGridRef: React.RefObject<HTMLDivElement | null>
+  icalUrl: string
+  showIcalModal: boolean
+  setShowIcalModal: (v: boolean) => void
+  getEntriesForDay: (d: Date) => CalendarEntry[]
+  getAllDayEntries: (d: Date) => CalendarEntry[]
+  getTimedEntries: (d: Date) => CalendarEntry[]
+  onPrev: () => void
+  onNext: () => void
+  onToday: () => void
+}
+
+function CalendarPageInner({
+  currentDate, setCurrentDate,
+  view, setView,
+  selectedDate, setSelectedDate,
+  loading, headerTitle, hasUser,
+  timeGridRef, icalUrl, showIcalModal, setShowIcalModal,
+  getEntriesForDay, getAllDayEntries, getTimedEntries,
+  onPrev, onNext, onToday,
+}: CalendarPageInnerProps) {
+  const { open: openModal, toggleComplete } = useEntryModal()
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -278,12 +247,12 @@ export default function CalendarPage() {
       <CalendarToolbar
         title={headerTitle}
         view={view}
-        hasUser={!!user}
+        hasUser={hasUser}
         onViewChange={setView}
-        onPrev={() => navigate(-1)}
-        onNext={() => navigate(1)}
-        onToday={goToToday}
-        onCreateClick={() => openCreateModal(selectedDate)}
+        onPrev={onPrev}
+        onNext={onNext}
+        onToday={onToday}
+        onCreateClick={() => openModal(undefined, selectedDate)}
         onIcalClick={() => setShowIcalModal(true)}
       />
 
@@ -300,26 +269,26 @@ export default function CalendarPage() {
             <div className="border-t border-border pt-4">
               <DayDetailPanel
                 selectedDate={selectedDate}
-                hasUser={!!user}
+                hasUser={hasUser}
                 getEntriesForDay={getEntriesForDay}
-                onCreateClick={() => openCreateModal(selectedDate)}
-                onEdit={openEditModal}
+                onCreateClick={() => openModal(undefined, selectedDate)}
+                onEdit={(entry) => openModal(entry)}
                 onToggleComplete={toggleComplete}
               />
             </div>
-            {user && (
+            {hasUser && (
               <div className="border-t border-border pt-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2 font-medium">Quick Add</p>
                 <div className="flex gap-1.5">
                   <button
-                    onClick={() => { setFormData({ ...defaultFormData(selectedDate), type: "event" }); setEditingEntry(null); setShowModal(true) }}
+                    onClick={() => openModal(undefined, selectedDate)}
                     className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors cursor-pointer text-foreground"
                   >
                     <CalendarDays className="w-3 h-3" />
                     Event
                   </button>
                   <button
-                    onClick={() => { setFormData({ ...defaultFormData(selectedDate), type: "task" }); setEditingEntry(null); setShowModal(true) }}
+                    onClick={() => openModal(undefined, selectedDate)}
                     className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs font-medium border border-border rounded-md hover:bg-muted transition-colors cursor-pointer text-foreground"
                   >
                     <CheckSquare className="w-3 h-3" />
@@ -339,21 +308,21 @@ export default function CalendarPage() {
             </div>
           )}
           {view === "month" && (
-            <MonthView currentDate={currentDate} selectedDate={selectedDate} hasUser={!!user}
+            <MonthView currentDate={currentDate} selectedDate={selectedDate} hasUser={hasUser}
               getEntriesForDay={getEntriesForDay} onSelectDate={setSelectedDate}
               onSetCurrentDate={setCurrentDate} onSetView={setView}
-              onCreateClick={openCreateModal} onEdit={openEditModal} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "week" && (
             <WeekView currentDate={currentDate} timeGridRef={timeGridRef}
               getAllDayEntries={getAllDayEntries} getTimedEntries={getTimedEntries}
               onDayClick={(d) => { setCurrentDate(d); setSelectedDate(d); setView("day") }}
-              onCreateClick={openCreateModal} onEdit={openEditModal} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "day" && (
             <DayView currentDate={currentDate} timeGridRef={timeGridRef}
               getAllDayEntries={getAllDayEntries} getTimedEntries={getTimedEntries}
-              onCreateClick={openCreateModal} onEdit={openEditModal} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "year" && (
             <YearView currentDate={currentDate} getEntriesForDay={getEntriesForDay}
@@ -366,19 +335,8 @@ export default function CalendarPage() {
       {/* Footer placeholder */}
       {/* <Footer /> */}
 
-      {/* Modals – stable tree position, no remounting */}
-      <EntryModal
-        open={showModal}
-        editingEntry={editingEntry}
-        formData={formData}
-        saving={saving}
-        showDeleteConfirm={showDeleteConfirm}
-        onFormChange={setFormData}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        onClose={() => setShowModal(false)}
-        onShowDeleteConfirm={setShowDeleteConfirm}
-      />
+      {/* Modals */}
+      <ConnectedEntryModal />
       <IcalModal
         open={showIcalModal}
         icalUrl={icalUrl}

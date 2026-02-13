@@ -5,21 +5,15 @@ import {
   Plus,
   Repeat,
   Clock,
-  Phone,
-  Video,
   Users,
   Trash2,
   Edit,
   Calendar,
-  Bell,
   MoreVertical,
   Check,
-  ExternalLink,
   MapPin,
-  Link as LinkIcon,
   AlertCircle,
   ChevronRight,
-  SkipForward,
   CheckSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,29 +25,27 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 import {
   format,
   isToday,
   isTomorrow,
   isThisWeek,
-  addDays,
-  parseISO,
   isBefore,
   isAfter,
   subDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
-// Import the CalendarEntry and EntryFormData types
-import type { CalendarEntry, EntryFormData, EntryType, RecurrenceFreq } from "@/app/scheduler/calendar/types";
-
-// Import the EntryModal
-import { EntryModal } from "@/components/calendar/entry-modal";
+import type { CalendarEntry } from "@/app/scheduler/calendar/types";
+import {
+  EntryModalProvider,
+  useEntryModal,
+} from "@/components/calendar/use-entry-modal";
+import { ConnectedEntryModal } from "@/components/calendar/entry-modal";
 
 // ============================================
-// CONSTANTS
+// CONSTANTS & HELPERS
 // ============================================
 
 const eventTypeIcons: Record<string, any> = {
@@ -108,89 +100,6 @@ function getRecurrenceSummary(entry: CalendarEntry): string | null {
 }
 
 // ============================================
-// CONVERSION HELPERS
-// ============================================
-
-function entryToFormData(entry: CalendarEntry): EntryFormData {
-  const startDt = new Date(entry.start_time);
-  const endDt = entry.end_time ? new Date(entry.end_time) : startDt;
-  
-  return {
-    type: entry.type,
-    title: entry.title,
-    description: entry.description || "",
-    color: entry.color,
-    start_date: format(startDt, "yyyy-MM-dd"),
-    start_time: entry.all_day ? "" : format(startDt, "HH:mm"),
-    end_date: format(endDt, "yyyy-MM-dd"),
-    end_time: entry.all_day ? "" : format(endDt, "HH:mm"),
-    all_day: entry.all_day,
-    is_recurring: entry.is_recurring,
-    recurrence_freq: entry.recurrence_freq || "weekly",
-    recurrence_interval: entry.recurrence_interval || 1,
-    recurrence_days: entry.recurrence_days || [],
-    recurrence_end: entry.recurrence_end ? format(new Date(entry.recurrence_end), "yyyy-MM-dd") : "",
-    location: entry.location || "",
-  };
-}
-
-function formDataToEntry(formData: EntryFormData, userId: string, entryId?: string): Partial<CalendarEntry> {
-  const startTime = formData.all_day
-    ? new Date(`${formData.start_date}T00:00:00`).toISOString()
-    : new Date(`${formData.start_date}T${formData.start_time || "00:00"}`).toISOString();
-  
-  const endTime = formData.all_day
-    ? new Date(`${formData.end_date}T23:59:59`).toISOString()
-    : formData.type === "event" && formData.end_time
-      ? new Date(`${formData.end_date}T${formData.end_time}`).toISOString()
-      : new Date(`${formData.start_date}T${formData.start_time || "00:00"}`).toISOString();
-
-  return {
-    ...(entryId && { id: entryId }),
-    user_id: userId,
-    type: formData.type,
-    title: formData.title,
-    description: formData.description || null,
-    color: formData.color,
-    start_time: startTime,
-    end_time: endTime,
-    all_day: formData.all_day,
-    location: formData.location || null,
-    is_recurring: formData.is_recurring,
-    recurrence_freq: formData.is_recurring ? formData.recurrence_freq : null,
-    recurrence_interval: formData.is_recurring ? formData.recurrence_interval : 1,
-    recurrence_days: formData.is_recurring && formData.recurrence_freq === "weekly" ? formData.recurrence_days : null,
-    recurrence_end: formData.is_recurring && formData.recurrence_end 
-      ? new Date(formData.recurrence_end).toISOString() 
-      : null,
-    is_completed: false,
-  };
-}
-
-function getDefaultFormData(date?: string): EntryFormData {
-  const now = new Date();
-  const startDate = date || format(now, "yyyy-MM-dd");
-  
-  return {
-    type: "event",
-    title: "",
-    description: "",
-    color: "#3b82f6",
-    start_date: startDate,
-    start_time: format(now, "HH:mm"),
-    end_date: startDate,
-    end_time: format(addDays(now, 0), "HH:mm"),
-    all_day: false,
-    is_recurring: false,
-    recurrence_freq: "weekly",
-    recurrence_interval: 1,
-    recurrence_days: [],
-    recurrence_end: "",
-    location: "",
-  };
-}
-
-// ============================================
 // EVENT CARD COMPONENT
 // ============================================
 
@@ -234,7 +143,9 @@ function EventCard({
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-center gap-2 mb-2">
-              <div className={cn("p-1.5 rounded-lg", eventTypeColors[entry.type])}>
+              <div
+                className={cn("p-1.5 rounded-lg", eventTypeColors[entry.type])}
+              >
                 <Icon className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -273,7 +184,9 @@ function EventCard({
               {entry.location && (
                 <div className="flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span className="truncate max-w-[150px]">{entry.location}</span>
+                  <span className="truncate max-w-[150px]">
+                    {entry.location}
+                  </span>
                 </div>
               )}
 
@@ -337,20 +250,21 @@ function EventCard({
 export function ScheduleTab() {
   const supabase = createClient();
   const [entries, setEntries] = useState<CalendarEntry[]>([]);
-  const [currentUser, setCurrentUser] = useState<{ id: string; email: string } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [showAllPast, setShowAllPast] = useState(false);
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false);
-  const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
-  const [formData, setFormData] = useState<EntryFormData>(getDefaultFormData());
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Fetch user
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) {
         setCurrentUser({ id: user.id, email: user.email || "" });
       }
@@ -385,9 +299,7 @@ export function ScheduleTab() {
   }, [currentUser, supabase]);
 
   useEffect(() => {
-    if (currentUser) {
-      fetchEntries();
-    }
+    if (currentUser) fetchEntries();
   }, [currentUser, fetchEntries]);
 
   // Set up realtime subscription
@@ -415,14 +327,72 @@ export function ScheduleTab() {
     };
   }, [currentUser, fetchEntries, supabase]);
 
-  // Filter upcoming and past entries
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-muted-foreground">Loading schedule...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <EntryModalProvider
+      userId={currentUser?.id}
+      defaultEntryOverrides={{ source: "meeting" }}
+      onMutate={fetchEntries}
+    >
+      <ScheduleTabInner
+        entries={entries}
+        currentUser={currentUser}
+        isSyncing={isSyncing}
+        syncError={syncError}
+        showAllPast={showAllPast}
+        setShowAllPast={setShowAllPast}
+        fetchEntries={fetchEntries}
+      />
+    </EntryModalProvider>
+  );
+}
+
+// ============================================
+// INNER COMPONENT (has access to useEntryModal)
+// ============================================
+
+interface ScheduleTabInnerProps {
+  entries: CalendarEntry[];
+  currentUser: { id: string; email: string } | null;
+  isSyncing: boolean;
+  syncError: string | null;
+  showAllPast: boolean;
+  setShowAllPast: (fn: (v: boolean) => boolean) => void;
+  fetchEntries: () => Promise<void>;
+}
+
+function ScheduleTabInner({
+  entries,
+  currentUser,
+  isSyncing,
+  syncError,
+  showAllPast,
+  setShowAllPast,
+  fetchEntries,
+}: ScheduleTabInnerProps) {
+  const { open: openModal, toggleComplete } = useEntryModal();
+  const supabase = createClient();
+
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
 
   const upcomingEntries = useMemo(() => {
     return entries
       .filter((e) => !e.is_completed && isAfter(new Date(e.start_time), now))
-      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+      .sort(
+        (a, b) =>
+          new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+      );
   }, [entries, now]);
 
   const pastEntries = useMemo(() => {
@@ -434,130 +404,43 @@ export function ScheduleTab() {
           isAfter(startTime, thirtyDaysAgo)
         );
       })
-      .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+      .sort(
+        (a, b) =>
+          new Date(b.start_time).getTime() - new Date(a.start_time).getTime(),
+      );
   }, [entries, now, thirtyDaysAgo]);
 
-  const visiblePastEntries = showAllPast ? pastEntries : pastEntries.slice(0, 6);
+  const visiblePastEntries = showAllPast
+    ? pastEntries
+    : pastEntries.slice(0, 6);
 
-  // Handle opening modal for new or editing entry
-  const openModal = (entry?: CalendarEntry) => {
-    if (entry) {
-      setEditingEntry(entry);
-      setFormData(entryToFormData(entry));
-    } else {
-      setEditingEntry(null);
-      setFormData(getDefaultFormData());
-    }
-    setShowDeleteConfirm(false);
-    setIsEventDialogOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsEventDialogOpen(false);
-    setEditingEntry(null);
-    setShowDeleteConfirm(false);
-    setFormData(getDefaultFormData());
-  };
-
-  // Handle save
-  const handleSave = async () => {
-    if (!currentUser) return;
-
-    try {
-      setIsSyncing(true);
-      setSyncError(null);
-
-      const payload = formDataToEntry(formData, currentUser.id, editingEntry?.id);
-
-      if (editingEntry) {
-        // Update existing
-        const { error } = await supabase
-          .from("calendar_entries")
-          .update(payload)
-          .eq("id", editingEntry.id);
-
-        if (error) throw error;
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from("calendar_entries")
-          .insert([payload]);
-
-        if (error) throw error;
-      }
-
-      await fetchEntries();
-      closeModal();
-    } catch (err: any) {
-      console.error("Error saving entry:", err);
-      setSyncError(err.message || "Failed to save entry");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Handle delete
+  // Simple delete handler (doesn't need modal state)
   const handleDeleteEntry = async (id: string) => {
     try {
-      setIsSyncing(true);
-      setSyncError(null);
-
       const { error } = await supabase
         .from("calendar_entries")
         .delete()
         .eq("id", id);
-
       if (error) throw error;
-
       await fetchEntries();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error deleting entry:", err);
-      setSyncError(err.message || "Failed to delete entry");
-    } finally {
-      setIsSyncing(false);
     }
   };
 
-  const handleDeleteFromModal = async () => {
-    if (!editingEntry) return;
-    await handleDeleteEntry(editingEntry.id);
-    closeModal();
-  };
-
-  // Handle complete
+  // Simple complete handler
   const handleCompleteEntry = async (id: string) => {
     try {
-      setIsSyncing(true);
-      setSyncError(null);
-
       const { error } = await supabase
         .from("calendar_entries")
         .update({ is_completed: true })
         .eq("id", id);
-
       if (error) throw error;
-
       await fetchEntries();
-    } catch (err: any) {
+    } catch (err) {
       console.error("Error completing entry:", err);
-      setSyncError(err.message || "Failed to complete entry");
-    } finally {
-      setIsSyncing(false);
     }
   };
-
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-muted-foreground">
-            Loading schedule...
-          </span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -574,11 +457,7 @@ export function ScheduleTab() {
                   {upcomingEntries.length}
                 </span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openModal()}
-              >
+              <Button variant="outline" size="sm" onClick={() => openModal()}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Event
               </Button>
@@ -607,9 +486,7 @@ export function ScheduleTab() {
             <p className="text-muted-foreground mb-6">
               Schedule events and tasks to stay organized
             </p>
-            <Button
-              onClick={() => openModal()}
-            >
+            <Button onClick={() => openModal()}>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule Your First Event
             </Button>
@@ -632,7 +509,7 @@ export function ScheduleTab() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowAllPast((v) => !v)}
+                  onClick={() => setShowAllPast((v: boolean) => !v)}
                   className="text-muted-foreground"
                 >
                   {showAllPast ? "Show less" : `Show all ${pastEntries.length}`}
@@ -662,19 +539,8 @@ export function ScheduleTab() {
         )}
       </TabsContent>
 
-      {/* Entry Modal */}
-      <EntryModal
-        open={isEventDialogOpen}
-        editingEntry={editingEntry}
-        formData={formData}
-        saving={isSyncing}
-        showDeleteConfirm={showDeleteConfirm}
-        onFormChange={setFormData}
-        onSave={handleSave}
-        onDelete={handleDeleteFromModal}
-        onClose={closeModal}
-        onShowDeleteConfirm={setShowDeleteConfirm}
-      />
+      {/* The self-wired modal — no props needed */}
+      <ConnectedEntryModal />
 
       {/* Sync indicator */}
       {isSyncing && (

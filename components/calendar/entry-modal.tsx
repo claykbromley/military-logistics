@@ -11,8 +11,11 @@ import {
   CheckSquare,
   Trash2,
 } from "lucide-react"
-import type { CalendarEntry, EntryFormData, RecurrenceFreq } from "../../app/scheduler/calendar/types"
-import { COLOR_OPTIONS, DAY_NAMES } from "../../app/scheduler/calendar/constants"
+import type { CalendarEntry, EntryFormData, RecurrenceFreq } from "@/app/scheduler/calendar/types"
+import { COLOR_OPTIONS, DAY_NAMES } from "@/app/scheduler/calendar/constants"
+import { useEntryModal } from "./use-entry-modal"
+
+// ─── Raw (dumb) modal — same UI as before ─────────────────
 
 interface EntryModalProps {
   open: boolean
@@ -385,5 +388,40 @@ export function EntryModal({
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── Connected modal — auto-wires to EntryModalProvider ───
+//
+// Usage: just drop <ConnectedEntryModal /> anywhere inside an
+// <EntryModalProvider>. No props needed.
+
+export function ConnectedEntryModal() {
+  const {
+    isOpen,
+    editingEntry,
+    formData,
+    saving,
+    showDeleteConfirm,
+    setFormData,
+    save,
+    deleteEntry,
+    close,
+    setShowDeleteConfirm,
+  } = useEntryModal()
+
+  return (
+    <EntryModal
+      open={isOpen}
+      editingEntry={editingEntry}
+      formData={formData}
+      saving={saving}
+      showDeleteConfirm={showDeleteConfirm}
+      onFormChange={setFormData}
+      onSave={save}
+      onDelete={deleteEntry}
+      onClose={close}
+      onShowDeleteConfirm={setShowDeleteConfirm}
+    />
   )
 }

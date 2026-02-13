@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -9,16 +9,14 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CommunicationLog, ScheduledEvent } from "@/lib/types"
-import { useCommunicationHub,CommunicationHubProvider } from "@/hooks/use-communication-hub"
+import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { MessagesTab } from "@/components/command-center/messages-tab"
-import { ScheduleTab, } from "@/components/command-center/schedule-tab"
+import { ScheduleTab } from "@/components/command-center/schedule-tab"
 import { LogTab, AddCommunicationDialog } from "@/components/command-center/log-tab"
-import { EntryModal } from "@/components/calendar/entry-modal";
-import {
-  format,
-  addDays,
-} from "date-fns";
-import type { CalendarEntry, EntryFormData } from "@/app/scheduler/calendar/types";
+import { createClient } from "@/lib/supabase/client"
+
+import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
+import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
 
 export default function CommunicationHubPage() {
   return (
@@ -39,18 +37,20 @@ function CommunicationHubPageContent() {
     syncError,
     addCommunication,
     updateCommunication,
-    createEvent,
-    updateEvent
   } = useCommunicationHub()
 
+  // Get the authenticated user ID for the EntryModalProvider
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
+  }, [])
+
   // Dialog states
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<CommunicationLog | null>(null)
-  const [editingEvent, setEditingEvent] = useState<ScheduledEvent | null>(null)
-    const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null);
-    const [formData, setFormData] = useState<EntryFormData>(getDefaultFormData());
-    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // View states
   const [activeTab, setActiveTab] = useState("schedule")
@@ -61,32 +61,16 @@ function CommunicationHubPageContent() {
     email: c.email || "",
   }))
 
-  // Calculate unread count from threads directly for accuracy
+  // Calculate unread count from threads
   const unreadCount = useMemo(() => {
     return messageThreads
       .filter(t => !t.isArchived)
       .reduce((sum, t) => sum + (t.unreadCount || 0), 0)
   }, [messageThreads])
 
-  // Count of threads with unread messages (for the badge)
   const unreadThreadCount = useMemo(() => {
     return messageThreads.filter(t => !t.isArchived && t.unreadCount > 0).length
   }, [messageThreads])
-
-  const handleCreateEvent = async (
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await createEvent(event, invitees)
-  }
-
-  const handleUpdateEvent = async (
-    eventId: string,
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await updateEvent(eventId, event, invitees)
-  }
 
   // Stats
   const totalEvents = scheduledEvents.filter((e) => e.status === "scheduled").length
@@ -103,64 +87,70 @@ function CommunicationHubPageContent() {
     )
   }
 
-  function entryToFormData(entry: CalendarEntry): EntryFormData {
-  const startDt = new Date(entry.start_time);
-  const endDt = entry.end_time ? new Date(entry.end_time) : startDt;
-  
-  return {
-    type: entry.type,
-    title: entry.title,
-    description: entry.description || "",
-    color: entry.color,
-    start_date: format(startDt, "yyyy-MM-dd"),
-    start_time: entry.all_day ? "" : format(startDt, "HH:mm"),
-    end_date: format(endDt, "yyyy-MM-dd"),
-    end_time: entry.all_day ? "" : format(endDt, "HH:mm"),
-    all_day: entry.all_day,
-    is_recurring: entry.is_recurring,
-    recurrence_freq: entry.recurrence_freq || "weekly",
-    recurrence_interval: entry.recurrence_interval || 1,
-    recurrence_days: entry.recurrence_days || [],
-    recurrence_end: entry.recurrence_end ? format(new Date(entry.recurrence_end), "yyyy-MM-dd") : "",
-    location: entry.location || "",
-  };
+  return (
+    <EntryModalProvider userId={userId} defaultEntryOverrides={{ source: "meeting" }}>
+      <CommunicationHubPageInner
+        contactOptions={contactOptions}
+        unreadCount={unreadCount}
+        unreadThreadCount={unreadThreadCount}
+        totalEvents={totalEvents}
+        totalLogs={totalLogs}
+        messageThreads={messageThreads}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isLogDialogOpen={isLogDialogOpen}
+        setIsLogDialogOpen={setIsLogDialogOpen}
+        editingLog={editingLog}
+        setEditingLog={setEditingLog}
+        addCommunication={addCommunication}
+        updateCommunication={updateCommunication}
+        isSyncing={isSyncing}
+        syncError={syncError}
+      />
+    </EntryModalProvider>
+  )
 }
-  
-  function getDefaultFormData(date?: string): EntryFormData {
-    const now = new Date();
-    const startDate = date || format(now, "yyyy-MM-dd");
-    
-    return {
-      type: "event",
-      title: "",
-      description: "",
-      color: "#3b82f6",
-      start_date: startDate,
-      start_time: format(now, "HH:mm"),
-      end_date: startDate,
-      end_time: format(addDays(now, 0), "HH:mm"),
-      all_day: false,
-      is_recurring: false,
-      recurrence_freq: "weekly",
-      recurrence_interval: 1,
-      recurrence_days: [],
-      recurrence_end: "",
-      location: "",
-    };
-  }
-  
 
-  const openModal = (entry?: CalendarEntry) => {
-      if (entry) {
-        setEditingEntry(entry);
-        setFormData(entryToFormData(entry));
-      } else {
-        setEditingEntry(null);
-        setFormData(getDefaultFormData());
-      }
-      setShowDeleteConfirm(false);
-      setIsEventDialogOpen(true);
-    };
+// ── Inner component (has access to useEntryModal) ─────────
+
+interface CommunicationHubPageInnerProps {
+  contactOptions: { id: string; name: string; email: string }[]
+  unreadCount: number
+  unreadThreadCount: number
+  totalEvents: number
+  totalLogs: number
+  messageThreads: any[]
+  activeTab: string
+  setActiveTab: (tab: string) => void
+  isLogDialogOpen: boolean
+  setIsLogDialogOpen: (open: boolean) => void
+  editingLog: CommunicationLog | null
+  setEditingLog: (log: CommunicationLog | null) => void
+  addCommunication: any
+  updateCommunication: any
+  isSyncing: boolean
+  syncError: string | null
+}
+
+function CommunicationHubPageInner({
+  contactOptions,
+  unreadCount,
+  unreadThreadCount,
+  totalEvents,
+  totalLogs,
+  messageThreads,
+  activeTab,
+  setActiveTab,
+  isLogDialogOpen,
+  setIsLogDialogOpen,
+  editingLog,
+  setEditingLog,
+  addCommunication,
+  updateCommunication,
+  isSyncing,
+  syncError,
+}: CommunicationHubPageInnerProps) {
+  const { open: openEntryModal } = useEntryModal()
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
@@ -204,7 +194,7 @@ function CommunicationHubPageContent() {
               </Button>
               <Button
                 className="bg-white text-primary hover:bg-white/90 cursor-pointer"
-                onClick={() => openModal()}
+                onClick={() => openEntryModal()}
               >
                 <CalendarPlus className="w-4 h-4 mr-2" />
                 Schedule Event
@@ -261,7 +251,7 @@ function CommunicationHubPageContent() {
           <History className="w-4 h-4 mr-2" />
           Log
         </Button>
-        <Button className="flex-1" onClick={() => setIsEventDialogOpen(true)}>
+        <Button className="flex-1" onClick={() => openEntryModal()}>
           <CalendarPlus className="w-4 h-4 mr-2" />
           Schedule
         </Button>
@@ -309,30 +299,8 @@ function CommunicationHubPageContent() {
         editingLog={editingLog}
       />
 
-      {/* <EntryModal
-        open={isEventDialogOpen}
-        editingEntry={editingEntry}
-        formData={formData}
-        saving={isSyncing}
-        showDeleteConfirm={showDeleteConfirm}
-        onFormChange={setFormData}
-        onSave={handleSave}
-        onDelete={handleDeleteFromModal}
-        onClose={closeModal}
-        onShowDeleteConfirm={setShowDeleteConfirm}
-      /> */}
-
-      {/* <ScheduleEventDialog
-        open={isEventDialogOpen}
-        onOpenChange={(open) => {
-          setIsEventDialogOpen(open)
-          if (!open) setEditingEvent(null)
-        }}
-        onSave={handleCreateEvent}
-        onUpdate={handleUpdateEvent}
-        contacts={contactOptions}
-        editingEvent={editingEvent}
-      /> */}
+      {/* Self-wired entry modal — no props needed */}
+      <ConnectedEntryModal />
 
       {/* Sync indicator */}
       {isSyncing && (
