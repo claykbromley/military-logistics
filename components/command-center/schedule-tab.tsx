@@ -388,7 +388,7 @@ function ScheduleTabInner({
 
   const upcomingEntries = useMemo(() => {
     return entries
-      .filter((e) => !e.is_completed && isAfter(new Date(e.start_time), now))
+      .filter((e) => !e.is_completed && isAfter(new Date(e.start_time), now) && e.source == "meeting")
       .sort(
         (a, b) =>
           new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
@@ -401,7 +401,7 @@ function ScheduleTabInner({
         const startTime = new Date(e.start_time);
         return (
           (e.is_completed || isBefore(startTime, now)) &&
-          isAfter(startTime, thirtyDaysAgo)
+          isAfter(startTime, thirtyDaysAgo) && e.source == "meeting"
         );
       })
       .sort(
