@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client"
 import type {
   CalendarEntry,
   EntryFormData,
+  EntryType,
   EventInvitation,
   InviteeInput,
 } from "@/app/scheduler/calendar/types"
@@ -24,7 +25,10 @@ interface EntryModalContextValue {
   formData: EntryFormData
   saving: boolean
   showDeleteConfirm: boolean
+  /** Existing invitations loaded when editing (read-only display) */
   existingInvitations: EventInvitation[]
+  /** When set, the modal is locked to this type — no toggle shown */
+  forceEntryType?: EntryType
 
   open: (entry?: CalendarEntry, date?: Date) => void
   close: () => void
@@ -53,6 +57,12 @@ interface EntryModalProviderProps {
   onAuthRequired?: () => void
   onMutate?: () => void | Promise<void>
   defaultEntryOverrides?: Partial<Record<string, any>>
+  /**
+   * Lock the modal to a specific entry type. Hides the Event/Task toggle
+   * and uses this type for all new entries.
+   * Example: "meeting" → header shows "New Meeting", no toggle.
+   */
+  forceEntryType?: EntryType
   children: ReactNode
 }
 
@@ -61,6 +71,7 @@ export function EntryModalProvider({
   onAuthRequired,
   onMutate,
   defaultEntryOverrides,
+  forceEntryType,
   children,
 }: EntryModalProviderProps) {
   const supabase = createClient()
@@ -86,7 +97,7 @@ export function EntryModalProvider({
           setExistingInvitations(data as EventInvitation[])
         }
       } catch {
-        // Silently fail
+        // Silently fail — invitations are non-critical
       }
     },
     [supabase],
@@ -102,6 +113,7 @@ export function EntryModalProvider({
       }
 
       if (entry) {
+        // Edit mode
         setEditingEntry(entry)
         const s = new Date(entry.start_time)
         const e = entry.end_time
@@ -126,17 +138,21 @@ export function EntryModalProvider({
             ? toLocalDateStr(new Date(entry.recurrence_end))
             : "",
           location: entry.location || "",
-          timezone:
-            entry.timezone ||
-            Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone: entry.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
           meeting_link: entry.meeting_link || "",
-          invitees: [],
+          invitees: [], // New invitees to add (existing ones shown separately)
         })
 
+        // Load existing invitations
         await fetchInvitations(entry.id)
       } else {
+        // Create mode
         setEditingEntry(null)
-        setFormData(defaultFormData(date))
+        const defaults = defaultFormData(date)
+        if (forceEntryType) {
+          defaults.type = forceEntryType
+        }
+        setFormData(defaults)
         setExistingInvitations([])
       }
 
@@ -170,9 +186,6 @@ export function EntryModalProvider({
         ? new Date(`${formData.end_date}T23:59:59`)
         : new Date(`${formData.end_date}T${formData.end_time}:00`)
 
-      const isEvent =
-        formData.type === "event" || formData.type === "meeting"
-
       const payload: Record<string, any> = {
         user_id: userId,
         type: formData.type,
@@ -186,9 +199,7 @@ export function EntryModalProvider({
             : endDT.toISOString(),
         all_day: formData.all_day,
         is_recurring: formData.is_recurring,
-        recurrence_freq: formData.is_recurring
-          ? formData.recurrence_freq
-          : null,
+        recurrence_freq: formData.is_recurring ? formData.recurrence_freq : null,
         recurrence_interval: formData.is_recurring
           ? formData.recurrence_interval
           : 1,
@@ -198,15 +209,12 @@ export function EntryModalProvider({
             : null,
         recurrence_end:
           formData.is_recurring && formData.recurrence_end
-            ? new Date(
-                `${formData.recurrence_end}T23:59:59`,
-              ).toISOString()
+            ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
             : null,
-        location: isEvent ? formData.location.trim() || null : null,
-        timezone: formData.timezone || null,
-        meeting_link: isEvent
-          ? formData.meeting_link.trim() || null
-          : null,
+        location:
+          formData.type === "event" || formData.type === "meeting"
+            ? formData.location.trim() || null
+            : null,
         // Page-level overrides (source, etc.)
         ...defaultEntryOverrides,
       }
@@ -233,10 +241,9 @@ export function EntryModalProvider({
       // ── Save new invitations ────────────────────────────
       const newInvitees = formData.invitees.filter((inv) => inv.email.trim())
       if (newInvitees.length > 0) {
+        // Deduplicate against existing invitations
         const existingEmails = new Set(
-          existingInvitations.map((inv) =>
-            inv.invitee_email.toLowerCase(),
-          ),
+          existingInvitations.map((inv) => inv.invitee_email.toLowerCase()),
         )
         const toInsert = newInvitees.filter(
           (inv) => !existingEmails.has(inv.email.trim().toLowerCase()),
@@ -268,15 +275,7 @@ export function EntryModalProvider({
     } finally {
       setSaving(false)
     }
-  }, [
-    userId,
-    formData,
-    editingEntry,
-    existingInvitations,
-    supabase,
-    onMutate,
-    defaultEntryOverrides,
-  ])
+  }, [userId, formData, editingEntry, existingInvitations, supabase, onMutate, defaultEntryOverrides])
 
   // ── Delete entry ────────────────────────────────────────
 
@@ -285,6 +284,7 @@ export function EntryModalProvider({
     setSaving(true)
 
     try {
+      // Invitations are CASCADE deleted via FK
       const { error } = await supabase
         .from("calendar_entries")
         .delete()
@@ -313,6 +313,7 @@ export function EntryModalProvider({
           .eq("id", invitationId)
         if (error) throw error
 
+        // Update local state immediately
         setExistingInvitations((prev) =>
           prev.filter((inv) => inv.id !== invitationId),
         )
@@ -351,6 +352,7 @@ export function EntryModalProvider({
     saving,
     showDeleteConfirm,
     existingInvitations,
+    forceEntryType,
     open,
     close,
     setFormData,

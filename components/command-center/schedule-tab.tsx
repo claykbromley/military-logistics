@@ -343,6 +343,7 @@ export function ScheduleTab() {
       userId={currentUser?.id}
       defaultEntryOverrides={{ source: "meeting" }}
       onMutate={fetchEntries}
+      forceEntryType="meeting"
     >
       <ScheduleTabInner
         entries={entries}
@@ -459,7 +460,7 @@ function ScheduleTabInner({
               </div>
               <Button variant="outline" size="sm" onClick={() => openModal()}>
                 <Plus className="w-4 h-4 mr-2" />
-                Add Event
+                Add Meeting
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

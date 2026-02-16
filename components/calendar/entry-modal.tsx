@@ -22,6 +22,7 @@ import {
 import type {
   CalendarEntry,
   EntryFormData,
+  EntryType,
   RecurrenceFreq,
   EventInvitation,
 } from "@/app/scheduler/calendar/types"
@@ -221,6 +222,8 @@ interface EntryModalProps {
   saving: boolean
   showDeleteConfirm: boolean
   existingInvitations: EventInvitation[]
+  /** When set, hides the Event/Task toggle and locks to this type */
+  forceEntryType?: EntryType
   onFormChange: (data: EntryFormData) => void
   onSave: () => void
   onDelete: () => void
@@ -236,6 +239,7 @@ export function EntryModal({
   saving,
   showDeleteConfirm,
   existingInvitations,
+  forceEntryType,
   onFormChange,
   onSave,
   onDelete,
@@ -261,6 +265,14 @@ export function EntryModal({
   if (!open) return null
 
   const isEvent = formData.type === "event" || formData.type === "meeting"
+
+  // Display label per type (used in header)
+  const typeLabels: Record<string, string> = {
+    event: "Event",
+    task: "Task",
+    meeting: "Meeting",
+  }
+  const typeLabel = typeLabels[formData.type] || "Event"
 
   const update = (partial: Partial<EntryFormData>) => {
     onFormChange({ ...formData, ...partial })
@@ -320,9 +332,7 @@ export function EntryModal({
               style={{ backgroundColor: formData.color }}
             />
             <h2 className="text-lg font-semibold text-foreground">
-              {editingEntry
-                ? `Edit ${isEvent ? "Event" : "Task"}`
-                : `New ${isEvent ? "Event" : "Task"}`}
+              {editingEntry ? `Edit ${typeLabel}` : `New ${typeLabel}`}
             </h2>
           </div>
           <button
@@ -335,31 +345,33 @@ export function EntryModal({
 
         {/* Body */}
         <div className="p-4 space-y-4">
-          {/* Type toggle */}
-          <div className="flex gap-1 p-1 bg-muted rounded-lg">
-            <button
-              onClick={() => update({ type: "event" })}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                formData.type === "event"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <CalendarDays className="w-4 h-4" />
-              Event
-            </button>
-            <button
-              onClick={() => update({ type: "task" })}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all cursor-pointer ${
-                formData.type === "task"
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <CheckSquare className="w-4 h-4" />
-              Task
-            </button>
-          </div>
+          {/* Type toggle — hidden when forceEntryType locks the type */}
+          {!forceEntryType && (
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
+              <button
+                onClick={() => update({ type: "event" })}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                  formData.type === "event"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CalendarDays className="w-4 h-4" />
+                Event
+              </button>
+              <button
+                onClick={() => update({ type: "task" })}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-sm font-medium transition-all cursor-pointer ${
+                  formData.type === "task"
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <CheckSquare className="w-4 h-4" />
+                Task
+              </button>
+            </div>
+          )}
 
           {/* Title */}
           <input
@@ -831,6 +843,7 @@ export function ConnectedEntryModal() {
     saving,
     showDeleteConfirm,
     existingInvitations,
+    forceEntryType,
     setFormData,
     save,
     deleteEntry,
@@ -847,6 +860,7 @@ export function ConnectedEntryModal() {
       saving={saving}
       showDeleteConfirm={showDeleteConfirm}
       existingInvitations={existingInvitations}
+      forceEntryType={forceEntryType}
       onFormChange={setFormData}
       onSave={save}
       onDelete={deleteEntry}

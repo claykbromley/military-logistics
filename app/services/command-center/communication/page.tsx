@@ -88,7 +88,7 @@ function CommunicationHubPageContent() {
   }
 
   return (
-    <EntryModalProvider userId={userId} defaultEntryOverrides={{ source: "meeting" }}>
+    <EntryModalProvider userId={userId} defaultEntryOverrides={{ source: "meeting" }} forceEntryType="meeting">
       <CommunicationHubPageInner
         contactOptions={contactOptions}
         unreadCount={unreadCount}
@@ -197,7 +197,7 @@ function CommunicationHubPageInner({
                 onClick={() => openEntryModal()}
               >
                 <CalendarPlus className="w-4 h-4 mr-2" />
-                Schedule Event
+                Schedule Meeting
               </Button>
             </div>
           </div>
