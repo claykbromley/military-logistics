@@ -89,6 +89,7 @@ export function defaultFormData(date?: Date): EntryFormData {
     recurrence_days: [],
     recurrence_end: "",
     location: "",
+    invitees: []
   }
 }
 

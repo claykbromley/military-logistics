@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import {
   X,
   Clock,
@@ -10,12 +11,30 @@ import {
   CalendarDays,
   CheckSquare,
   Trash2,
+  UserPlus,
+  Mail,
+  Plus,
+  XCircle,
 } from "lucide-react"
-import type { CalendarEntry, EntryFormData, RecurrenceFreq } from "@/app/scheduler/calendar/types"
+import type {
+  CalendarEntry,
+  EntryFormData,
+  RecurrenceFreq,
+  EventInvitation,
+} from "@/app/scheduler/calendar/types"
 import { COLOR_OPTIONS, DAY_NAMES } from "@/app/scheduler/calendar/constants"
 import { useEntryModal } from "./use-entry-modal"
 
-// ─── Raw (dumb) modal — same UI as before ─────────────────
+// ─── Status badge colors ──────────────────────────────────
+
+const statusColors: Record<string, string> = {
+  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  accepted: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  declined: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  tentative: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+}
+
+// ─── Raw (dumb) modal ─────────────────────────────────────
 
 interface EntryModalProps {
   open: boolean
@@ -23,11 +42,13 @@ interface EntryModalProps {
   formData: EntryFormData
   saving: boolean
   showDeleteConfirm: boolean
+  existingInvitations: EventInvitation[]
   onFormChange: (data: EntryFormData) => void
   onSave: () => void
   onDelete: () => void
   onClose: () => void
   onShowDeleteConfirm: (show: boolean) => void
+  onRemoveInvitation: (invitationId: string) => void
 }
 
 export function EntryModal({
@@ -36,18 +57,61 @@ export function EntryModal({
   formData,
   saving,
   showDeleteConfirm,
+  existingInvitations,
   onFormChange,
   onSave,
   onDelete,
   onClose,
   onShowDeleteConfirm,
+  onRemoveInvitation,
 }: EntryModalProps) {
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteName, setInviteName] = useState("")
+
   if (!open) return null
 
-  const isEvent = formData.type === "event"
+  const isEvent = formData.type === "event" || formData.type === "meeting"
 
   const update = (partial: Partial<EntryFormData>) => {
     onFormChange({ ...formData, ...partial })
+  }
+
+  const addInvitee = () => {
+    const email = inviteEmail.trim()
+    if (!email) return
+    // Prevent duplicates
+    const alreadyInForm = formData.invitees.some(
+      (inv) => inv.email.toLowerCase() === email.toLowerCase(),
+    )
+    const alreadyExisting = existingInvitations.some(
+      (inv) => inv.invitee_email.toLowerCase() === email.toLowerCase(),
+    )
+    if (alreadyInForm || alreadyExisting) {
+      setInviteEmail("")
+      setInviteName("")
+      return
+    }
+    update({
+      invitees: [
+        ...formData.invitees,
+        { email, name: inviteName.trim() || undefined },
+      ],
+    })
+    setInviteEmail("")
+    setInviteName("")
+  }
+
+  const removeNewInvitee = (index: number) => {
+    update({
+      invitees: formData.invitees.filter((_, i) => i !== index),
+    })
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      addInvitee()
+    }
   }
 
   return (
@@ -188,7 +252,7 @@ export function EntryModal({
             </div>
           </div>
 
-          {/* Location (Event only) */}
+          {/* Location (Event/Meeting only) */}
           {isEvent && (
             <div className="flex items-center gap-2">
               <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -213,6 +277,114 @@ export function EntryModal({
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none border-b border-transparent focus:border-muted transition-colors py-1 resize-none"
             />
           </div>
+
+          {/* Invitees (Event/Meeting only) */}
+          {isEvent && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm text-foreground font-medium">Invite People</span>
+              </div>
+
+              {/* Add invitee inputs */}
+              <div className="ml-6 space-y-2">
+                <div className="flex gap-2">
+                  <div className="flex-1 flex items-center gap-2 bg-muted rounded-md px-3 py-1.5">
+                    <Mail className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                    <input
+                      type="email"
+                      placeholder="Email address"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Name (optional)"
+                    value={inviteName}
+                    onChange={(e) => setInviteName(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="w-32 bg-muted rounded-md px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
+                  />
+                  <button
+                    onClick={addInvitee}
+                    disabled={!inviteEmail.trim()}
+                    className="p-1.5 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* New invitees (not yet saved) */}
+                {formData.invitees.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      New invitations
+                    </span>
+                    {formData.invitees.map((inv, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between gap-2 py-1 px-2 bg-muted/50 rounded-md"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Mail className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm text-foreground truncate">
+                            {inv.name ? `${inv.name} (${inv.email})` : inv.email}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeNewInvitee(idx)}
+                          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer flex-shrink-0"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Existing invitations (already saved) */}
+                {existingInvitations.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      Sent invitations
+                    </span>
+                    {existingInvitations.map((inv) => (
+                      <div
+                        key={inv.id}
+                        className="flex items-center justify-between gap-2 py-1 px-2 bg-muted/30 rounded-md"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Mail className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                          <span className="text-sm text-foreground truncate">
+                            {inv.invitee_name
+                              ? `${inv.invitee_name} (${inv.invitee_email})`
+                              : inv.invitee_email}
+                          </span>
+                          <span
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                              statusColors[inv.status] || statusColors.pending
+                            }`}
+                          >
+                            {inv.status}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => onRemoveInvitation(inv.id)}
+                          className="text-muted-foreground hover:text-destructive transition-colors cursor-pointer flex-shrink-0"
+                          title="Remove invitation"
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Color */}
           <div className="flex items-center gap-2">
@@ -392,9 +564,6 @@ export function EntryModal({
 }
 
 // ─── Connected modal — auto-wires to EntryModalProvider ───
-//
-// Usage: just drop <ConnectedEntryModal /> anywhere inside an
-// <EntryModalProvider>. No props needed.
 
 export function ConnectedEntryModal() {
   const {
@@ -403,11 +572,13 @@ export function ConnectedEntryModal() {
     formData,
     saving,
     showDeleteConfirm,
+    existingInvitations,
     setFormData,
     save,
     deleteEntry,
     close,
     setShowDeleteConfirm,
+    removeInvitation,
   } = useEntryModal()
 
   return (
@@ -417,11 +588,13 @@ export function ConnectedEntryModal() {
       formData={formData}
       saving={saving}
       showDeleteConfirm={showDeleteConfirm}
+      existingInvitations={existingInvitations}
       onFormChange={setFormData}
       onSave={save}
       onDelete={deleteEntry}
       onClose={close}
       onShowDeleteConfirm={setShowDeleteConfirm}
+      onRemoveInvitation={removeInvitation}
     />
   )
 }

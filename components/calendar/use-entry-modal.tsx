@@ -8,34 +8,36 @@ import {
   type ReactNode,
 } from "react"
 import { createClient } from "@/lib/supabase/client"
-import type { CalendarEntry, EntryFormData } from "@/app/scheduler/calendar/types"
+import type {
+  CalendarEntry,
+  EntryFormData,
+  EventInvitation,
+  InviteeInput,
+} from "@/app/scheduler/calendar/types"
 import { defaultFormData, toLocalDateStr, toLocalTimeStr } from "@/app/scheduler/calendar/utils"
 
 // ─── Context value ────────────────────────────────────────
 
 interface EntryModalContextValue {
-  // State (exposed so the dumb modal can render)
   isOpen: boolean
   editingEntry: CalendarEntry | null
   formData: EntryFormData
   saving: boolean
   showDeleteConfirm: boolean
+  /** Existing invitations loaded when editing (read-only display) */
+  existingInvitations: EventInvitation[]
 
-  // Actions for consumers (pages that want to open the modal)
   open: (entry?: CalendarEntry, date?: Date) => void
   close: () => void
-
-  // Internal actions (used by the modal UI itself)
   setFormData: (data: EntryFormData) => void
   setShowDeleteConfirm: (show: boolean) => void
   save: () => Promise<void>
   deleteEntry: () => Promise<void>
   toggleComplete: (entry: CalendarEntry) => Promise<void>
+  removeInvitation: (invitationId: string) => Promise<void>
 }
 
 const EntryModalContext = createContext<EntryModalContextValue | null>(null)
-
-// ─── Hook ─────────────────────────────────────────────────
 
 export function useEntryModal() {
   const ctx = useContext(EntryModalContext)
@@ -48,20 +50,12 @@ export function useEntryModal() {
 // ─── Provider ─────────────────────────────────────────────
 
 interface EntryModalProviderProps {
-  /** The authenticated user's ID. If null/undefined, open() will call onAuthRequired instead. */
   userId?: string | null
-  /** Called when a user tries to open the modal but isn't authenticated */
   onAuthRequired?: () => void
-  /** Called after any successful create / update / delete so the consumer can refetch its data */
   onMutate?: () => void | Promise<void>
   /**
-   * Partial CalendarEntry fields that are automatically merged into every
-   * save payload (create & update). Use this to tag entries by source page.
-   *
-   * Examples:
-   *   { source: "meeting" }                          — communication hub
-   *   { source: "expirationDates", all_day: true }   — expiration tracker
-   *   { source: "calendar" }                         — main calendar (or omit)
+   * Partial fields merged into every save payload.
+   * Examples: { source: "meeting" }, { source: "expirationDates", all_day: true }
    */
   defaultEntryOverrides?: Partial<Record<string, any>>
   children: ReactNode
@@ -81,11 +75,32 @@ export function EntryModalProvider({
   const [formData, setFormData] = useState<EntryFormData>(defaultFormData())
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [existingInvitations, setExistingInvitations] = useState<EventInvitation[]>([])
+
+  // ── Fetch existing invitations for an entry ─────────────
+
+  const fetchInvitations = useCallback(
+    async (entryId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("event_invitations")
+          .select("*")
+          .eq("event_id", entryId)
+          .order("created_at", { ascending: true })
+        if (!error && data) {
+          setExistingInvitations(data as EventInvitation[])
+        }
+      } catch {
+        // Silently fail — invitations are non-critical
+      }
+    },
+    [supabase],
+  )
 
   // ── Open ────────────────────────────────────────────────
 
   const open = useCallback(
-    (entry?: CalendarEntry, date?: Date) => {
+    async (entry?: CalendarEntry, date?: Date) => {
       if (!userId) {
         onAuthRequired?.()
         return
@@ -117,17 +132,22 @@ export function EntryModalProvider({
             ? toLocalDateStr(new Date(entry.recurrence_end))
             : "",
           location: entry.location || "",
+          invitees: [], // New invitees to add (existing ones shown separately)
         })
+
+        // Load existing invitations
+        await fetchInvitations(entry.id)
       } else {
         // Create mode
         setEditingEntry(null)
         setFormData(defaultFormData(date))
+        setExistingInvitations([])
       }
 
       setShowDeleteConfirm(false)
       setIsOpen(true)
     },
-    [userId, onAuthRequired],
+    [userId, onAuthRequired, fetchInvitations],
   )
 
   // ── Close ───────────────────────────────────────────────
@@ -136,6 +156,7 @@ export function EntryModalProvider({
     setIsOpen(false)
     setEditingEntry(null)
     setShowDeleteConfirm(false)
+    setExistingInvitations([])
   }, [])
 
   // ── Save (create or update) ─────────────────────────────
@@ -179,12 +200,14 @@ export function EntryModalProvider({
             ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
             : null,
         location:
-          formData.type === "event"
+          formData.type === "event" || formData.type === "meeting"
             ? formData.location.trim() || null
             : null,
-        // Merge page-level overrides (source, all_day, etc.) — always wins
+        // Page-level overrides (source, etc.)
         ...defaultEntryOverrides,
       }
+
+      let entryId: string
 
       if (editingEntry) {
         const { error } = await supabase
@@ -192,30 +215,64 @@ export function EntryModalProvider({
           .update(payload)
           .eq("id", editingEntry.id)
         if (error) throw error
+        entryId = editingEntry.id
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("calendar_entries")
           .insert(payload)
+          .select("id")
+          .single()
         if (error) throw error
+        entryId = data.id
+      }
+
+      // ── Save new invitations ────────────────────────────
+      const newInvitees = formData.invitees.filter((inv) => inv.email.trim())
+      if (newInvitees.length > 0) {
+        // Deduplicate against existing invitations
+        const existingEmails = new Set(
+          existingInvitations.map((inv) => inv.invitee_email.toLowerCase()),
+        )
+        const toInsert = newInvitees.filter(
+          (inv) => !existingEmails.has(inv.email.trim().toLowerCase()),
+        )
+
+        if (toInsert.length > 0) {
+          const rows = toInsert.map((inv) => ({
+            event_id: entryId,
+            user_id: userId,
+            invitee_email: inv.email.trim().toLowerCase(),
+            invitee_name: inv.name?.trim() || null,
+            contact_id: inv.contactId || null,
+            status: "pending",
+          }))
+
+          const { error: invErr } = await supabase
+            .from("event_invitations")
+            .insert(rows)
+          if (invErr) console.error("Failed to create invitations:", invErr)
+        }
       }
 
       setIsOpen(false)
       setEditingEntry(null)
+      setExistingInvitations([])
       await onMutate?.()
     } catch (err) {
       console.error("Entry save failed:", err)
     } finally {
       setSaving(false)
     }
-  }, [userId, formData, editingEntry, supabase, onMutate])
+  }, [userId, formData, editingEntry, existingInvitations, supabase, onMutate, defaultEntryOverrides])
 
-  // ── Delete ──────────────────────────────────────────────
+  // ── Delete entry ────────────────────────────────────────
 
   const deleteEntry = useCallback(async () => {
     if (!editingEntry) return
     setSaving(true)
 
     try {
+      // Invitations are CASCADE deleted via FK
       const { error } = await supabase
         .from("calendar_entries")
         .delete()
@@ -224,6 +281,7 @@ export function EntryModalProvider({
 
       setIsOpen(false)
       setEditingEntry(null)
+      setExistingInvitations([])
       await onMutate?.()
     } catch (err) {
       console.error("Entry delete failed:", err)
@@ -232,7 +290,29 @@ export function EntryModalProvider({
     }
   }, [editingEntry, supabase, onMutate])
 
-  // ── Toggle complete (convenience — used by chips/cards) ─
+  // ── Remove a single invitation ──────────────────────────
+
+  const removeInvitation = useCallback(
+    async (invitationId: string) => {
+      try {
+        const { error } = await supabase
+          .from("event_invitations")
+          .delete()
+          .eq("id", invitationId)
+        if (error) throw error
+
+        // Update local state immediately
+        setExistingInvitations((prev) =>
+          prev.filter((inv) => inv.id !== invitationId),
+        )
+      } catch (err) {
+        console.error("Remove invitation failed:", err)
+      }
+    },
+    [supabase],
+  )
+
+  // ── Toggle complete ─────────────────────────────────────
 
   const toggleComplete = useCallback(
     async (entry: CalendarEntry) => {
@@ -259,6 +339,7 @@ export function EntryModalProvider({
     formData,
     saving,
     showDeleteConfirm,
+    existingInvitations,
     open,
     close,
     setFormData,
@@ -266,6 +347,7 @@ export function EntryModalProvider({
     save,
     deleteEntry,
     toggleComplete,
+    removeInvitation,
   }
 
   return (
