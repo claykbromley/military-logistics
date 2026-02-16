@@ -89,7 +89,9 @@ export function defaultFormData(date?: Date): EntryFormData {
     recurrence_days: [],
     recurrence_end: "",
     location: "",
-    invitees: []
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    meeting_link: "",
+    invitees: [],
   }
 }
 

@@ -24,7 +24,6 @@ interface EntryModalContextValue {
   formData: EntryFormData
   saving: boolean
   showDeleteConfirm: boolean
-  /** Existing invitations loaded when editing (read-only display) */
   existingInvitations: EventInvitation[]
 
   open: (entry?: CalendarEntry, date?: Date) => void
@@ -53,10 +52,6 @@ interface EntryModalProviderProps {
   userId?: string | null
   onAuthRequired?: () => void
   onMutate?: () => void | Promise<void>
-  /**
-   * Partial fields merged into every save payload.
-   * Examples: { source: "meeting" }, { source: "expirationDates", all_day: true }
-   */
   defaultEntryOverrides?: Partial<Record<string, any>>
   children: ReactNode
 }
@@ -91,7 +86,7 @@ export function EntryModalProvider({
           setExistingInvitations(data as EventInvitation[])
         }
       } catch {
-        // Silently fail — invitations are non-critical
+        // Silently fail
       }
     },
     [supabase],
@@ -107,7 +102,6 @@ export function EntryModalProvider({
       }
 
       if (entry) {
-        // Edit mode
         setEditingEntry(entry)
         const s = new Date(entry.start_time)
         const e = entry.end_time
@@ -132,13 +126,15 @@ export function EntryModalProvider({
             ? toLocalDateStr(new Date(entry.recurrence_end))
             : "",
           location: entry.location || "",
-          invitees: [], // New invitees to add (existing ones shown separately)
+          timezone:
+            entry.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
+          meeting_link: entry.meeting_link || "",
+          invitees: [],
         })
 
-        // Load existing invitations
         await fetchInvitations(entry.id)
       } else {
-        // Create mode
         setEditingEntry(null)
         setFormData(defaultFormData(date))
         setExistingInvitations([])
@@ -174,6 +170,9 @@ export function EntryModalProvider({
         ? new Date(`${formData.end_date}T23:59:59`)
         : new Date(`${formData.end_date}T${formData.end_time}:00`)
 
+      const isEvent =
+        formData.type === "event" || formData.type === "meeting"
+
       const payload: Record<string, any> = {
         user_id: userId,
         type: formData.type,
@@ -187,7 +186,9 @@ export function EntryModalProvider({
             : endDT.toISOString(),
         all_day: formData.all_day,
         is_recurring: formData.is_recurring,
-        recurrence_freq: formData.is_recurring ? formData.recurrence_freq : null,
+        recurrence_freq: formData.is_recurring
+          ? formData.recurrence_freq
+          : null,
         recurrence_interval: formData.is_recurring
           ? formData.recurrence_interval
           : 1,
@@ -197,12 +198,15 @@ export function EntryModalProvider({
             : null,
         recurrence_end:
           formData.is_recurring && formData.recurrence_end
-            ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
+            ? new Date(
+                `${formData.recurrence_end}T23:59:59`,
+              ).toISOString()
             : null,
-        location:
-          formData.type === "event" || formData.type === "meeting"
-            ? formData.location.trim() || null
-            : null,
+        location: isEvent ? formData.location.trim() || null : null,
+        timezone: formData.timezone || null,
+        meeting_link: isEvent
+          ? formData.meeting_link.trim() || null
+          : null,
         // Page-level overrides (source, etc.)
         ...defaultEntryOverrides,
       }
@@ -229,9 +233,10 @@ export function EntryModalProvider({
       // ── Save new invitations ────────────────────────────
       const newInvitees = formData.invitees.filter((inv) => inv.email.trim())
       if (newInvitees.length > 0) {
-        // Deduplicate against existing invitations
         const existingEmails = new Set(
-          existingInvitations.map((inv) => inv.invitee_email.toLowerCase()),
+          existingInvitations.map((inv) =>
+            inv.invitee_email.toLowerCase(),
+          ),
         )
         const toInsert = newInvitees.filter(
           (inv) => !existingEmails.has(inv.email.trim().toLowerCase()),
@@ -263,7 +268,15 @@ export function EntryModalProvider({
     } finally {
       setSaving(false)
     }
-  }, [userId, formData, editingEntry, existingInvitations, supabase, onMutate, defaultEntryOverrides])
+  }, [
+    userId,
+    formData,
+    editingEntry,
+    existingInvitations,
+    supabase,
+    onMutate,
+    defaultEntryOverrides,
+  ])
 
   // ── Delete entry ────────────────────────────────────────
 
@@ -272,7 +285,6 @@ export function EntryModalProvider({
     setSaving(true)
 
     try {
-      // Invitations are CASCADE deleted via FK
       const { error } = await supabase
         .from("calendar_entries")
         .delete()
@@ -301,7 +313,6 @@ export function EntryModalProvider({
           .eq("id", invitationId)
         if (error) throw error
 
-        // Update local state immediately
         setExistingInvitations((prev) =>
           prev.filter((inv) => inv.id !== invitationId),
         )

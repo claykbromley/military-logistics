@@ -21,6 +21,8 @@ export interface CalendarEntry {
   is_completed: boolean
   source: string | null
   location: string | null
+  timezone: string | null
+  meeting_link: string | null
   created_at: string
   updated_at: string
 }
@@ -62,5 +64,7 @@ export interface EntryFormData {
   recurrence_days: number[]
   recurrence_end: string
   location: string
+  timezone: string
+  meeting_link: string
   invitees: InviteeInput[]
 }

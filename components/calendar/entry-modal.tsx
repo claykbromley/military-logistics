@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   X,
   Clock,
@@ -15,6 +15,9 @@ import {
   Mail,
   Plus,
   XCircle,
+  Globe,
+  Link2,
+  ChevronDown,
 } from "lucide-react"
 import type {
   CalendarEntry,
@@ -25,13 +28,188 @@ import type {
 import { COLOR_OPTIONS, DAY_NAMES } from "@/app/scheduler/calendar/constants"
 import { useEntryModal } from "./use-entry-modal"
 
+// ─── Time generation helpers ──────────────────────────────
+
+function generateTimeSlots(): string[] {
+  const slots: string[] = []
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      slots.push(
+        `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`,
+      )
+    }
+  }
+  return slots
+}
+
+const TIME_SLOTS = generateTimeSlots()
+
+function formatTimeDisplay(time24: string): string {
+  if (!time24) return ""
+  const [hStr, mStr] = time24.split(":")
+  const h = parseInt(hStr)
+  const m = mStr || "00"
+  const ampm = h >= 12 ? "PM" : "AM"
+  const h12 = h % 12 || 12
+  return `${h12}:${m} ${ampm}`
+}
+
+// ─── Common timezones ─────────────────────────────────────
+
+const COMMON_TIMEZONES = [
+  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Chicago", label: "Central (CT)" },
+  { value: "America/Denver", label: "Mountain (MT)" },
+  { value: "America/Los_Angeles", label: "Pacific (PT)" },
+  { value: "America/Anchorage", label: "Alaska (AKT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (HT)" },
+  { value: "America/Phoenix", label: "Arizona (MST)" },
+  { value: "UTC", label: "UTC" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Paris (CET)" },
+  { value: "Europe/Berlin", label: "Berlin (CET)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
+  { value: "Asia/Kolkata", label: "India (IST)" },
+  { value: "Australia/Sydney", label: "Sydney (AEST)" },
+]
+
+// ─── Time Picker Dropdown ─────────────────────────────────
+
+function TimePicker({
+  value,
+  onChange,
+  label,
+}: {
+  value: string
+  onChange: (val: string) => void
+  label?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const containerRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false)
+        setSearch("")
+      }
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  // Scroll to current value when opening
+  useEffect(() => {
+    if (isOpen && listRef.current && value) {
+      const idx = TIME_SLOTS.indexOf(value)
+      if (idx >= 0) {
+        const el = listRef.current.children[idx] as HTMLElement
+        if (el) el.scrollIntoView({ block: "center" })
+      }
+    }
+  }, [isOpen, value])
+
+  const filtered = search
+    ? TIME_SLOTS.filter((t) => {
+        const display = formatTimeDisplay(t).toLowerCase()
+        const raw = t.replace(":", "")
+        const q = search.toLowerCase().replace(/[\s:]/g, "")
+        return display.replace(/[\s:]/g, "").includes(q) || raw.includes(q)
+      })
+    : TIME_SLOTS
+
+  return (
+    <div ref={containerRef} className="relative">
+      {label && (
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-0.5">
+          {label}
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-1.5 bg-muted rounded-md px-3 py-1.5 text-sm text-foreground hover:bg-muted/80 transition-colors cursor-pointer min-w-[110px]"
+      >
+        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="flex-1 text-left">
+          {value ? formatTimeDisplay(value) : "Select"}
+        </span>
+        <ChevronDown className="w-3 h-3 text-muted-foreground" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-xl w-48 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+          {/* Search / manual input */}
+          <div className="p-2 border-b border-border">
+            <input
+              type="text"
+              placeholder="Type time (e.g. 2:30 PM)"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && filtered.length > 0) {
+                  onChange(filtered[0])
+                  setIsOpen(false)
+                  setSearch("")
+                }
+              }}
+              className="w-full bg-muted rounded px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary/40 text-foreground placeholder:text-muted-foreground/50"
+              autoFocus
+            />
+          </div>
+          {/* Scrollable list */}
+          <div
+            ref={listRef}
+            className="max-h-48 overflow-y-auto overscroll-contain"
+          >
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">
+                No match. Try "2:30 PM" or "14:30"
+              </div>
+            ) : (
+              filtered.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => {
+                    onChange(t)
+                    setIsOpen(false)
+                    setSearch("")
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-sm cursor-pointer transition-colors ${
+                    t === value
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {formatTimeDisplay(t)}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Status badge colors ──────────────────────────────────
 
 const statusColors: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  accepted: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-  declined: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-  tentative: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  pending:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+  accepted:
+    "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
+  declined:
+    "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+  tentative:
+    "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
 }
 
 // ─── Raw (dumb) modal ─────────────────────────────────────
@@ -68,6 +246,18 @@ export function EntryModal({
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
 
+  // Recurrence end mode derived from formData
+  const recurrenceEndMode: "never" | "on_date" = formData.recurrence_end
+    ? "on_date"
+    : "never"
+
+  // Timezone label for display
+  const currentTzLabel = useMemo(() => {
+    const match = COMMON_TIMEZONES.find((tz) => tz.value === formData.timezone)
+    if (match) return match.label
+    return formData.timezone?.replace(/_/g, " ").split("/").pop() || "UTC"
+  }, [formData.timezone])
+
   if (!open) return null
 
   const isEvent = formData.type === "event" || formData.type === "meeting"
@@ -79,7 +269,6 @@ export function EntryModal({
   const addInvitee = () => {
     const email = inviteEmail.trim()
     if (!email) return
-    // Prevent duplicates
     const alreadyInForm = formData.invitees.some(
       (inv) => inv.email.toLowerCase() === email.toLowerCase(),
     )
@@ -199,8 +388,9 @@ export function EntryModal({
 
           {/* Date/Time */}
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            {/* Start row */}
+            <div className="flex items-start gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-2" />
               <div className="flex flex-wrap items-center gap-2 flex-1">
                 <input
                   type="date"
@@ -217,38 +407,54 @@ export function EntryModal({
                   className="bg-muted rounded-md px-3 py-1.5 text-sm text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 {!formData.all_day && (
+                  <TimePicker
+                    value={formData.start_time}
+                    onChange={(val) => update({ start_time: val })}
+                  />
+                )}
+                {isEvent && (
                   <>
-                    <input
-                      type="time"
-                      value={formData.start_time}
-                      onChange={(e) => update({ start_time: e.target.value })}
-                      className="bg-muted rounded-md px-3 py-1.5 text-sm text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    {isEvent && (
-                      <>
-                        <span className="text-muted-foreground text-sm">to</span>
-                        <input
-                          type="time"
-                          value={formData.end_time}
-                          onChange={(e) => update({ end_time: e.target.value })}
-                          className="bg-muted rounded-md px-3 py-1.5 text-sm text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30"
-                        />
-                      </>
+                    <span className="text-muted-foreground text-sm">to</span>
+                    {formData.all_day ? (
+                      <input
+                        type="date"
+                        value={formData.end_date}
+                        onChange={(e) => update({ end_date: e.target.value })}
+                        className="bg-muted rounded-md px-3 py-1.5 text-sm text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    ) : (
+                      <TimePicker
+                        value={formData.end_time}
+                        onChange={(val) => update({ end_time: val })}
+                      />
                     )}
                   </>
                 )}
-                {formData.all_day && isEvent && (
-                  <>
-                    <span className="text-muted-foreground text-sm">to</span>
-                    <input
-                      type="date"
-                      value={formData.end_date}
-                      onChange={(e) => update({ end_date: e.target.value })}
-                      className="bg-muted rounded-md px-3 py-1.5 text-sm text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                  </>
-                )}
               </div>
+            </div>
+
+            {/* Timezone row */}
+            <div className="flex items-center gap-2 ml-6">
+              <Globe className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+              <select
+                value={formData.timezone}
+                onChange={(e) => update({ timezone: e.target.value })}
+                className="bg-muted rounded-md px-2 py-1 text-xs text-foreground border-0 outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+              >
+                {COMMON_TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label}
+                  </option>
+                ))}
+                {/* Include current if not in common list */}
+                {!COMMON_TIMEZONES.some(
+                  (tz) => tz.value === formData.timezone,
+                ) && (
+                  <option value={formData.timezone}>
+                    {formData.timezone}
+                  </option>
+                )}
+              </select>
             </div>
           </div>
 
@@ -261,6 +467,20 @@ export function EntryModal({
                 placeholder="Add location"
                 value={formData.location}
                 onChange={(e) => update({ location: e.target.value })}
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none border-b border-transparent focus:border-muted transition-colors py-1"
+              />
+            </div>
+          )}
+
+          {/* Meeting Link (Event/Meeting only) */}
+          {isEvent && (
+            <div className="flex items-center gap-2">
+              <Link2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <input
+                type="url"
+                placeholder="Add meeting link (Zoom, Teams, etc.)"
+                value={formData.meeting_link}
+                onChange={(e) => update({ meeting_link: e.target.value })}
                 className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none border-b border-transparent focus:border-muted transition-colors py-1"
               />
             </div>
@@ -283,10 +503,11 @@ export function EntryModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <UserPlus className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm text-foreground font-medium">Invite People</span>
+                <span className="text-sm text-foreground font-medium">
+                  Invite People
+                </span>
               </div>
 
-              {/* Add invitee inputs */}
               <div className="ml-6 space-y-2">
                 <div className="flex gap-2">
                   <div className="flex-1 flex items-center gap-2 bg-muted rounded-md px-3 py-1.5">
@@ -317,7 +538,7 @@ export function EntryModal({
                   </button>
                 </div>
 
-                {/* New invitees (not yet saved) */}
+                {/* New invitees */}
                 {formData.invitees.length > 0 && (
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
@@ -331,7 +552,9 @@ export function EntryModal({
                         <div className="flex items-center gap-2 min-w-0">
                           <Mail className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           <span className="text-sm text-foreground truncate">
-                            {inv.name ? `${inv.name} (${inv.email})` : inv.email}
+                            {inv.name
+                              ? `${inv.name} (${inv.email})`
+                              : inv.email}
                           </span>
                         </div>
                         <button
@@ -345,7 +568,7 @@ export function EntryModal({
                   </div>
                 )}
 
-                {/* Existing invitations (already saved) */}
+                {/* Existing invitations */}
                 {existingInvitations.length > 0 && (
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
@@ -430,6 +653,7 @@ export function EntryModal({
 
             {formData.is_recurring && (
               <div className="ml-6 space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
+                {/* Frequency */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm text-muted-foreground">Every</span>
                   <input
@@ -460,6 +684,7 @@ export function EntryModal({
                   </select>
                 </div>
 
+                {/* Weekly day buttons */}
                 {formData.recurrence_freq === "weekly" && (
                   <div className="flex gap-1.5">
                     {DAY_NAMES.map((d, i) => (
@@ -483,23 +708,56 @@ export function EntryModal({
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Ends</span>
-                  <input
-                    type="date"
-                    value={formData.recurrence_end}
-                    onChange={(e) => update({ recurrence_end: e.target.value })}
-                    className="bg-card rounded-md px-3 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30"
-                    placeholder="Never"
-                  />
-                  {formData.recurrence_end && (
-                    <button
-                      onClick={() => update({ recurrence_end: "" })}
-                      className="text-xs text-muted-foreground hover:text-destructive cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  )}
+                {/* End condition — clear radio choice */}
+                <div className="space-y-2 pt-1">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Ends
+                  </span>
+
+                  {/* Never option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurrence_end_mode"
+                      checked={recurrenceEndMode === "never"}
+                      onChange={() => update({ recurrence_end: "" })}
+                      className="w-4 h-4 text-primary border-border accent-primary cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground">
+                      Never — repeats indefinitely
+                    </span>
+                  </label>
+
+                  {/* On date option */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="recurrence_end_mode"
+                      checked={recurrenceEndMode === "on_date"}
+                      onChange={() => {
+                        // Default to 3 months from start if switching
+                        const d = new Date(formData.start_date)
+                        d.setMonth(d.getMonth() + 3)
+                        const y = d.getFullYear()
+                        const m = String(d.getMonth() + 1).padStart(2, "0")
+                        const dd = String(d.getDate()).padStart(2, "0")
+                        update({ recurrence_end: `${y}-${m}-${dd}` })
+                      }}
+                      className="w-4 h-4 text-primary border-border accent-primary cursor-pointer"
+                    />
+                    <span className="text-sm text-foreground">On date</span>
+                    {recurrenceEndMode === "on_date" && (
+                      <input
+                        type="date"
+                        value={formData.recurrence_end}
+                        onChange={(e) =>
+                          update({ recurrence_end: e.target.value })
+                        }
+                        min={formData.start_date}
+                        className="ml-1 bg-card rounded-md px-3 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    )}
+                  </label>
                 </div>
               </div>
             )}
