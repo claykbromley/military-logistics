@@ -8,8 +8,12 @@ export const COLOR_OPTIONS = [
   { name: "Teal", value: "#14b8a6" },
   { name: "Yellow", value: "#eab308" },
   { name: "Indigo", value: "#6366f1" },
-  { name: "Slate", value: "#64748b" },
+  { name: "Crimson", value: "#dc2626" },
 ]
+
+/** Reserved holiday color — not available in COLOR_OPTIONS */
+export const HOLIDAY_COLOR = "#1e3a5f"
+export const HOLIDAY_ACCENT = "#c5a44e"
 
 export const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 export const DAY_NAMES_FULL = [

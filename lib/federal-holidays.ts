@@ -1,4 +1,5 @@
 import type { CalendarEntry } from "@/app/scheduler/calendar/types"
+import { HOLIDAY_COLOR } from "@/app/scheduler/calendar/constants"
 
 // Calculates the Nth weekday of a month (e.g. 3rd Monday of January)
 function nthWeekday(year: number, month: number, weekday: number, n: number): Date {
@@ -54,7 +55,7 @@ export function getFederalHolidays(year: number): CalendarEntry[] {
       type: "event" as const,
       title: h.name,
       description: "Federal Holiday",
-      color: "#64748b",
+      color: HOLIDAY_COLOR,
       start_time: startTime,
       end_time: endTime,
       all_day: true,
