@@ -72,8 +72,10 @@ function CommunicationHubPageContent() {
     return messageThreads.filter(t => !t.isArchived && t.unreadCount > 0).length
   }, [messageThreads])
 
-  // Stats
-  const totalEvents = scheduledEvents.filter((e) => e.status === "scheduled").length
+  // Stats — only count future, non-completed meetings
+  const totalEvents = scheduledEvents.filter(
+    (e) => e.status === "scheduled" && new Date(e.startTime) > new Date()
+  ).length
   const totalLogs = communicationLog.length
 
   if (!isLoaded) {
@@ -211,7 +213,7 @@ function CommunicationHubPageInner({
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-white">{totalEvents}</p>
-                  <p className="text-sm text-white/70">Upcoming Events</p>
+                  <p className="text-sm text-white/70">Upcoming Meetings</p>
                 </div>
               </div>
             </div>

@@ -173,7 +173,7 @@ function useCommunicationHubInternal() {
         setCommunicationLog(localComm)
         localStorage.setItem(COMM_LOG_KEY, JSON.stringify(localComm))
 
-        // Load calendar entries (replaces scheduled_events) with invitations
+        // Load calendar entries with source "meeting" (comm hub only shows meetings)
         const { data: eventsData, error: eventsError } = await supabase
           .from("calendar_entries")
           .select(`
@@ -181,6 +181,7 @@ function useCommunicationHubInternal() {
             event_invitations(*)
           `)
           .eq("user_id", user.id)
+          .eq("source", "meeting")
           .order("start_time", { ascending: true })
 
         if (eventsError) throw eventsError
