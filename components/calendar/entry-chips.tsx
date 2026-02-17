@@ -2,6 +2,9 @@ import { Check, Repeat } from "lucide-react"
 import type { CalendarEntry } from "../../app/scheduler/calendar/types"
 import { formatTime } from "../../app/scheduler/calendar/utils"
 
+/** Holiday entries are read-only — clicks should do nothing */
+const isHoliday = (entry: CalendarEntry) => entry.source === "holiday"
+
 interface EntryChipProps {
   entry: CalendarEntry
   compact?: boolean
@@ -17,11 +20,11 @@ export function EntryChip({ entry, compact = false, onEdit, onToggleComplete }: 
     <button
       onClick={(e) => {
         e.stopPropagation()
-        onEdit(entry)
+        if (!isHoliday(entry)) onEdit(entry)
       }}
-      className={`group flex items-center gap-1 rounded px-1.5 py-0.5 text-left transition-all hover:shadow-md cursor-pointer w-full overflow-hidden ${
-        entry.is_completed ? "opacity-50" : ""
-      }`}
+      className={`group flex items-center gap-1 rounded px-1.5 py-0.5 text-left transition-all w-full overflow-hidden ${
+        isHoliday(entry) ? "cursor-default" : "hover:shadow-md cursor-pointer"
+      } ${entry.is_completed ? "opacity-50" : ""}`}
       style={{
         backgroundColor: `${entry.color}18`,
         borderLeft: `3px solid ${entry.color}`,
@@ -75,9 +78,11 @@ export function AllDayChip({ entry, onEdit, onToggleComplete }: AllDayChipProps)
     <button
       onClick={(e) => {
         e.stopPropagation()
-        onEdit(entry)
+        if (!isHoliday(entry)) onEdit(entry)
       }}
-      className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-white cursor-pointer hover:shadow-md transition-all w-full truncate"
+      className={`flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-white transition-all w-full truncate ${
+        isHoliday(entry) ? "cursor-default" : "cursor-pointer hover:shadow-md"
+      }`}
       style={{ backgroundColor: entry.color }}
     >
       {entry.type === "task" && (
@@ -117,11 +122,11 @@ export function TimeGridEntry({ entry, onEdit, onToggleComplete }: TimeGridEntry
     <button
       onClick={(e) => {
         e.stopPropagation()
-        onEdit(entry)
+        if (!isHoliday(entry)) onEdit(entry)
       }}
-      className={`absolute left-1 right-1 rounded-md px-2 py-1 text-xs font-medium cursor-pointer hover:shadow-lg transition-shadow overflow-hidden ${
-        entry.is_completed ? "opacity-50" : ""
-      }`}
+      className={`absolute left-1 right-1 rounded-md px-2 py-1 text-xs font-medium transition-shadow overflow-hidden ${
+        isHoliday(entry) ? "cursor-default" : "cursor-pointer hover:shadow-lg"
+      } ${entry.is_completed ? "opacity-50" : ""}`}
       style={{
         top: `${topPx}px`,
         height: `${heightPx}px`,

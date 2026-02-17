@@ -14,6 +14,7 @@ import {
   expandRecurring,
   defaultFormData,
 } from "./utils"
+import { getFederalHolidays } from "@/lib/federal-holidays"
 
 import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
 import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
@@ -110,7 +111,21 @@ export default function CalendarPage() {
       rangeStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate())
       rangeEnd = new Date(rangeStart.getTime() + 86400000)
     }
-    return entries.flatMap((e) => expandRecurring(e, rangeStart, rangeEnd))
+
+    // User entries (with recurrence expansion)
+    const expanded = entries.flatMap((e) => expandRecurring(e, rangeStart, rangeEnd))
+
+    // Federal holidays for all years in the visible range
+    const years = new Set<number>()
+    for (let y = rangeStart.getFullYear(); y <= rangeEnd.getFullYear(); y++) {
+      years.add(y)
+    }
+    const holidays = [...years].flatMap(getFederalHolidays).filter((h) => {
+      const d = new Date(h.start_time)
+      return d >= rangeStart && d <= rangeEnd
+    })
+
+    return [...expanded, ...holidays]
   }, [entries, currentDate, view])
 
   // ── Navigation ──────────────────────────────────────────
