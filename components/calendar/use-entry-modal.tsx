@@ -29,13 +29,22 @@ interface EntryModalContextValue {
   existingInvitations: EventInvitation[]
   /** When set, the modal is locked to this type — no toggle shown */
   forceEntryType?: EntryType
+  /** Entry currently shown in the detail popover (null = closed) */
+  previewedEntry: CalendarEntry | null
+  /** Invitations loaded for the previewed entry */
+  previewInvitations: EventInvitation[]
 
   open: (entry?: CalendarEntry, date?: Date) => void
   close: () => void
+  /** Open the read-only detail popover for an entry */
+  preview: (entry: CalendarEntry) => void
+  closePreview: () => void
   setFormData: (data: EntryFormData) => void
   setShowDeleteConfirm: (show: boolean) => void
   save: () => Promise<void>
   deleteEntry: () => Promise<void>
+  /** Delete an entry by ID (used from preview popover) */
+  deleteEntryById: (id: string) => Promise<void>
   toggleComplete: (entry: CalendarEntry) => Promise<void>
   removeInvitation: (invitationId: string) => Promise<void>
 }
@@ -82,6 +91,8 @@ export function EntryModalProvider({
   const [saving, setSaving] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [existingInvitations, setExistingInvitations] = useState<EventInvitation[]>([])
+  const [previewedEntry, setPreviewedEntry] = useState<CalendarEntry | null>(null)
+  const [previewInvitations, setPreviewInvitations] = useState<EventInvitation[]>([])
 
   // ── Fetch existing invitations for an entry ─────────────
 
@@ -349,6 +360,55 @@ export function EntryModalProvider({
     [userId, supabase, onMutate],
   )
 
+  // ── Preview (read-only detail popover) ────────────────────
+
+  const preview = useCallback(
+    async (entry: CalendarEntry) => {
+      setPreviewedEntry(entry)
+      // Load invitations for the preview
+      try {
+        const { data, error } = await supabase
+          .from("event_invitations")
+          .select("*")
+          .eq("event_id", entry.id)
+          .order("created_at", { ascending: true })
+        if (!error && data) {
+          setPreviewInvitations(data as EventInvitation[])
+        } else {
+          setPreviewInvitations([])
+        }
+      } catch {
+        setPreviewInvitations([])
+      }
+    },
+    [supabase],
+  )
+
+  const closePreview = useCallback(() => {
+    setPreviewedEntry(null)
+    setPreviewInvitations([])
+  }, [])
+
+  // ── Delete entry by ID (from preview popover) ───────────
+
+  const deleteEntryById = useCallback(
+    async (id: string) => {
+      try {
+        const { error } = await supabase
+          .from("calendar_entries")
+          .delete()
+          .eq("id", id)
+        if (error) throw error
+        setPreviewedEntry(null)
+        setPreviewInvitations([])
+        await onMutate?.()
+      } catch (err) {
+        console.error("Delete entry failed:", err)
+      }
+    },
+    [supabase, onMutate],
+  )
+
   // ── Context value ───────────────────────────────────────
 
   const value: EntryModalContextValue = {
@@ -359,12 +419,17 @@ export function EntryModalProvider({
     showDeleteConfirm,
     existingInvitations,
     forceEntryType,
+    previewedEntry,
+    previewInvitations,
     open,
     close,
+    preview,
+    closePreview,
     setFormData,
     setShowDeleteConfirm,
     save,
     deleteEntry,
+    deleteEntryById,
     toggleComplete,
     removeInvitation,
   }

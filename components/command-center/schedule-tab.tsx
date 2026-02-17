@@ -43,6 +43,7 @@ import {
   useEntryModal,
 } from "@/components/calendar/use-entry-modal";
 import { ConnectedEntryModal } from "@/components/calendar/entry-modal";
+import { ConnectedEntryDetailPopover } from "@/components/calendar/entry-detail-popover";
 
 // ============================================
 // CONSTANTS & HELPERS
@@ -130,6 +131,7 @@ interface EventCardProps {
   entry: CalendarEntry;
   user: string;
   compact?: boolean;
+  onCardClick?: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onComplete: () => void;
@@ -139,6 +141,7 @@ function EventCard({
   entry,
   user,
   compact = false,
+  onCardClick,
   onEdit,
   onDelete,
   onComplete,
@@ -149,8 +152,10 @@ function EventCard({
 
   return (
     <div
+      onClick={onCardClick}
       className={cn(
         "group relative bg-card border rounded-xl overflow-hidden transition-all hover:shadow-md",
+        onCardClick && "cursor-pointer",
         (isPast || isCompleted) && "opacity-60",
         compact && "py-3",
       )}
@@ -230,6 +235,7 @@ function EventCard({
           </div>
 
           {/* Actions */}
+          <div onClick={(e) => e.stopPropagation()}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -260,6 +266,7 @@ function EventCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
     </div>
@@ -404,7 +411,7 @@ function ScheduleTabInner({
   setShowAllPast,
   fetchEntries,
 }: ScheduleTabInnerProps) {
-  const { open: openModal, toggleComplete } = useEntryModal();
+  const { open: openModal, preview: previewEntry, toggleComplete } = useEntryModal();
   const supabase = createClient();
 
   const now = new Date();
@@ -492,6 +499,7 @@ function ScheduleTabInner({
                   key={entry.id}
                   entry={entry}
                   user={currentUser?.id || ""}
+                  onCardClick={() => previewEntry(entry)}
                   onEdit={() => openModal(entry)}
                   onDelete={() => handleDeleteEntry(entry.id)}
                   onComplete={() => handleCompleteEntry(entry.id)}
@@ -553,6 +561,7 @@ function ScheduleTabInner({
                   entry={entry}
                   user={currentUser?.id || ""}
                   compact
+                  onCardClick={() => previewEntry(entry)}
                   onEdit={() => openModal(entry)}
                   onDelete={() => handleDeleteEntry(entry.id)}
                   onComplete={() => {}}
@@ -565,6 +574,7 @@ function ScheduleTabInner({
 
       {/* The self-wired modal — no props needed */}
       <ConnectedEntryModal />
+      <ConnectedEntryDetailPopover />
 
       {/* Sync indicator */}
       {isSyncing && (

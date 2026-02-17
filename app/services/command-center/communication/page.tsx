@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client"
 
 import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
 import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
+import { ConnectedEntryDetailPopover } from "@/components/calendar/entry-detail-popover"
 
 export default function CommunicationHubPage() {
   return (
@@ -213,7 +214,7 @@ function CommunicationHubPageInner({
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-white">{totalEvents}</p>
-                  <p className="text-sm text-white/70">Upcoming Meetings</p>
+                  <p className="text-sm text-white/70">Upcoming Events</p>
                 </div>
               </div>
             </div>
@@ -301,8 +302,9 @@ function CommunicationHubPageInner({
         editingLog={editingLog}
       />
 
-      {/* Self-wired entry modal — no props needed */}
+      {/* Self-wired entry modal & detail popover */}
       <ConnectedEntryModal />
+      <ConnectedEntryDetailPopover />
 
       {/* Sync indicator */}
       {isSyncing && (

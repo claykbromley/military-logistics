@@ -18,6 +18,7 @@ import { getFederalHolidays } from "@/lib/federal-holidays"
 
 import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
 import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
+import { ConnectedEntryDetailPopover } from "@/components/calendar/entry-detail-popover"
 
 import { CalendarToolbar } from "@/components/calendar/calendar-toolbar"
 import { MiniCalendar } from "@/components/calendar/mini-calendar"
@@ -253,7 +254,7 @@ function CalendarPageInner({
   getEntriesForDay, getAllDayEntries, getTimedEntries,
   onPrev, onNext, onToday,
 }: CalendarPageInnerProps) {
-  const { open: openModal, toggleComplete } = useEntryModal()
+  const { open: openModal, preview: previewEntry, toggleComplete } = useEntryModal()
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -287,7 +288,7 @@ function CalendarPageInner({
                 hasUser={hasUser}
                 getEntriesForDay={getEntriesForDay}
                 onCreateClick={() => openModal(undefined, selectedDate)}
-                onEdit={(entry) => openModal(entry)}
+                onEdit={(entry) => previewEntry(entry)}
                 onToggleComplete={toggleComplete}
               />
             </div>
@@ -326,18 +327,18 @@ function CalendarPageInner({
             <MonthView currentDate={currentDate} selectedDate={selectedDate} hasUser={hasUser}
               getEntriesForDay={getEntriesForDay} onSelectDate={setSelectedDate}
               onSetCurrentDate={setCurrentDate} onSetView={setView}
-              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => previewEntry(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "week" && (
             <WeekView currentDate={currentDate} timeGridRef={timeGridRef}
               getAllDayEntries={getAllDayEntries} getTimedEntries={getTimedEntries}
               onDayClick={(d) => { setCurrentDate(d); setSelectedDate(d); setView("day") }}
-              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => previewEntry(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "day" && (
             <DayView currentDate={currentDate} timeGridRef={timeGridRef}
               getAllDayEntries={getAllDayEntries} getTimedEntries={getTimedEntries}
-              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => openModal(entry)} onToggleComplete={toggleComplete} />
+              onCreateClick={(d) => openModal(undefined, d)} onEdit={(entry) => previewEntry(entry)} onToggleComplete={toggleComplete} />
           )}
           {view === "year" && (
             <YearView currentDate={currentDate} getEntriesForDay={getEntriesForDay}
@@ -350,8 +351,9 @@ function CalendarPageInner({
       {/* Footer placeholder */}
       {/* <Footer /> */}
 
-      {/* Modals */}
+      {/* Modals & Popovers */}
       <ConnectedEntryModal />
+      <ConnectedEntryDetailPopover />
       <IcalModal
         open={showIcalModal}
         icalUrl={icalUrl}
