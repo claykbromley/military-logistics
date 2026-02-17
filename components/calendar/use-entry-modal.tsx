@@ -121,7 +121,7 @@ export function EntryModalProvider({
           : new Date(s.getTime() + 3600000)
 
         setFormData({
-          type: entry.type,
+          type: entry.source === "meeting" ? "meeting" : entry.type,
           title: entry.title,
           description: entry.description || "",
           color: entry.color,
@@ -188,9 +188,12 @@ export function EntryModalProvider({
         ? new Date(`${formData.end_date}T23:59:59`)
         : new Date(`${formData.end_date}T${formData.end_time}:00`)
 
+      const isMeeting = formData.type === "meeting"
+      const isEvent = formData.type === "event" || isMeeting
+
       const payload: Record<string, any> = {
         user_id: userId,
-        type: formData.type,
+        type: isMeeting ? "event" : formData.type, // DB enum only has event|task
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         color: formData.color,
@@ -213,11 +216,12 @@ export function EntryModalProvider({
           formData.is_recurring && formData.recurrence_end
             ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
             : null,
-        location:
-          formData.type === "event" || formData.type === "meeting"
-            ? formData.location.trim() || null
-            : null,
-        // Page-level overrides (source, etc.)
+        location: isEvent ? formData.location.trim() || null : null,
+        timezone: formData.all_day ? null : (formData.timezone || null),
+        meeting_link: isEvent ? formData.meeting_link.trim() || null : null,
+        // Auto-tag meetings with source: "meeting"
+        source: isMeeting ? "meeting" : (defaultEntryOverrides?.source || null),
+        // Page-level overrides (can still override source, etc.)
         ...defaultEntryOverrides,
       }
 
