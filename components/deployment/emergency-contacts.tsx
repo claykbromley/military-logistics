@@ -142,7 +142,7 @@ export function EmergencyContacts() {
                 className="bg-background border border-border rounded-lg p-5 hover:border-accent/50 transition-colors"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center text-accent flex-shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-accent/30 flex items-center justify-center text-accent flex-shrink-0">
                     <IconComponent className="w-5 h-5" />
                   </div>
                   <div>

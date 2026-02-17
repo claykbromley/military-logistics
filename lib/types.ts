@@ -85,6 +85,7 @@ export const STATES: { name: string; abbr: string; dmv: string }[] = [
   { name: "Colorado", abbr: "CO", dmv: "https://dmv.colorado.gov/" },
   { name: "Connecticut", abbr: "CT", dmv: "https://portal.ct.gov/dmv" },
   { name: "Delaware", abbr: "DE", dmv: "https://www.dmv.de.gov/" },
+  { name: "District of Columbia", abbr: "DC", dmv: "https://dmv.dc.gov/" },
   { name: "Florida", abbr: "FL", dmv: "https://www.flhsmv.gov/" },
   { name: "Georgia", abbr: "GA", dmv: "https://dds.georgia.gov/" },
   { name: "Hawaii", abbr: "HI", dmv: "https://hidot.hawaii.gov/" },
@@ -412,7 +413,6 @@ export interface SharedContact {
   priority: number
   createdAt: string
   updatedAt: string
-  // User's local edits
   localDisplayName?: string
   localRelationship?: string
   addedToContacts?: boolean

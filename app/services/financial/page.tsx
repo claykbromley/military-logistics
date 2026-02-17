@@ -1,111 +1,182 @@
 "use client"
 
-import { Header } from "@/components/header"
-import { DollarSign, PiggyBank, CreditCard, Home, TrendingUp, Shield, ChevronRight, BriefcaseBusiness } from "lucide-react"
-import { Card } from "@/components/ui/card"
 import { useState, useEffect } from "react"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import {
+  DollarSign, PiggyBank, CreditCard, Home, TrendingUp,
+  Shield, ChevronRight, BriefcaseBusiness, ArrowUpRight,
+  ArrowDownRight, ExternalLink, Clock, Newspaper,
+  Sparkles, type LucideIcon,
+} from "lucide-react"
+import { Card } from "@/components/ui/card"
 import axios from "axios"
 
-const API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY;
-const FIXED_STOCKS = ["QQQ", "SPY", "DIA"];
-const CYCLING_STOCKS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN", "NVDA", "META"];
+/* ─── Constants ─── */
+
+const API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY
+const FIXED_STOCKS = ["QQQ", "SPY", "DIA"]
+const CYCLING_STOCKS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN", "NVDA", "META"]
+
+type ServiceCategory = {
+  name: string
+  icon: LucideIcon
+  description: string
+  accent: string
+  accentBg: string
+  hoverBorder: string
+}
+
+const serviceCategories: ServiceCategory[] = [
+  { name: "Investments", icon: TrendingUp, description: "Learn about investment options to grow your capital", accent: "text-blue-700", accentBg: "bg-blue-50", hoverBorder: "hover:border-blue-400" },
+  { name: "Taxes and Income", icon: PiggyBank, description: "Analyze your income and file your taxes", accent: "text-violet-700", accentBg: "bg-violet-50", hoverBorder: "hover:border-violet-400" },
+  { name: "Loans", icon: Home, description: "Secure loans for important life changes", accent: "text-rose-700", accentBg: "bg-rose-50", hoverBorder: "hover:border-rose-400" },
+  { name: "Retirement", icon: Shield, description: "Prepare for a life after the military", accent: "text-amber-700", accentBg: "bg-amber-50", hoverBorder: "hover:border-amber-400" },
+  { name: "Start a Business", icon: BriefcaseBusiness, description: "Manage a side business while active duty", accent: "text-orange-700", accentBg: "bg-orange-50", hoverBorder: "hover:border-orange-400" },
+  { name: "Credit", icon: CreditCard, description: "Grow your credit and explore card options", accent: "text-cyan-700", accentBg: "bg-cyan-50", hoverBorder: "hover:border-cyan-400" },
+]
+
+/* ─── Types ─── */
+
+type Stock = {
+  symbol: string
+  price: number
+  change: number
+  percentChange: number
+}
+
+type NewsItem = {
+  id: string
+  url: string
+  headline: string
+  datetime: number
+  summary: string
+}
+
+/* ─── Helpers ─── */
+
+function getTimeAgo(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return "Just now"
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+/* ─── Sub-components ─── */
+
+function StockPill({ stock }: { stock: Stock }) {
+  const up = stock.percentChange >= 0
+  return (
+    <div className="flex items-center gap-2.5 rounded-full border border-border bg-card px-4 py-2.5 text-sm shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+      <span className="text-xs font-bold tracking-wide text-foreground">{stock.symbol}</span>
+      <span className="font-medium tabular-nums text-muted-foreground">${stock.price?.toFixed(2)}</span>
+      <span
+        className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+          up ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+        }`}
+      >
+        {up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+        {up ? "+" : ""}{stock.percentChange?.toFixed(2)}%
+      </span>
+    </div>
+  )
+}
+
+function NewsCard({ item }: { item: NewsItem }) {
+  const timeAgo = getTimeAgo(new Date(item.datetime * 1000))
+  const summary = item.summary?.length > 150 ? item.summary.slice(0, 150) + "…" : item.summary
+
+  return (
+    <a
+      href={item.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block no-underline"
+    >
+      <div className="flex h-full flex-col rounded-xl border border-border bg-card p-5 transition-all duration-200 group-hover:-translate-y-1 group-hover:border-primary group-hover:shadow-lg">
+        <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium text-primary">
+          <Clock size={11} />
+          <span>{timeAgo}</span>
+        </div>
+        <h3 className="mb-2 text-[15px] font-semibold leading-snug tracking-tight text-foreground transition-colors group-hover:text-primary">
+          {item.headline}
+        </h3>
+        {summary && (
+          <p className="mb-3 flex-1 text-[13px] leading-relaxed text-muted-foreground">{summary}</p>
+        )}
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-primary opacity-0 transition-all group-hover:opacity-100">
+          Read article <ExternalLink size={11} />
+        </div>
+      </div>
+    </a>
+  )
+}
+
+/* ─── Main Page ─── */
 
 export default function FinancialPage() {
-  const serviceCategories = [
-    { name: "Manage Finances", icon: DollarSign, description: "Control your monthly bills and investments" },
-    { name: "Investments", icon: TrendingUp, description: "Learn about investment options to grow your capital" },
-    { name: "Taxes and Income", icon: PiggyBank, description: "Analyze your income and file your taxes" },
-    { name: "Loans", icon: Home, description: "Secure loans for important life changes" },
-    { name: "Retirement", icon: Shield, description: "Prepare for a life after the military" },
-    { name: "Start a Business", icon: BriefcaseBusiness, description: "Manage a side business while active duty" },
-    { name: "Credit", icon: CreditCard, description: "Grow your credit and explore card options" },
-  ]
+  const [data, setData] = useState<Stock[]>([])
+  const [stockError, setStockError] = useState<string | null>(null)
+  const [cycleIndex, setCycleIndex] = useState(0)
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [newsError, setNewsError] = useState<string | null>(null)
 
-  type Stock = {
-    symbol: string;
-    price: number;
-    change: number;
-    percentChange: number;
-  };
-
-  type News = {
-    id: string;
-    url: string;
-    headline: string;
-    datetime: number;
-    summary: string;
-  };
-
-
-  const [data, setData] = useState<Stock[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [stockerror, setStockError] = useState<string | null>(null);
-  const [cycleIndex, setCycleIndex] = useState(0);
-  const [news, setNews] = useState<News[]>([]);
-
-  const fetchNews = async () => {
-    try {
-      setError(null);
-
-      const response = await axios.get(
-        `https://finnhub.io/api/v1/news?category=general&token=${API_KEY}`
-      );
-
-      setNews(response.data.slice(0, 20));
-    } catch (err) {
-      console.error("Error fetching news:", err);
-      setError("Failed to load financial news");
-    }
-  };
-
+  /* Fetch news */
   useEffect(() => {
-    fetchNews();
-    const interval = setInterval(fetchNews, 5 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCycleIndex((prev) => (prev + 1) % CYCLING_STOCKS.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const fetchStockData = async () => {
+    const fetchNews = async () => {
       try {
-        setStockError(null);
-
-        const currentStocks = [...FIXED_STOCKS, CYCLING_STOCKS[cycleIndex]];
-        const responses = await Promise.all(
-          currentStocks.map(symbol =>
-            axios.get(
-              `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`
-            )
-          )
-        );
-
-        const stocks = responses.map((resp, i) => {
-          const q = resp.data;  
-          return {
-            symbol: currentStocks[i],
-            price: q.c,
-            change: q.d,
-            percentChange: q.dp
-          };
-        });
-
-        setData(stocks);
-      } catch (err) {
-        console.error("Error fetching stock data:", err);
-        setStockError("Failed to load stock data");
+        setNewsError(null)
+        const res = await axios.get<NewsItem[]>(
+          `https://finnhub.io/api/v1/news?category=general&token=${API_KEY}`
+        )
+        setNews(res.data.slice(0, 20))
+      } catch {
+        setNewsError("Unable to load financial news right now.")
       }
-    };
+    }
+    fetchNews()
+    const id = setInterval(fetchNews, 5 * 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
 
-    fetchStockData();
-    const interval = setInterval(fetchStockData, 60 * 1000); 
-    return () => clearInterval(interval);
-  }, [cycleIndex]);
+  /* Cycle through extra stocks */
+  useEffect(() => {
+    const id = setInterval(() => {
+      setCycleIndex((p) => (p + 1) % CYCLING_STOCKS.length)
+    }, 5000)
+    return () => clearInterval(id)
+  }, [])
+
+  /* Fetch stock quotes */
+  useEffect(() => {
+    const fetchStocks = async () => {
+      try {
+        setStockError(null)
+        const symbols = [...FIXED_STOCKS, CYCLING_STOCKS[cycleIndex]]
+        const responses = await Promise.all(
+          symbols.map((s) =>
+            axios.get(`https://finnhub.io/api/v1/quote?symbol=${s}&token=${API_KEY}`)
+          )
+        )
+        setData(
+          responses.map((r, i) => ({
+            symbol: symbols[i],
+            price: r.data.c,
+            change: r.data.d,
+            percentChange: r.data.dp,
+          }))
+        )
+      } catch {
+        setStockError("Unable to load market data.")
+      }
+    }
+    fetchStocks()
+    const id = setInterval(fetchStocks, 60 * 1000)
+    return () => clearInterval(id)
+  }, [cycleIndex])
 
   return (
     <div className="min-h-screen bg-background">
@@ -130,101 +201,110 @@ export default function FinancialPage() {
 
       <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] overflow-hidden">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r overflow-y-auto">
+        <aside className="w-full lg:w-80 bg-sidebar border-r overflow-y-auto">
           <div className="top-20 p-6">
             <a href="/services/financial">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
+              <h2 className="text-2xl font-bold text-sidebar-foreground mb-6 pb-3 border-b-2 border-muted-foreground text-center">
                 Financial Services
               </h2>
             </a>
             <div className="space-y-3">
+              <a key={"finance-manager"} href={`/services/command-center/financial`} className="block">
+                <Card
+                  key={"finance-manager"}
+                  className="p-4 hover:shadow-md transition-all cursor-pointer bg-card border-2 hover:border-primary group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-card-foreground/10 group-hover:bg-card-foreground/20 transition-colors">
+                      <DollarSign className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
+                        Financial Manager
+                      </h3>
+                    </div>
+                  </div>
+                </Card>
+              </a>
               {serviceCategories.map((category) => {
                 const Icon = category.icon
+                const href = `/services/financial/${category.name.toLowerCase().replace(/\s+/g, "-")}`
                 return (
-                  <Card
-                    key={category.name}
-                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
-                  >
-                    <a key={category.name} href={`/services/financial/${category.name.toLowerCase().replace(/\s+/g, "-")}`}>
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                  <a key={category.name} href={href} className="block">
+                    <Card
+                      key={category.name}
+                      className="p-4 hover:shadow-md transition-all cursor-pointer bg-card border-2 hover:border-primary group"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-card-foreground/10 group-hover:bg-card-foreground/20 transition-colors">
                           <Icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
+                          <h3 className="font-semibold text-card-foreground group-hover:text-primary transition-colors">
                             {category.name}
                           </h3>
-                          <p className="text-xs text-muted-foreground">{category.description}</p>
                         </div>
                       </div>
-                    </a>
-                  </Card>
+                    </Card>
+                  </a>
                 )
               })}
             </div>
           </div>
         </aside>
 
-        {/* Main Content */}
-        <main className="flex flex-1 relative flex-col h-full min-h-0 overflow-hidden">
-          <div className="relative z-10 p-6 lg:px-12 lg:py-3 h-full min-h-0">
-            <div className="flex flex-col max-w-6xl mx-auto h-full min-h-0">
-              <div className="text-center mb-2 flex-shrink-0">
-                <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">Financial Services and Benefits</h1>
-                {stockerror?
-                  <div className="text-center">{stockerror}</div>:
-                  <div className="flex bg-[lightgray] rounded-[5px] p-[8px] justify-space-evenly">
-                    {data.map(stock => (
-                      <div key={stock.symbol} className="flex flex-1 justify-center">
-                        <div key={stock.symbol} className="p-[8px] rounded-[10px]"
-                        style={{
-                          color: stock.percentChange >= 0 ? "#00bf00ff" : "#c70000ff",
-                          backgroundColor: stock.percentChange >= 0 ? "#e0f9e0" : "#f9e0e0",
-                          border: stock.percentChange >= 0 ? "solid 2px #00bf00ff" : "solid 2px #c70000ff", }}>
-                          {stock.symbol}: {stock.price?.toFixed(2)}
-                          ({stock.percentChange >= 0 ? "+" : ""}
-                          {stock.percentChange?.toFixed(2)}%)
-                        </div>
-                      </div>
-                    ))}
-                  </div>}
-                </div>
-              <div className="overflow-y-auto h-full flex-1">
-                {error?
-                  <div className="text-center">{error}</div>:
-                  <div>
-                    <div className="text-center">
-                      <h1 className="md:text-3xl font-bold text-slate-900 m-4">Financial News</h1>
-                    </div>
-                    <ul style={{ listStyle: "none", padding: 0 }}>
-                      {news.map((item) => (
-                        <li key={item.id} style={{
-                          marginBottom: 20,
-                          padding: 15,
-                          border: "1px solid #ddd",
-                          borderRadius: 8
-                        }}>
-                          <a 
-                            href={item.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            style={{ textDecoration: "none", color: "#0a2a66", fontWeight: "bold" }}
-                          >
-                            {item.headline}
-                          </a>
-                          <p style={{ margin: "5px 0", color: "#555" }}>
-                            {new Date(item.datetime * 1000).toLocaleString()}
-                          </p>
-                          {item.summary && <p style={{ color: "#333" }}>{item.summary}</p>}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>}
+        {/* ── Main Content ── */}
+        <main className="flex-1 overflow-y-auto px-5 py-7 lg:px-10">
+          <div className="mx-auto max-w-[960px]">
+
+            {/* Hero */}
+            <div className="mb-7 text-center">
+              <div className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wider uppercase mb-5 bg-primary text-primary-foreground">
+                <Sparkles className="w-3 h-3" />
+                Financial Readiness
               </div>
+              <h1 className="text-4xl lg:text-5xl font-bold mb-3 leading-tight text-foreground">
+                Financial Services &amp; Benefits
+              </h1>
+              <p className="text-base lg:text-lg max-w-lg mx-auto text-muted-foreground">
+                Tools, guidance, and real-time market data to help you make
+                confident financial decisions during and after service.
+              </p>
             </div>
+
+            {/* Stock Ticker */}
+            {stockError ? (
+              <div className="mb-7 rounded-lg bg-stone-100 p-4 text-center text-sm text-stone-400">
+                {stockError}
+              </div>
+            ) : (
+              <div className="mb-8 flex flex-wrap justify-center gap-1">
+                {data.map((stock) => (
+                  <StockPill key={stock.symbol} stock={stock} />
+                ))}
+              </div>
+            )}
+
+            {/* News header */}
+            <div className="mb-5 flex items-center gap-2.5 border-b-2 border-muted-foreground pb-3">
+              <Newspaper size={18} className="text-muted-foreground" />
+              <h2 className="text-lg font-bold tracking-tight text-muted-foreground">Market News</h2>
+            </div>
+
+            {/* News grid */}
+            {newsError ? (
+              <div className="py-10 text-center text-sm text-stone-400">{newsError}</div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {news.map((item) => (
+                  <NewsCard key={item.id} item={item} />
+                ))}
+              </div>
+            )}
           </div>
         </main>
       </div>
+      <Footer />
     </div>
   )
 }

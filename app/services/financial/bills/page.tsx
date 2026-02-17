@@ -3,11 +3,11 @@
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { useState } from "react"
-import { DollarSign, PiggyBank, CreditCard, Home, Receipt, Building2, ExternalLink, Banknote, GraduationCap, Phone, ChevronDown, Lightbulb, CircleDollarSign, TrendingUp, Shield, ChevronRight, BriefcaseBusiness } from "lucide-react"
+import { DollarSign, PiggyBank, CreditCard, Home, Receipt, Building2, ExternalLink, Wallet, Landmark, ShieldCheck, BadgeCheck, Clock, Phone, ChevronDown, Lightbulb, TrendingUp, Shield, ChevronRight, BriefcaseBusiness, AlertTriangle } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 
-export default function InvestmentPage() {
+export default function BillsPage() {
   const [expandedSections, setExpandedSections] = useState<string[]>([])
   const serviceCategories = [
     { name: "Investments", icon: TrendingUp},
@@ -20,222 +20,224 @@ export default function InvestmentPage() {
   ]
 
   const intro = {
-    description: "Building wealth while serving requires understanding the unique financial tools available to you. The military offers investment vehicles that most civilians do not have access to, including the Thrift Savings Plan with its incredibly low expense ratios (as low as 0.043%), the Savings Deposit Program with a guaranteed 10% return, and VA-backed real estate opportunities. Whether you are a junior enlisted member just starting out or a senior officer planning for retirement, investing early and consistently is one of the most impactful financial decisions you can make during your military career.",
+    description: "Managing bills effectively is the foundation of financial stability, especially for military families dealing with deployments, PCS moves, and irregular schedules. Automating as much as possible ensures nothing falls through the cracks when you are in the field or deployed with limited connectivity. Beyond just paying bills, understanding budgeting strategies and building an emergency fund protects your family from unexpected expenses. Every service member should have at least 3 to 6 months of expenses saved before deployment, and free budgeting tools like YNAB (free for active duty) can help you get there.",
     keyFacts: [
-      { label: "TSP Expense Ratio", value: "0.043%", icon: TrendingUp },
-      { label: "2026 TSP Limit", value: "$23,500", icon: DollarSign },
-      { label: "SDP Return Rate", value: "10% APR", icon: CircleDollarSign },
-      { label: "VA Loan Down Payment", value: "$0", icon: Home },
+      { label: "Emergency Fund Goal", value: "3-6 Months", icon: Wallet },
+      { label: "YNAB for Military", value: "Free", icon: BadgeCheck },
+      { label: "myPay Allotments", value: "Unlimited", icon: DollarSign },
+      { label: "Base Financial Counseling", value: "Free", icon: Phone },
     ],
-    importantNote: "Financial readiness is reviewed as part of security clearance investigations. Maintaining healthy finances is not just good practice -- it is part of your military obligation. If you need help getting started, every installation has free Personal Financial Counselors available through Military OneSource.",
+    importantNote: "Before any deployment, pay all bills one month ahead as a buffer. Set up autopay for everything and ensure your spouse or trusted POA holder has access to all accounts. Leave a binder or document with all account information, login details, and customer service numbers.",
     helpfulLinks: [
-      { label: "Military OneSource Financial Counseling", url: "https://www.militaryonesource.mil/financial-legal/personal-finance/" },
-      { label: "TSP.gov - Official Thrift Savings Plan", url: "https://www.tsp.gov" },
+      { label: "myPay (DFAS)", url: "https://mypay.dfas.mil/" },
+      { label: "Military OneSource Financial Help", url: "https://www.militaryonesource.mil/financial-legal/personal-finance/managing-your-money/" },
     ],
   }
 
   const icons = {
-    "Thrift Savings Plan (TSP)": PiggyBank,
-    "Real Estate": Home,
-    "Investment Strategy": TrendingUp,
-    "Savings Deposit Program (SDP)": Banknote,
-    "Education Benefits as Investment": GraduationCap,
+    "Automated Bill Pay Setup": Clock,
+    "Budgeting Tools": DollarSign,
+    "Emergency Funds": Wallet,
+    "Debt Payoff Strategies": TrendingUp,
+    "Military Pay & Allowances": Landmark,
+    "Insurance for Military Families": ShieldCheck
   }
 
   const page = {
-    title: "Investments and Personal Finances",
+    title: "Manage Bills",
     sections: [
       {
-        name: "Thrift Savings Plan (TSP)",
+        name: "Automated Bill Pay Setup",
         content: (
           <div className="space-y-4">
             <p className="text-muted-foreground">
-              The Thrift Savings Plan is a retirement savings plan for federal employees and members of the uniformed services. It offers the same types of savings and tax benefits that many private corporations offer their employees under 401(k) plans.
-            </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">2026 Contribution Limits</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li><strong>Elective Deferral:</strong> $23,500</li>
-                  <li><strong>Catch-up (50+):</strong> Additional $7,500</li>
-                  <li><strong>Annual Addition Limit:</strong> $70,000</li>
-                </ul>
-              </div>
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">TSP Fund Options</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li><strong>G Fund:</strong> Government Securities</li>
-                  <li><strong>F Fund:</strong> Fixed Income Index</li>
-                  <li><strong>C Fund:</strong> Common Stock Index (S&P 500)</li>
-                  <li><strong>S Fund:</strong> Small Cap Stock Index</li>
-                  <li><strong>I Fund:</strong> International Stock Index</li>
-                  <li><strong>L Funds:</strong> Lifecycle Funds</li>
-                </ul>
-              </div>
-            </div>
-            <div className="rounded-lg p-4 bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700/40">
-              <h5 className="font-semibold mb-2 text-green-800 dark:text-green-300">BRS Matching</h5>
-              <p className="text-sm text-green-700 dark:text-green-400">Under the Blended Retirement System, the DoD automatically contributes 1% of base pay and matches up to 4% of your contributions (5% total match).</p>
-            </div>
-            <a href="https://www.tsp.gov" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
-              Visit TSP.gov <ExternalLink className="h-4 w-4" />
-            </a>
-          </div>
-        ),
-      },
-      {
-        name: "Real Estate",
-        content: (
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              Real estate can be an excellent investment for military members, especially with access to VA loans. However, PCS moves require careful planning for property management.
-            </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">VA Loan Benefits</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>No down payment required</li>
-                  <li>No private mortgage insurance (PMI)</li>
-                  <li>Competitive interest rates</li>
-                  <li>Limited closing costs</li>
-                  <li>No prepayment penalties</li>
-                </ul>
-              </div>
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">Investment Strategies</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>Buy near military installations</li>
-                  <li>Consider rental potential during PCS</li>
-                  <li>Use property management companies</li>
-                  <li>Research BAH rates for rental income</li>
-                  <li>Explore house hacking opportunities</li>
-                </ul>
-              </div>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 dark:bg-amber-900/20 dark:border-amber-700/40">
-              <h5 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">PCS Consideration</h5>
-              <p className="text-sm text-amber-700 dark:text-amber-400">If you PCS, you can rent your home and still use your VA loan benefit again for your next primary residence after restoring your entitlement.</p>
-            </div>
-          </div>
-        ),
-      },
-      {
-        name: "Investment Strategy",
-        content: (
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              Building a solid investment strategy as a service member involves understanding your unique benefits and planning around military life transitions.
+              Automating your bills ensures payments are never missed, especially during deployments or field exercises. Here is how to set up a bulletproof system.
             </p>
             <div className="bg-card p-4 rounded-lg border">
-              <h5 className="font-semibold text-foreground mb-3">Military-Specific Investment Tips</h5>
+              <h5 className="font-semibold text-foreground mb-2">Automation Strategies</h5>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><strong>1. Maximize TSP First:</strong> Take full advantage of the 5% match before other investments</li>
-                <li><strong>2. Combat Zone Tax Exclusion:</strong> Contributions from tax-free combat pay to Roth TSP grow tax-free</li>
-                <li><strong>3. Savings Deposit Program:</strong> Earn 10% guaranteed return on up to $10,000 while deployed to combat zones</li>
-                <li><strong>4. Emergency Fund:</strong> Maintain 3-6 months expenses before aggressive investing</li>
-                <li><strong>5. Diversify:</strong> {"Don't"} put all investments in TSP - consider IRAs, taxable accounts</li>
+                <li><strong>Direct Debit:</strong> Allow creditors to automatically withdraw payments</li>
+                <li><strong>Bank Bill Pay:</strong> Schedule payments through your bank</li>
+                <li><strong>Military Allotments:</strong> Set up automatic deductions from pay through myPay</li>
+                <li><strong>Credit Card Autopay:</strong> Link bills to credit cards, then autopay the card</li>
               </ul>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 mt-4">
-              <a href="https://www.militaryonesource.mil/financial-legal/personal-finance/" target="_blank" rel="noopener noreferrer" className="bg-card p-4 rounded-lg border hover:border-primary transition-colors">
-                <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-                  MilitaryOneSource Financial <ExternalLink className="h-4 w-4 text-primary" />
-                </h5>
-                <p className="text-sm text-muted-foreground">Free financial counseling and resources</p>
-              </a>
-              <a href="https://www.investor.gov" target="_blank" rel="noopener noreferrer" className="bg-card p-4 rounded-lg border hover:border-primary transition-colors">
-                <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-                  Investor.gov <ExternalLink className="h-4 w-4 text-primary" />
-                </h5>
-                <p className="text-sm text-muted-foreground">SEC resources for new investors</p>
-              </a>
-            </div>
-          </div>
-        ),
-      },
-      {
-        name: "Savings Deposit Program (SDP)",
-        content: (
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              The Savings Deposit Program allows service members deployed to designated combat zones to earn 10% annual interest on deposits up to $10,000. This is one of the highest guaranteed returns available anywhere.
-            </p>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">SDP Rules</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li><strong>Maximum Deposit:</strong> $10,000</li>
-                  <li><strong>Interest Rate:</strong> 10% annually, compounded quarterly</li>
-                  <li><strong>Eligibility:</strong> Must be in a combat zone for 30+ consecutive days or at least one day in 3 consecutive months</li>
-                  <li><strong>Deposits:</strong> Can deposit up to entire unallotted pay and allowances</li>
-                </ul>
-              </div>
-              <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">Withdrawal Rules</h5>
-                <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li>Emergency withdrawals possible during deployment</li>
-                  <li>Interest continues 90 days after leaving the combat zone</li>
-                  <li>Full amount available after returning from deployment</li>
-                  <li>Interest earned is taxable (unless CZTE applies)</li>
-                </ul>
-              </div>
-            </div>
             <div className="bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700/40 rounded-lg p-4">
-              <h5 className="font-semibold text-green-800 dark:text-green-300 mb-2">Strategy</h5>
-              <p className="text-sm text-green-700 dark:text-green-400">Max out SDP as quickly as possible during deployment. Save up before you deploy so you can deposit the full $10,000 early and earn the maximum interest. The 10% guaranteed return beats virtually every other safe investment available.</p>
+              <h5 className="font-semibold text-green-800 dark:text-green-300 mb-2">Deployment Tip</h5>
+              <p className="text-sm text-green-700 dark:text-green-400">Before deployment, pay one month ahead on all bills. This gives a buffer if any automation fails while you have limited communication access.</p>
             </div>
-            <a href="https://www.dfas.mil/militarymembers/payentitlements/sdp/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
-              DFAS SDP Information <ExternalLink className="h-4 w-4" />
+            <a href="https://mypay.dfas.mil/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
+              myPay Allotments <ExternalLink className="h-4 w-4" />
             </a>
           </div>
         ),
       },
       {
-        name: "Education Benefits as Investment",
+        name: "Budgeting Tools",
         content: (
           <div className="space-y-4">
             <p className="text-muted-foreground">
-              Military education benefits represent a significant financial asset. The Post-9/11 GI Bill alone can be worth over $100,000 in tuition, housing, and book stipends. Using these benefits wisely -- or transferring them to dependents -- is one of the most impactful financial decisions you can make.
+              A solid budget is the foundation of financial success. These tools can help military families manage their money effectively.
             </p>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">Post-9/11 GI Bill</h5>
+                <h5 className="font-semibold text-foreground mb-2">Free Budgeting Apps</h5>
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li><strong>Tuition:</strong> Full in-state tuition at public schools or up to $28,937.94/yr at private schools</li>
-                  <li><strong>Housing:</strong> Monthly housing allowance based on E-5 with dependents BAH</li>
-                  <li><strong>Books:</strong> Up to $1,000/year stipend</li>
-                  <li><strong>Duration:</strong> 36 months of benefits</li>
-                  <li><strong>Transferability:</strong> Can transfer to spouse or children with 6+ years of service</li>
+                  <li><strong>YNAB:</strong> Free for active duty military</li>
+                  <li><strong>Mint:</strong> Free budget tracking and alerts</li>
+                  <li><strong>EveryDollar:</strong> Simple zero-based budgeting</li>
+                  <li><strong>Personal Capital:</strong> Free net worth tracking</li>
                 </ul>
               </div>
               <div className="bg-card p-4 rounded-lg border">
-                <h5 className="font-semibold text-foreground mb-2">Tuition Assistance (TA)</h5>
+                <h5 className="font-semibold text-foreground mb-2">Military-Specific Resources</h5>
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  <li><strong>Amount:</strong> Up to $250/credit hour, $4,500/fiscal year</li>
-                  <li><strong>Use While Serving:</strong> Does not reduce GI Bill benefits</li>
-                  <li><strong>Strategy:</strong> Use TA for undergraduate, save GI Bill for graduate school</li>
-                  <li><strong>Available To:</strong> Active duty, some Guard/Reserve</li>
+                  <li>Personal Financial Counselors (free on base)</li>
+                  <li>Military OneSource financial coaching</li>
+                  <li>Command Financial Specialist</li>
+                  <li>Fleet and Family Support Centers</li>
+                </ul>
+              </div>
+            </div>
+            <a href="https://www.militaryonesource.mil/financial-legal/personal-finance/managing-your-money/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline mt-4">
+              MilitaryOneSource Financial Help <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+        ),
+      },
+      {
+        name: "Emergency Funds",
+        content: (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              An emergency fund is your financial safety net. Military families should aim for 3-6 months of expenses saved in an easily accessible account.
+            </p>
+            <div className="bg-card p-4 rounded-lg border">
+              <h5 className="font-semibold text-foreground mb-2">Building Your Emergency Fund</h5>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><strong>Start Small:</strong> Begin with $1,000 as a starter emergency fund</li>
+                <li><strong>Build to 3-6 Months:</strong> Cover rent, utilities, food, insurance, minimum payments</li>
+                <li><strong>Keep It Accessible:</strong> High-yield savings account, not investments</li>
+                <li><strong>{"Don't"} Touch It:</strong> Only for true emergencies, not planned expenses</li>
+              </ul>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-700/40 rounded-lg p-4">
+              <h5 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">High-Yield Savings Options</h5>
+              <ul className="space-y-1 text-sm text-blue-700 dark:text-blue-400">
+                <li>Navy Federal: Competitive rates for members</li>
+                <li>USAA: Performance First Savings</li>
+                <li>Ally Bank: No minimums, good rates</li>
+                <li>Marcus by Goldman Sachs: High APY</li>
+              </ul>
+            </div>
+          </div>
+        ),
+      },
+      {
+        name: "Debt Payoff Strategies",
+        content: (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Getting out of debt frees up money for savings and investments. Choose a strategy that works for your personality and stick with it.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-card p-4 rounded-lg border">
+                <h5 className="font-semibold text-foreground mb-2">Debt Snowball</h5>
+                <p className="text-sm text-muted-foreground mb-2">Pay minimums on all debts, throw extra at the smallest balance first.</p>
+                <p className="text-xs text-slate-500"><strong>Best for:</strong> People who need quick wins for motivation</p>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h5 className="font-semibold text-foreground mb-2">Debt Avalanche</h5>
+                <p className="text-sm text-muted-foreground mb-2">Pay minimums on all debts, throw extra at the highest interest rate first.</p>
+                <p className="text-xs text-slate-500"><strong>Best for:</strong> Saving the most money in interest</p>
+              </div>
+            </div>
+            <div className="bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700/40 rounded-lg p-4 mt-4">
+              <h5 className="font-semibold text-green-800 dark:text-green-300 mb-2">Military Advantage: SCRA</h5>
+              <p className="text-sm text-green-700 dark:text-green-400">Request SCRA rate reductions on pre-service debt to 6%. This can accelerate your payoff significantly on high-interest credit cards.</p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        name: "Military Pay & Allowances",
+        content: (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Understanding your military compensation is the first step to managing your bills effectively. Your total military pay consists of base pay plus several allowances and special pays, many of which are not taxable.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-card p-4 rounded-lg border">
+                <h5 className="font-semibold text-foreground mb-2">Taxable Pay</h5>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li><strong>Base Pay:</strong> Determined by rank and time in service</li>
+                  <li><strong>Special Pays:</strong> Hazardous duty, flight pay, dive pay, etc.</li>
+                  <li><strong>Incentive Pays:</strong> Reenlistment bonuses, special skills</li>
+                  <li><strong>Retired Pay:</strong> Taxable as ordinary income</li>
+                </ul>
+              </div>
+              <div className="bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-700/40 rounded-lg p-4">
+                <h5 className="font-semibold text-green-800 dark:text-green-300 mb-2">Tax-Free Allowances</h5>
+                <ul className="space-y-1 text-sm text-green-700 dark:text-green-400">
+                  <li><strong>BAH:</strong> Basic Allowance for Housing (based on location, rank, dependents)</li>
+                  <li><strong>BAS:</strong> Basic Allowance for Subsistence ($460.25 enlisted / $316.98 officers in 2026)</li>
+                  <li><strong>COLA:</strong> Cost of Living Allowance (OCONUS)</li>
+                  <li><strong>FSA:</strong> Family Separation Allowance ($250/month when deployed)</li>
+                  <li><strong>Combat Zone Pay:</strong> All pay earned in designated combat zones (enlisted)</li>
+                </ul>
+              </div>
+            </div>
+            <div className="bg-card p-4 rounded-lg border mt-4">
+              <h5 className="font-semibold text-foreground mb-2">Understanding Your LES</h5>
+              <p className="text-sm text-muted-foreground mb-2">Your Leave and Earnings Statement (LES) is your military paycheck stub. Key sections to understand:</p>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li><strong>Entitlements:</strong> Everything you earn (base pay + allowances + special pays)</li>
+                <li><strong>Deductions:</strong> Taxes, SGLI, TSP contributions, allotments</li>
+                <li><strong>Allotments:</strong> Voluntary deductions you set up (savings, car payment, etc.)</li>
+                <li><strong>Net Pay:</strong> What actually hits your bank account</li>
+              </ul>
+            </div>
+            <a href="https://mypay.dfas.mil/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
+              View Your LES on myPay <ExternalLink className="h-4 w-4" />
+            </a>
+          </div>
+        ),
+      },
+      {
+        name: "Insurance for Military Families",
+        content: (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              While the military provides TRICARE health coverage, there are other insurance needs that military families should address. Life insurance, renters insurance, and auto insurance are essential for financial protection.
+            </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="bg-card p-4 rounded-lg border">
+                <h5 className="font-semibold text-foreground mb-2">SGLI (Servicemembers Group Life Insurance)</h5>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li><strong>Coverage:</strong> Up to $500,000</li>
+                  <li><strong>Cost:</strong> $25/month for $500,000 (very affordable)</li>
+                  <li><strong>FSGLI:</strong> Spouse coverage up to $100,000</li>
+                  <li><strong>TSGLI:</strong> Traumatic injury coverage ($25,000-$100,000)</li>
+                  <li><strong>Conversion:</strong> Convert to VGLI within 240 days of separation</li>
+                </ul>
+              </div>
+              <div className="bg-card p-4 rounded-lg border">
+                <h5 className="font-semibold text-foreground mb-2">Other Essential Insurance</h5>
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                  <li><strong>Renters Insurance:</strong> Protects personal property in base housing or rentals ($10-20/month)</li>
+                  <li><strong>Auto Insurance:</strong> USAA and Navy Federal typically offer the best military rates</li>
+                  <li><strong>Umbrella Policy:</strong> Extra liability protection ($150-300/year)</li>
+                  <li><strong>Private Life Insurance:</strong> Consider supplementing SGLI if you have significant debts or many dependents</li>
                 </ul>
               </div>
             </div>
             <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/40 rounded-lg p-4">
-              <h5 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Transfer Deadline</h5>
-              <p className="text-sm text-amber-700 dark:text-amber-400">You must transfer GI Bill benefits while still serving. You need at least 6 years of service and must commit to 4 more years. Plan ahead -- once you separate, you cannot transfer benefits to dependents.</p>
+              <h5 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">PCS Insurance Tip</h5>
+              <p className="text-sm text-amber-700 dark:text-amber-400">When PCSing to a new state, shop auto insurance rates immediately. Rates vary dramatically by state. USAA and Navy Federal both allow you to update your location before you move to ensure seamless coverage.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 mt-4">
-              <a href="https://www.va.gov/education/about-gi-bill-benefits/post-9-11/" target="_blank" rel="noopener noreferrer" className="bg-card p-4 rounded-lg border hover:border-primary transition-colors">
-                <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-                  Post-9/11 GI Bill <ExternalLink className="h-4 w-4 text-primary" />
-                </h5>
-                <p className="text-sm text-muted-foreground">Official VA information</p>
-              </a>
-              <a href="https://www.va.gov/education/transfer-post-9-11-gi-bill-benefits/" target="_blank" rel="noopener noreferrer" className="bg-card p-4 rounded-lg border hover:border-primary transition-colors">
-                <h5 className="font-semibold text-foreground mb-1 flex items-center gap-2">
-                  Transfer Benefits <ExternalLink className="h-4 w-4 text-primary" />
-                </h5>
-                <p className="text-sm text-muted-foreground">How to transfer to dependents</p>
-              </a>
-            </div>
+            <a href="https://www.va.gov/life-insurance/options-eligibility/sgli/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-primary hover:underline">
+              VA SGLI Information <ExternalLink className="h-4 w-4" />
+            </a>
           </div>
         ),
       },
@@ -268,7 +270,7 @@ export default function InvestmentPage() {
               Financial
             </a>
             <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground font-medium">Investments</span>
+            <span className="text-foreground font-medium">Bills</span>
           </div>
         </div>
       </div>

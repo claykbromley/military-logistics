@@ -78,18 +78,18 @@ function formatDate(date: string): string {
 function AnimatedBackground() {
   return (
     <div className="fixed inset-0 -z-10 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100" />
+      <div className="absolute inset-0 bg-background" />
       <div 
-        className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full opacity-30"
+        className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full opacity-20 dark:opacity-10"
         style={{
-          background: 'radial-gradient(circle, rgba(251,191,36,0.15) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 70%)',
           animation: 'float 20s ease-in-out infinite',
         }}
       />
       <div 
-        className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full opacity-20"
+        className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full opacity-15 dark:opacity-8"
         style={{
-          background: 'radial-gradient(circle, rgba(168,162,158,0.2) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, hsl(var(--accent) / 0.25) 0%, transparent 70%)',
           animation: 'float 25s ease-in-out infinite reverse',
         }}
       />
@@ -144,12 +144,12 @@ function PropertyCard({
     rental: 'from-violet-400 to-purple-500',
     vehicle: 'from-blue-400 to-indigo-500',
     storage: 'from-amber-400 to-orange-500',
-    other: 'from-stone-400 to-stone-500',
+    other: 'from-stone-400 to-stone-500 dark:from-stone-500 dark:to-stone-600',
   }
 
   return (
     <div 
-      className="group bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden border border-stone-200/50 shadow-sm hover:shadow-xl transition-all duration-500 ease-out"
+      className="group bg-card backdrop-blur-sm rounded-2xl overflow-hidden border border-border shadow-sm hover:shadow-xl dark:hover:shadow-primary/5 transition-all duration-500 ease-out"
       style={{
         animation: `fadeSlideIn 0.5s ease-out ${index * 0.1}s both`,
       }}
@@ -181,11 +181,11 @@ function PropertyCard({
               {getPropertyIcon(property.propertyType)}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-stone-800 text-lg truncate">
+              <h3 className="font-semibold text-card-foreground text-lg truncate">
                 {property.propertyName}
               </h3>
               {property.address && (
-                <p className="text-sm text-stone-500 flex items-center gap-1.5 mt-0.5">
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
                   <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="truncate">{property.address}</span>
                 </p>
@@ -213,7 +213,7 @@ function PropertyCard({
                 Add Task
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onDelete} className="text-rose-600 rounded-lg">
+              <DropdownMenuItem onClick={onDelete} className="text-destructive rounded-lg">
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete
               </DropdownMenuItem>
@@ -223,15 +223,15 @@ function PropertyCard({
 
         {/* Caretaker Info */}
         {property.caretakerName && (
-          <div className="mt-4 p-3 rounded-xl bg-stone-50 border border-stone-100">
+          <div className="mt-4 p-3 rounded-xl bg-muted border border-border">
             <div className="flex items-center gap-2 text-sm">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-stone-200 to-stone-300 flex items-center justify-center">
-                <User className="w-4 h-4 text-stone-600" />
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center">
+                <User className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <p className="font-medium text-stone-700">{property.caretakerName}</p>
+                <p className="font-medium text-card-foreground">{property.caretakerName}</p>
                 {property.caretakerPhone && (
-                  <p className="text-stone-500 text-xs">{property.caretakerPhone}</p>
+                  <p className="text-muted-foreground text-xs">{property.caretakerPhone}</p>
                 )}
               </div>
             </div>
@@ -244,15 +244,14 @@ function PropertyCard({
             {expiringItems.map((item) => (
               <div
                 key={item.label}
-                className={`
-                  flex items-center gap-2 text-xs px-3 py-2 rounded-xl
-                  ${item.days <= 0
-                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                className={cn(
+                  "flex items-center gap-2 text-xs px-3 py-2 rounded-xl border",
+                  item.days <= 0
+                    ? "bg-destructive/10 text-destructive border-destructive/20"
                     : item.days <= 30
-                      ? "bg-amber-50 text-amber-700 border border-amber-200"
-                      : "bg-stone-50 text-stone-600 border border-stone-200"
-                  }
-                `}
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                      : "bg-muted text-muted-foreground border-border"
+                )}
               >
                 {item.days <= 0 ? (
                   <AlertTriangle className="w-3.5 h-3.5" />
@@ -271,8 +270,8 @@ function PropertyCard({
       {/* Maintenance Tasks */}
       {pendingTasks.length > 0 && (
         <div className="px-5 pb-5">
-          <div className="bg-gradient-to-br from-stone-50 to-stone-100/50 rounded-xl p-4 border border-stone-100">
-            <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <div className="bg-muted/50 rounded-xl p-4 border border-border">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <Wrench className="w-3.5 h-3.5" />
               Maintenance ({pendingTasks.length})
             </h4>
@@ -280,11 +279,11 @@ function PropertyCard({
               {pendingTasks.slice(0, 3).map((task) => (
                 <div
                   key={task.id}
-                  className="flex items-center justify-between bg-white rounded-lg p-3 border border-stone-100 hover:border-stone-200 transition-colors"
+                  className="flex items-center justify-between bg-card rounded-lg p-3 border border-border hover:border-primary/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-stone-700 text-sm truncate">{task.taskName}</p>
-                    <div className="flex items-center gap-2 text-xs text-stone-500 mt-0.5">
+                    <p className="font-medium text-card-foreground text-sm truncate">{task.taskName}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       {task.nextDue && (
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
@@ -312,7 +311,7 @@ function PropertyCard({
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => onDeleteTask(task.id)} className="text-rose-600 rounded-lg">
+                      <DropdownMenuItem onClick={() => onDeleteTask(task.id)} className="text-destructive rounded-lg">
                         <Trash2 className="w-4 h-4 mr-2" />
                         Delete
                       </DropdownMenuItem>
@@ -321,7 +320,7 @@ function PropertyCard({
                 </div>
               ))}
               {pendingTasks.length > 3 && (
-                <p className="text-xs text-stone-400 text-center pt-1">
+                <p className="text-xs text-muted-foreground text-center pt-1">
                   +{pendingTasks.length - 3} more
                 </p>
               )}
@@ -332,12 +331,12 @@ function PropertyCard({
 
       {/* Insurance Footer */}
       {property.insuranceCompany && (
-        <div className="px-5 py-3 bg-stone-50/50 border-t border-stone-100 flex items-center gap-2 text-sm text-stone-500">
+        <div className="px-5 py-3 bg-muted/30 border-t border-border flex items-center gap-2 text-sm text-muted-foreground">
           <Shield className="w-4 h-4" />
           <span>
             {property.insuranceCompany}
             {property.insurancePolicyNumber && (
-              <span className="text-stone-400"> • #{property.insurancePolicyNumber}</span>
+              <span className="text-muted-foreground/70"> • #{property.insurancePolicyNumber}</span>
             )}
           </span>
         </div>
@@ -357,25 +356,27 @@ function AlertCard({
   children: React.ReactNode
 }) {
   return (
-    <div className={`
-      rounded-2xl p-5 border backdrop-blur-sm
-      ${type === 'warning' 
-        ? 'bg-gradient-to-br from-amber-50/80 to-orange-50/80 border-amber-200/50' 
-        : 'bg-white/80 border-stone-200/50'
-      }
-    `}>
+    <div className={cn(
+      "rounded-2xl p-5 border backdrop-blur-sm",
+      type === 'warning' 
+        ? 'bg-amber-500/10 border-amber-500/20' 
+        : 'bg-card border-border'
+    )}>
       <div className="flex items-start gap-3">
         {type === 'warning' ? (
-          <div className="p-2 rounded-xl bg-amber-100">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <div className="p-2 rounded-xl bg-amber-500/20">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
           </div>
         ) : (
-          <div className="p-2 rounded-xl bg-stone-100">
-            <Clock className="w-5 h-5 text-stone-600" />
+          <div className="p-2 rounded-xl bg-primary/20">
+            <Clock className="w-5 h-5 text-primary" />
           </div>
         )}
         <div className="flex-1">
-          <h3 className={`font-semibold ${type === 'warning' ? 'text-amber-800' : 'text-stone-800'}`}>
+          <h3 className={cn(
+            "font-semibold",
+            type === 'warning' ? 'text-amber-800 dark:text-amber-400' : 'text-card-foreground'
+          )}>
             {title}
           </h3>
           {children}
@@ -497,26 +498,26 @@ function AddPropertyDialog({
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-xl">{editingProperty ? "Edit Property" : "Add Property"}</DialogTitle>
-          <DialogDescription className="text-stone-500">
+          <DialogDescription>
             Track your property, vehicle, or storage with insurance and maintenance details.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 py-2">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="prop-name" className="text-stone-700">Name</Label>
+              <Label htmlFor="prop-name">Name</Label>
               <Input
                 id="prop-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Primary Residence"
-                className="rounded-xl border-stone-200 focus:border-amber-400 focus:ring-amber-400"
+                className="rounded-xl"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prop-type" className="text-stone-700">Type</Label>
+              <Label htmlFor="prop-type">Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as PropertyType)}>
-                <SelectTrigger className="rounded-xl border-stone-200">
+                <SelectTrigger className="rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -534,7 +535,7 @@ function AddPropertyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address" className="text-stone-700">
+            <Label htmlFor="address">
               {isVehicle ? "Description (Year, Make, Model)" : "Address"}
             </Label>
             <Input
@@ -542,87 +543,87 @@ function AddPropertyDialog({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder={isVehicle ? "e.g., 2022 Toyota Tacoma" : "e.g., 123 Main St, City, State"}
-              className="rounded-xl border-stone-200 focus:border-amber-400 focus:ring-amber-400"
+              className="rounded-xl"
             />
           </div>
 
-          <div className="border-t border-stone-100 pt-5">
-            <h4 className="font-semibold text-stone-700 mb-4 flex items-center gap-2">
-              <Shield className="w-4 h-4 text-stone-400" />
+          <div className="border-t border-border pt-5">
+            <h4 className="font-semibold text-card-foreground mb-4 flex items-center gap-2">
+              <Shield className="w-4 h-4 text-muted-foreground" />
               Insurance Information
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="insurance-company" className="text-stone-600 text-sm">Company</Label>
+                <Label htmlFor="insurance-company" className="text-sm">Company</Label>
                 <Input
                   id="insurance-company"
                   value={insuranceCompany}
                   onChange={(e) => setInsuranceCompany(e.target.value)}
                   placeholder="e.g., USAA"
-                  className="rounded-xl border-stone-200"
+                  className="rounded-xl"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="insurance-policy" className="text-stone-600 text-sm">Policy Number</Label>
+                <Label htmlFor="insurance-policy" className="text-sm">Policy Number</Label>
                 <Input
                   id="insurance-policy"
                   value={insurancePolicyNumber}
                   onChange={(e) => setInsurancePolicyNumber(e.target.value)}
                   placeholder="e.g., ABC123456"
-                  className="rounded-xl border-stone-200"
+                  className="rounded-xl"
                 />
               </div>
             </div>
             <div className="space-y-2 mt-3">
-              <Label htmlFor="insurance-expiry" className="text-stone-600 text-sm">Expiration Date</Label>
+              <Label htmlFor="insurance-expiry" className="text-sm">Expiration Date</Label>
               <Input
                 id="insurance-expiry"
                 type="date"
                 value={insuranceExpiry}
                 onChange={(e) => setInsuranceExpiry(e.target.value)}
-                className="rounded-xl border-stone-200"
+                className="rounded-xl"
               />
             </div>
           </div>
 
           {isVehicle && (
-            <div className="border-t border-stone-100 pt-5">
-              <h4 className="font-semibold text-stone-700 mb-4 flex items-center gap-2">
-                <Car className="w-4 h-4 text-stone-400" />
+            <div className="border-t border-border pt-5">
+              <h4 className="font-semibold text-card-foreground mb-4 flex items-center gap-2">
+                <Car className="w-4 h-4 text-muted-foreground" />
                 Vehicle Details
               </h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="registration" className="text-stone-600 text-sm">Registration Expiry</Label>
+                  <Label htmlFor="registration" className="text-sm">Registration Expiry</Label>
                   <Input
                     id="registration"
                     type="date"
                     value={registrationExpiry}
                     onChange={(e) => setRegistrationExpiry(e.target.value)}
-                    className="rounded-xl border-stone-200"
+                    className="rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="inspection" className="text-stone-600 text-sm">Inspection Expiry</Label>
+                  <Label htmlFor="inspection" className="text-sm">Inspection Expiry</Label>
                   <Input
                     id="inspection"
                     type="date"
                     value={inspectionExpiry}
                     onChange={(e) => setInspectionExpiry(e.target.value)}
-                    className="rounded-xl border-stone-200"
+                    className="rounded-xl"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          <div className="border-t border-stone-100 pt-5">
-            <h4 className="font-semibold text-stone-700 mb-4 flex items-center gap-2">
-              <User className="w-4 h-4 text-stone-400" />
+          <div className="border-t border-border pt-5">
+            <h4 className="font-semibold text-card-foreground mb-4 flex items-center gap-2">
+              <User className="w-4 h-4 text-muted-foreground" />
               Caretaker (while deployed)
             </h4>
             <div className="space-y-2">
-              <Label className="text-stone-600 text-sm">
+              <Label className="text-sm">
                 Select from Emergency Contacts
               </Label>
 
@@ -631,7 +632,7 @@ function AddPropertyDialog({
                   <Button
                     variant="outline"
                     role="combobox"
-                    className="w-full justify-between rounded-xl border-stone-200"
+                    className="w-full justify-between rounded-xl"
                   >
                     {caretakerContactId === "none"
                       ? "None (Enter manually)"
@@ -656,7 +657,6 @@ function AddPropertyDialog({
                     <CommandEmpty>No contacts found.</CommandEmpty>
 
                     <CommandGroup className="max-h-60 overflow-auto">
-                      {/* Manual entry option */}
                       <CommandItem
                         value="none"
                         onSelect={() => {
@@ -686,7 +686,7 @@ function AddPropertyDialog({
                         >
                           {contact.name}
                           {contact.phone && (
-                            <span className="ml-2 text-stone-400 text-xs">
+                            <span className="ml-2 text-muted-foreground text-xs">
                               {contact.phone}
                             </span>
                           )}
@@ -706,12 +706,12 @@ function AddPropertyDialog({
                 </PopoverContent>
               </Popover>
             </div>
-            <p className="text-xs text-stone-400 mt-2 mb-3">
+            <p className="text-xs text-muted-foreground mt-2 mb-3">
               Or enter caretaker details manually below
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="caretaker-name" className="text-stone-600 text-sm">Name</Label>
+                <Label htmlFor="caretaker-name" className="text-sm">Name</Label>
                 <Input
                   id="caretaker-name"
                   value={caretakerName}
@@ -720,11 +720,11 @@ function AddPropertyDialog({
                     setCaretakerContactId("")
                   }}
                   placeholder="e.g., John Smith"
-                  className="rounded-xl border-stone-200"
+                  className="rounded-xl"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="caretaker-phone" className="text-stone-600 text-sm">Phone</Label>
+                <Label htmlFor="caretaker-phone" className="text-sm">Phone</Label>
                 <Input
                   id="caretaker-phone"
                   value={caretakerPhone}
@@ -733,15 +733,15 @@ function AddPropertyDialog({
                     setCaretakerContactId("")
                   }}
                   placeholder="e.g., (555) 123-4567"
-                  className="rounded-xl border-stone-200"
+                  className="rounded-xl"
                 />
               </div>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes" className="text-stone-700 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-stone-400" />
+            <Label htmlFor="notes" className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-muted-foreground" />
               Notes
             </Label>
             <Textarea
@@ -750,7 +750,7 @@ function AddPropertyDialog({
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any additional details..."
               rows={2}
-              className="rounded-xl border-stone-200 focus:border-amber-400 focus:ring-amber-400"
+              className="rounded-xl"
             />
           </div>
         </div>
@@ -758,14 +758,14 @@ function AddPropertyDialog({
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
-            className="rounded-xl border-stone-200"
+            className="rounded-xl"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSave} 
             disabled={!name.trim()}
-            className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white border-0"
+            className="rounded-xl"
           >
             {editingProperty ? "Save Changes" : "Add Property"}
           </Button>
@@ -859,37 +859,37 @@ function AddTaskDialog({
           <DialogTitle className="text-xl">
             {editingTask ? "Edit Task" : "Add Maintenance Task"}
           </DialogTitle>
-          <DialogDescription className="text-stone-500">
+          <DialogDescription>
             {editingTask ? "Update the" : "Add a"} maintenance task for {propertyName}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label htmlFor="task-name" className="text-stone-700">Task Name</Label>
+            <Label htmlFor="task-name">Task Name</Label>
             <Input
               id="task-name"
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
               placeholder="e.g., Change oil, Check HVAC filter"
-              className="rounded-xl border-stone-200 focus:border-amber-400 focus:ring-amber-400"
+              className="rounded-xl"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="task-desc" className="text-stone-700">Description</Label>
+            <Label htmlFor="task-desc">Description</Label>
             <Textarea
               id="task-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Details about the task..."
               rows={2}
-              className="rounded-xl border-stone-200 focus:border-amber-400 focus:ring-amber-400"
+              className="rounded-xl"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="frequency" className="text-stone-600 text-sm">Frequency</Label>
+              <Label htmlFor="frequency" className="text-sm">Frequency</Label>
               <Select value={frequency} onValueChange={(v) => setFrequency(v as MaintenanceFrequency)}>
-                <SelectTrigger className="rounded-xl border-stone-200">
+                <SelectTrigger className="rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl">
@@ -902,18 +902,18 @@ function AddTaskDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="next-due" className="text-stone-600 text-sm">Next Due Date</Label>
+              <Label htmlFor="next-due" className="text-sm">Next Due Date</Label>
               <Input
                 id="next-due"
                 type="date"
                 value={nextDue}
                 onChange={(e) => setNextDue(e.target.value)}
-                className="rounded-xl border-stone-200"
+                className="rounded-xl"
               />
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-stone-600 text-sm">
+            <Label className="text-sm">
               Assign To
             </Label>
 
@@ -922,7 +922,7 @@ function AddTaskDialog({
                 <Button
                   variant="outline"
                   role="combobox"
-                  className="w-full justify-between rounded-xl border-stone-200"
+                  className="w-full justify-between rounded-xl"
                 >
                   {assignedToContactId === "none"
                     ? "None (Enter manually)"
@@ -957,7 +957,7 @@ function AddTaskDialog({
                       >
                         {contact.name}
                         {contact.phone && (
-                          <span className="ml-2 text-stone-400 text-xs">
+                          <span className="ml-2 text-muted-foreground text-xs">
                             {contact.phone}
                           </span>
                         )}
@@ -982,14 +982,14 @@ function AddTaskDialog({
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
-            className="rounded-xl border-stone-200"
+            className="rounded-xl"
           >
             Cancel
           </Button>
           <Button 
             onClick={handleSave} 
             disabled={!taskName.trim()}
-            className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white border-0"
+            className="rounded-xl"
           >
             {editingTask ? "Save Changes" : "Add Task"}
           </Button>
@@ -1004,14 +1004,14 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="text-center py-16 px-8">
       <div className="relative inline-block">
-        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center mx-auto mb-6 shadow-lg">
-          <Home className="w-10 h-10 text-amber-600" />
+        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center mx-auto mb-6 shadow-lg">
+          <Home className="w-10 h-10 text-primary" />
         </div>
         <div 
-          className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center shadow-lg"
+          className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg"
           style={{ animation: 'bounce 2s ease-in-out infinite' }}
         >
-          <Sparkles className="w-4 h-4 text-white" />
+          <Sparkles className="w-4 h-4 text-primary-foreground" />
         </div>
       </div>
       <style jsx>{`
@@ -1020,13 +1020,13 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           50% { transform: translateY(-5px); }
         }
       `}</style>
-      <h3 className="text-xl font-semibold text-stone-800 mb-2">No properties yet</h3>
-      <p className="text-stone-500 mb-6 max-w-sm mx-auto">
+      <h3 className="text-xl font-semibold text-card-foreground mb-2">No properties yet</h3>
+      <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
         Add your properties and vehicles to track maintenance schedules and insurance details.
       </p>
       <Button 
         onClick={onAdd}
-        className="rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white border-0 shadow-lg shadow-amber-200/50 px-6"
+        className="rounded-xl shadow-lg px-6"
       >
         <Plus className="w-4 h-4 mr-2" />
         Add Your First Property
@@ -1143,12 +1143,12 @@ export default function PropertyManagerPage() {
 
   if (!isLoaded) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-stone-50 via-amber-50/30 to-stone-100 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center animate-pulse">
-            <Home className="w-6 h-6 text-white" />
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center animate-pulse">
+            <Home className="w-6 h-6 text-primary-foreground" />
           </div>
-          <p className="text-stone-500">Loading your properties...</p>
+          <p className="text-muted-foreground">Loading your properties...</p>
         </div>
       </div>
     )
@@ -1266,10 +1266,10 @@ export default function PropertyManagerPage() {
                   {expiringItems.map((item, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-white/80 text-amber-800 text-xs font-medium border border-amber-200"
+                      className="inline-flex items-center px-3 py-1.5 rounded-full bg-card/80 text-amber-800 dark:text-amber-400 text-xs font-medium border border-amber-500/20"
                     >
                       {item.propertyName}: {item.type}
-                      <span className="ml-2 text-amber-600">({formatDate(item.date)})</span>
+                      <span className="ml-2 text-amber-600 dark:text-amber-500">({formatDate(item.date)})</span>
                     </span>
                   ))}
                 </div>
@@ -1282,11 +1282,11 @@ export default function PropertyManagerPage() {
                   {upcomingMaintenance.slice(0, 5).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center justify-between py-2.5 border-b border-stone-100 last:border-0"
+                      className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
                     >
                       <div>
-                        <p className="font-medium text-sm text-stone-800">{task.taskName}</p>
-                        <p className="text-xs text-stone-500 mt-0.5">
+                        <p className="font-medium text-sm text-card-foreground">{task.taskName}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
                           {task.propertyName} • Due: {formatDate(task.nextDue!)}
                           {task.assignedToName && ` • ${task.assignedToName}`}
                         </p>
@@ -1302,28 +1302,28 @@ export default function PropertyManagerPage() {
         {/* Tabs and Property Grid */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex items-center justify-between mb-6">
-            <TabsList className="bg-white/80 backdrop-blur-sm rounded-xl p-1 border border-stone-200/50">
+            <TabsList className="bg-card backdrop-blur-sm rounded-xl p-1 border border-border">
               <TabsTrigger 
                 value="all" 
-                className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-amber-500 data-[state=active]:text-white"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 All ({properties.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="homes"
-                className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-amber-500 data-[state=active]:text-white"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 Homes ({homes.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="vehicles"
-                className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-amber-500 data-[state=active]:text-white"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 Vehicles ({vehicles.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="other"
-                className="rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-amber-400 data-[state=active]:to-amber-500 data-[state=active]:text-white"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
               >
                 Other
               </TabsTrigger>
@@ -1355,7 +1355,7 @@ export default function PropertyManagerPage() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-stone-200/50">
+              <div className="bg-card backdrop-blur-sm rounded-2xl border border-border">
                 <EmptyState onAdd={() => setIsAddDialogOpen(true)} />
               </div>
             )}

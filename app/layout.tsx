@@ -31,14 +31,31 @@ export const metadata: Metadata = {
   },
 }
 
+// Inline script that runs before React hydrates to prevent flash of wrong theme.
+// Reads from localStorage first, falls back to system preference.
+const themeScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('milify-theme');
+    var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    if (stored === 'dark' || (!stored && prefersDark)) {
+      document.documentElement.classList.add('dark');
+    }
+  } catch(e) {}
+})();
+`
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="font-sans antialiased bg-background text-foreground">
         <UIProvider>
           {children}
         </UIProvider>
