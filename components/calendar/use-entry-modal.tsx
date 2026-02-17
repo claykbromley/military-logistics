@@ -138,7 +138,9 @@ export function EntryModalProvider({
             ? toLocalDateStr(new Date(entry.recurrence_end))
             : "",
           location: entry.location || "",
-          timezone: entry.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+          timezone:
+            entry.timezone ||
+            Intl.DateTimeFormat().resolvedOptions().timeZone,
           meeting_link: entry.meeting_link || "",
           invitees: [], // New invitees to add (existing ones shown separately)
         })

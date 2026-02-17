@@ -58,12 +58,35 @@ const eventTypeColors: Record<string, string> = {
   task: "text-amber-600 bg-amber-100 dark:bg-amber-900/30",
 };
 
-function formatEventDate(dateStr: string): string {
+function formatEventDate(dateStr: string, allDay = false, timezone?: string | null): string {
   const date = new Date(dateStr);
-  if (isToday(date)) return `Today at ${format(date, "HH:mm")}`;
-  if (isTomorrow(date)) return `Tomorrow at ${format(date, "HH:mm")}`;
-  if (isThisWeek(date)) return format(date, "EEEE 'at' HH:mm");
-  return format(date, "MMM d 'at' HH:mm");
+
+  // Short timezone label, e.g. "ET", "PT", "CST" — always show for timed events
+  let tzLabel = "";
+  if (!allDay) {
+    const tz = timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    try {
+      tzLabel = " " + (new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        timeZoneName: "short",
+      })
+        .formatToParts(date)
+        .find((p) => p.type === "timeZoneName")?.value || "");
+    } catch {
+      // Invalid timezone — skip
+    }
+  }
+
+  if (allDay) {
+    if (isToday(date)) return "Today";
+    if (isTomorrow(date)) return "Tomorrow";
+    if (isThisWeek(date)) return format(date, "EEEE");
+    return format(date, "MMM d");
+  }
+  if (isToday(date)) return `Today at ${format(date, "HH:mm")}${tzLabel}`;
+  if (isTomorrow(date)) return `Tomorrow at ${format(date, "HH:mm")}${tzLabel}`;
+  if (isThisWeek(date)) return format(date, "EEEE 'at' HH:mm") + tzLabel;
+  return format(date, "MMM d 'at' HH:mm") + tzLabel;
 }
 
 function getRecurrenceSummary(entry: CalendarEntry): string | null {
@@ -164,7 +187,7 @@ function EventCard({
             {/* Time */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
               <Clock className="w-3.5 h-3.5" />
-              <span>{formatEventDate(entry.start_time)}</span>
+              <span>{formatEventDate(entry.start_time, entry.all_day, entry.timezone)}</span>
               {entry.all_day && (
                 <span className="text-xs bg-muted px-2 py-0.5 rounded">
                   All day
