@@ -17,7 +17,7 @@ declare global {
   }
 }
 
-const API_KEY = "AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI"
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ""
 const SEARCH_RADIUS = 24140 // 15 miles in meters
 
 interface UseGoogleMapsReturn {

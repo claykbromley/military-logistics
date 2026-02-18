@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -9,10 +9,15 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CommunicationLog, ScheduledEvent } from "@/lib/types"
-import { useCommunicationHub,CommunicationHubProvider } from "@/hooks/use-communication-hub"
+import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { MessagesTab } from "@/components/command-center/messages-tab"
-import { ScheduleTab, ScheduleEventDialog } from "@/components/command-center/schedule-tab"
+import { ScheduleTab } from "@/components/command-center/schedule-tab"
 import { LogTab, AddCommunicationDialog } from "@/components/command-center/log-tab"
+import { createClient } from "@/lib/supabase/client"
+
+import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
+import { ConnectedEntryModal } from "@/components/calendar/entry-modal"
+import { ConnectedEntryDetailPopover } from "@/components/calendar/entry-detail-popover"
 
 export default function CommunicationHubPage() {
   return (
@@ -33,15 +38,20 @@ function CommunicationHubPageContent() {
     syncError,
     addCommunication,
     updateCommunication,
-    createEvent,
-    updateEvent
   } = useCommunicationHub()
 
+  // Get the authenticated user ID for the EntryModalProvider
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
+  }, [])
+
   // Dialog states
-  const [isEventDialogOpen, setIsEventDialogOpen] = useState(false)
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<CommunicationLog | null>(null)
-  const [editingEvent, setEditingEvent] = useState<ScheduledEvent | null>(null)
 
   // View states
   const [activeTab, setActiveTab] = useState("schedule")
@@ -52,35 +62,21 @@ function CommunicationHubPageContent() {
     email: c.email || "",
   }))
 
-  // Calculate unread count from threads directly for accuracy
+  // Calculate unread count from threads
   const unreadCount = useMemo(() => {
     return messageThreads
       .filter(t => !t.isArchived)
       .reduce((sum, t) => sum + (t.unreadCount || 0), 0)
   }, [messageThreads])
 
-  // Count of threads with unread messages (for the badge)
   const unreadThreadCount = useMemo(() => {
     return messageThreads.filter(t => !t.isArchived && t.unreadCount > 0).length
   }, [messageThreads])
 
-  const handleCreateEvent = async (
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await createEvent(event, invitees)
-  }
-
-  const handleUpdateEvent = async (
-    eventId: string,
-    event: Omit<ScheduledEvent, "id" | "createdAt" | "updatedAt" | "invitations">,
-    invitees: { email: string; name?: string; contactId?: string }[]
-  ) => {
-    await updateEvent(eventId, event, invitees)
-  }
-
-  // Stats
-  const totalEvents = scheduledEvents.filter((e) => e.status === "scheduled").length
+  // Stats — only count future, non-completed meetings
+  const totalEvents = scheduledEvents.filter(
+    (e) => e.status === "scheduled" && new Date(e.startTime) > new Date()
+  ).length
   const totalLogs = communicationLog.length
 
   if (!isLoaded) {
@@ -93,6 +89,71 @@ function CommunicationHubPageContent() {
       </div>
     )
   }
+
+  return (
+    <EntryModalProvider userId={userId} defaultEntryOverrides={{ source: "meeting" }} forceEntryType="meeting">
+      <CommunicationHubPageInner
+        contactOptions={contactOptions}
+        unreadCount={unreadCount}
+        unreadThreadCount={unreadThreadCount}
+        totalEvents={totalEvents}
+        totalLogs={totalLogs}
+        messageThreads={messageThreads}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isLogDialogOpen={isLogDialogOpen}
+        setIsLogDialogOpen={setIsLogDialogOpen}
+        editingLog={editingLog}
+        setEditingLog={setEditingLog}
+        addCommunication={addCommunication}
+        updateCommunication={updateCommunication}
+        isSyncing={isSyncing}
+        syncError={syncError}
+      />
+    </EntryModalProvider>
+  )
+}
+
+// ── Inner component (has access to useEntryModal) ─────────
+
+interface CommunicationHubPageInnerProps {
+  contactOptions: { id: string; name: string; email: string }[]
+  unreadCount: number
+  unreadThreadCount: number
+  totalEvents: number
+  totalLogs: number
+  messageThreads: any[]
+  activeTab: string
+  setActiveTab: (tab: string) => void
+  isLogDialogOpen: boolean
+  setIsLogDialogOpen: (open: boolean) => void
+  editingLog: CommunicationLog | null
+  setEditingLog: (log: CommunicationLog | null) => void
+  addCommunication: any
+  updateCommunication: any
+  isSyncing: boolean
+  syncError: string | null
+}
+
+function CommunicationHubPageInner({
+  contactOptions,
+  unreadCount,
+  unreadThreadCount,
+  totalEvents,
+  totalLogs,
+  messageThreads,
+  activeTab,
+  setActiveTab,
+  isLogDialogOpen,
+  setIsLogDialogOpen,
+  editingLog,
+  setEditingLog,
+  addCommunication,
+  updateCommunication,
+  isSyncing,
+  syncError,
+}: CommunicationHubPageInnerProps) {
+  const { open: openEntryModal } = useEntryModal()
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
@@ -136,10 +197,10 @@ function CommunicationHubPageContent() {
               </Button>
               <Button
                 className="bg-white text-primary hover:bg-white/90 cursor-pointer"
-                onClick={() => setIsEventDialogOpen(true)}
+                onClick={() => openEntryModal()}
               >
                 <CalendarPlus className="w-4 h-4 mr-2" />
-                Schedule Event
+                Schedule Meeting
               </Button>
             </div>
           </div>
@@ -193,7 +254,7 @@ function CommunicationHubPageContent() {
           <History className="w-4 h-4 mr-2" />
           Log
         </Button>
-        <Button className="flex-1" onClick={() => setIsEventDialogOpen(true)}>
+        <Button className="flex-1" onClick={() => openEntryModal()}>
           <CalendarPlus className="w-4 h-4 mr-2" />
           Schedule
         </Button>
@@ -241,17 +302,9 @@ function CommunicationHubPageContent() {
         editingLog={editingLog}
       />
 
-      <ScheduleEventDialog
-        open={isEventDialogOpen}
-        onOpenChange={(open) => {
-          setIsEventDialogOpen(open)
-          if (!open) setEditingEvent(null)
-        }}
-        onSave={handleCreateEvent}
-        onUpdate={handleUpdateEvent}
-        contacts={contactOptions}
-        editingEvent={editingEvent}
-      />
+      {/* Self-wired entry modal & detail popover */}
+      <ConnectedEntryModal />
+      <ConnectedEntryDetailPopover />
 
       {/* Sync indicator */}
       {isSyncing && (

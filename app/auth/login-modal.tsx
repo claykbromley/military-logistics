@@ -70,7 +70,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50 border-2 border-blue-200/50">
+      <DialogContent className="sm:max-w-md bg-card border-2 border-border">
         <DialogTitle className="sr-only">Log In</DialogTitle>
         <div
           className="absolute inset-0 -z-10 opacity-5"
@@ -80,18 +80,18 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
             backgroundPosition: "center",
           }}
         />
-        <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-blue-200/30">
+        <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-slate-500">
           <div className="flex items-center gap-3 mb-3">
             <span className="text-3xl font-bold text-primary">
               Milify Login
             </span>
           </div>
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-muted-foreground">
             Not a member?{" "}
             <button
               type="button"
               onClick={onSwitchToSignup}
-              className="text-blue-600 font-semibold hover:text-blue-700 hover:underline transition-colors cursor-pointer"
+              className="text-blue-600 dark:text-blue-700 font-semibold hover:text-blue-700 hover:underline transition-colors cursor-pointer"
             >
               Register
             </button>
@@ -100,7 +100,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
 
         <form onSubmit={handleSubmit} className="space-y-5 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="login-email-phone" className="text-slate-700 font-medium">
+            <Label htmlFor="login-email-phone" className="text-muted-foreground font-medium">
               Username or Email
             </Label>
             <Input
@@ -114,7 +114,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="login-password" className="text-slate-700 font-medium">
+            <Label htmlFor="login-password" className="text-muted-foreground font-medium">
               Password
             </Label>
             <Input
@@ -130,7 +130,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
             type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
+            className="w-full bg-blue-600 dark:bg-blue-800 hover:bg-blue-700 dark:hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer"
             size="lg"
             disabled={isLoading}
           >
@@ -140,7 +140,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
           <div className="text-center pt-2">
             <button
               type="button"
-              className="text-sm text-blue-600 font-medium hover:text-blue-700 hover:underline transition-colors"
+              className="text-sm text-blue-600 dark:text-blue-700 font-medium hover:text-blue-700 hover:underline transition-colors cursor-pointer"
             >
               Forgot password?
             </button>

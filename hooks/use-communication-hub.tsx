@@ -173,13 +173,15 @@ function useCommunicationHubInternal() {
         setCommunicationLog(localComm)
         localStorage.setItem(COMM_LOG_KEY, JSON.stringify(localComm))
 
-        // Load scheduled events with invitations
+        // Load calendar entries with source "meeting" (comm hub only shows meetings)
         const { data: eventsData, error: eventsError } = await supabase
-          .from("scheduled_events")
+          .from("calendar_entries")
           .select(`
             *,
             event_invitations(*)
           `)
+          .eq("user_id", user.id)
+          .eq("source", "meeting")
           .order("start_time", { ascending: true })
 
         if (eventsError) throw eventsError
@@ -189,19 +191,21 @@ function useCommunicationHubInternal() {
           user_id: e.user_id,
           title: e.title,
           description: e.description || undefined,
-          eventType: e.event_type as EventType,
+          eventType: (e.type === "task" ? "reminder" : e.type === "meeting" ? "meeting" : "meeting") as EventType,
           startTime: e.start_time,
           endTime: e.end_time || undefined,
-          durationMinutes: e.duration_minutes || 30,
+          durationMinutes: e.end_time
+            ? Math.round((new Date(e.end_time).getTime() - new Date(e.start_time).getTime()) / 60000)
+            : 30,
           location: e.location || undefined,
-          meetingLink: e.meeting_link || undefined,
+          meetingLink: undefined,
           isRecurring: e.is_recurring || false,
-          recurrencePattern: e.recurrence_pattern || undefined,
+          recurrencePattern: e.recurrence_freq || undefined,
           recurrenceInterval: e.recurrence_interval || undefined,
-          recurrenceEndDate: e.recurrence_end_date || undefined,
-          recurrenceCount: e.recurrence_count || undefined,
-          status: e.status as EventStatus,
-          notes: e.notes || undefined,
+          recurrenceEndDate: e.recurrence_end || undefined,
+          recurrenceCount: undefined,
+          status: (e.is_completed ? "completed" : "scheduled") as EventStatus,
+          notes: e.description || undefined,
           invitations: (e.event_invitations || []).map((inv: any) => ({
             id: inv.id,
             eventId: inv.event_id,
@@ -739,19 +743,21 @@ function useCommunicationHubInternal() {
       user_id: eventData.user_id,
       title: eventData.title,
       description: eventData.description || undefined,
-      eventType: eventData.event_type as EventType,
+      eventType: (eventData.type === "task" ? "reminder" : "meeting") as EventType,
       startTime: eventData.start_time,
       endTime: eventData.end_time || undefined,
-      durationMinutes: eventData.duration_minutes || 30,
+      durationMinutes: eventData.end_time
+        ? Math.round((new Date(eventData.end_time).getTime() - new Date(eventData.start_time).getTime()) / 60000)
+        : 30,
       location: eventData.location || undefined,
-      meetingLink: eventData.meeting_link || undefined,
+      meetingLink: undefined,
       isRecurring: eventData.is_recurring || false,
-      recurrencePattern: eventData.recurrence_pattern || undefined,
+      recurrencePattern: eventData.recurrence_freq || undefined,
       recurrenceInterval: eventData.recurrence_interval || undefined,
-      recurrenceEndDate: eventData.recurrence_end_date || undefined,
-      recurrenceCount: eventData.recurrence_count || undefined,
-      status: eventData.status as EventStatus,
-      notes: eventData.notes || undefined,
+      recurrenceEndDate: eventData.recurrence_end || undefined,
+      recurrenceCount: undefined,
+      status: (eventData.is_completed ? "completed" : "scheduled") as EventStatus,
+      notes: eventData.description || undefined,
       invitations: invitationsData.map((inv) => ({
         id: inv.id,
         eventId: inv.event_id,
@@ -812,42 +818,36 @@ function useCommunicationHubInternal() {
           } = await supabase.auth.getUser()
 
           if (user) {
-            // Build insert payload — ensure mutual exclusivity of end conditions
+            // Build insert payload for calendar_entries
             const insertData: any = {
               user_id: user.id,
+              type: event.eventType === "reminder" ? "task" : "event",
               title: event.title,
               description: event.description || null,
-              event_type: event.eventType,
+              color: "#3b82f6",
               start_time: event.startTime,
               end_time: event.endTime || null,
-              duration_minutes: event.durationMinutes || 30,
+              all_day: false,
               location: event.location || null,
-              meeting_link: event.meetingLink || null,
+              source: "meeting",
               is_recurring: event.isRecurring || false,
-              recurrence_pattern: null,
-              recurrence_interval: null,
-              recurrence_end_date: null,
-              recurrence_count: null,
-              status: event.status || "scheduled",
-              notes: event.notes || null,
+              recurrence_freq: null,
+              recurrence_interval: 1,
+              recurrence_days: null,
+              recurrence_end: null,
+              is_completed: false,
             }
 
             if (event.isRecurring) {
-              insertData.recurrence_pattern = event.recurrencePattern || "weekly"
+              insertData.recurrence_freq = event.recurrencePattern || "weekly"
               insertData.recurrence_interval = event.recurrenceInterval || 1
-
-              // Mutually exclusive: only one end condition
               if (event.recurrenceEndDate) {
-                insertData.recurrence_end_date = event.recurrenceEndDate
-                insertData.recurrence_count = null
-              } else if (event.recurrenceCount) {
-                insertData.recurrence_count = event.recurrenceCount
-                insertData.recurrence_end_date = null
+                insertData.recurrence_end = event.recurrenceEndDate
               }
             }
 
             const { data: eventData, error: eventError } = await supabase
-              .from("scheduled_events")
+              .from("calendar_entries")
               .insert(insertData)
               .select()
               .single()
@@ -918,66 +918,46 @@ function useCommunicationHubInternal() {
 
             if (updates.title !== undefined) updateData.title = updates.title
             if (updates.description !== undefined) updateData.description = updates.description || null
-            if (updates.eventType !== undefined) updateData.event_type = updates.eventType
+            if (updates.eventType !== undefined) {
+              updateData.type = updates.eventType === "reminder" ? "task" : "event"
+            }
             if (updates.startTime !== undefined) updateData.start_time = updates.startTime
             if (updates.endTime !== undefined) updateData.end_time = updates.endTime || null
-            if (updates.durationMinutes !== undefined) updateData.duration_minutes = updates.durationMinutes
             if (updates.location !== undefined) updateData.location = updates.location || null
-            if (updates.meetingLink !== undefined) updateData.meeting_link = updates.meetingLink || null
-            if (updates.status !== undefined) updateData.status = updates.status
-            if (updates.notes !== undefined) updateData.notes = updates.notes || null
+            if (updates.status !== undefined) {
+              updateData.is_completed = updates.status === "completed"
+            }
 
-            // Handle recurrence — ensure mutual exclusivity of end conditions
+            // Handle recurrence
             if (updates.isRecurring !== undefined) {
               updateData.is_recurring = updates.isRecurring
 
               if (updates.isRecurring) {
                 if (updates.recurrencePattern !== undefined)
-                  updateData.recurrence_pattern = updates.recurrencePattern || "weekly"
+                  updateData.recurrence_freq = updates.recurrencePattern || "weekly"
                 if (updates.recurrenceInterval !== undefined)
                   updateData.recurrence_interval = updates.recurrenceInterval || 1
-
-                // FIX: Enforce mutual exclusivity of end conditions
-                // If recurrenceEndDate is set, clear recurrenceCount and vice versa
                 if (updates.recurrenceEndDate !== undefined) {
-                  updateData.recurrence_end_date = updates.recurrenceEndDate || null
-                  updateData.recurrence_count = null
-                } else if (updates.recurrenceCount !== undefined) {
-                  updateData.recurrence_count = updates.recurrenceCount || null
-                  updateData.recurrence_end_date = null
-                }
-
-                // Handle "never" end type: both null
-                if (!updates.recurrenceEndDate && !updates.recurrenceCount) {
-                  updateData.recurrence_end_date = null
-                  updateData.recurrence_count = null
+                  updateData.recurrence_end = updates.recurrenceEndDate || null
                 }
               } else {
-                // Toggled off — clear everything
-                updateData.recurrence_pattern = null
-                updateData.recurrence_interval = null
-                updateData.recurrence_end_date = null
-                updateData.recurrence_count = null
+                updateData.recurrence_freq = null
+                updateData.recurrence_interval = 1
+                updateData.recurrence_days = null
+                updateData.recurrence_end = null
               }
             } else {
-              // isRecurring not in updates, but individual recurrence fields may be
               if (updates.recurrencePattern !== undefined)
-                updateData.recurrence_pattern = updates.recurrencePattern || null
+                updateData.recurrence_freq = updates.recurrencePattern || null
               if (updates.recurrenceInterval !== undefined)
                 updateData.recurrence_interval = updates.recurrenceInterval || null
-
-              // Enforce mutual exclusivity even for partial updates
               if (updates.recurrenceEndDate !== undefined) {
-                updateData.recurrence_end_date = updates.recurrenceEndDate || null
-                updateData.recurrence_count = null
-              } else if (updates.recurrenceCount !== undefined) {
-                updateData.recurrence_count = updates.recurrenceCount || null
-                updateData.recurrence_end_date = null
+                updateData.recurrence_end = updates.recurrenceEndDate || null
               }
             }
 
             const { data: eventData, error: eventError } = await supabase
-              .from("scheduled_events")
+              .from("calendar_entries")
               .update(updateData)
               .eq("id", eventId)
               .eq("user_id", user.id)
@@ -1087,7 +1067,7 @@ function useCommunicationHubInternal() {
         setIsSyncing(true)
         try {
           const supabase = createClient()
-          const { error } = await supabase.from("scheduled_events").delete().eq("id", id)
+          const { error } = await supabase.from("calendar_entries").delete().eq("id", id)
           if (error) throw error
           setSyncError(null)
         } catch (error) {

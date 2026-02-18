@@ -295,7 +295,7 @@ export function DiscountMap() {
 
       const script = document.createElement("script");
       script.id = "google-maps-script";
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI&libraries=places`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`;
       script.async = true;
       script.defer = true;
 
@@ -504,7 +504,7 @@ export function DiscountMap() {
 
     try {
       const q = encodeURIComponent(addressInput);
-      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=AIzaSyAdrCyFkQA2fmt-Lup40KN4qhI2yKpRLbI`;
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${q}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`;
       const res = await fetch(url);
       const data = await res.json();
 
