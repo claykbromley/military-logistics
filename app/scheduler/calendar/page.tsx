@@ -275,7 +275,7 @@ function CalendarPageInner({
       <div className="flex-1 flex overflow-hidden">
         {/* Side panel */}
         {view !== "year" && (
-          <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-card p-4 space-y-5 overflow-y-auto flex-shrink-0">
+          <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-sidebar p-4 space-y-5 overflow-y-auto flex-shrink-0">
             <MiniCalendar
               date={currentDate}
               selectedDate={selectedDate}

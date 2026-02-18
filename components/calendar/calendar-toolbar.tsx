@@ -43,7 +43,7 @@ export function CalendarToolbar({
   onIcalClick,
 }: CalendarToolbarProps) {
   return (
-    <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-16 z-40">
+    <div className="border-b border-border bg-background backdrop-blur-sm sticky top-16 z-40">
       <div className="container mx-auto px-4 py-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           {/* Left: Navigation */}
