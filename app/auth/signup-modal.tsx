@@ -70,7 +70,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
 
   return (
     <Dialog open={open} onOpenChange={onClose}> 
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-gradient-to-br from-blue-50 via-indigo-50 to-slate-50 border-2 border-blue-200/50">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-card border-2 border-border">
         <DialogTitle className="sr-only">Sign Up</DialogTitle>
         <div
           className="absolute inset-0 -z-10 opacity-5"
@@ -81,8 +81,8 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
           }}
         />
         {success? 
-        <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-blue-200/30">
-          <div className="text-sm text-slate-600">
+        <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-slate-500">
+          <div className="text-sm text-muted-foreground">
             <h3 className="text-2xl text-center font-bold">Check Your Email</h3>
             <p className="p-2">We&apos;ve sent you a confirmation link</p>
           </div>
@@ -103,18 +103,18 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
           </div>
         </div> :
         <div>
-          <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-blue-200/30">
+          <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-slate-500">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-3xl font-bold text-primary bg-clip-text">
                 Milify Sign Up
               </span>
             </div>
-            <div className="text-sm text-slate-600">
+            <div className="text-sm text-muted-foreground">
               Already a member?{" "}
               <button
                 type="button"
                 onClick={onSwitchToLogin}
-                className="text-blue-600 font-semibold hover:text-blue-700 hover:underline transition-colors cursor-pointer"
+                className="text-blue-600 dark:text-blue-700 font-semibold hover:text-blue-700 hover:underline transition-colors cursor-pointer"
               >
                 Login
               </button>
@@ -123,7 +123,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-2">
             <div className="space-y-2">
-              <Label htmlFor="signup-username" className="text-slate-700 font-medium">
+              <Label htmlFor="signup-username" className="text-muted-foreground font-medium">
                 Username
               </Label>
               <Input
@@ -138,7 +138,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup-password" className="text-slate-700 font-medium">
+              <Label htmlFor="signup-password" className="text-muted-foreground font-medium">
                 Password
               </Label>
               <Input
@@ -153,7 +153,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm-password" className="text-slate-700 font-medium">
+              <Label htmlFor="confirm-password" className="text-muted-foreground font-medium">
                 Confirm Password
               </Label>
               <Input
@@ -167,10 +167,10 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
               />
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
-            <hr/>
+            <hr className="border-slate-500"/>
 
             <div className="space-y-2">
-              <Label htmlFor="service" className="text-slate-700 font-medium">
+              <Label htmlFor="service" className="text-muted-foreground font-medium">
                 Service
               </Label>
               <Select value={service} onValueChange={setService} required>
@@ -191,7 +191,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status" className="text-slate-700 font-medium">
+              <Label htmlFor="status" className="text-muted-foreground font-medium">
                 Status
               </Label>
               <Select value={status} onValueChange={setStatus} required>
@@ -212,7 +212,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="paygrade" className="text-slate-700 font-medium">
+              <Label htmlFor="paygrade" className="text-muted-foreground font-medium">
                 Paygrade
               </Label>
               <Select value={paygrade} onValueChange={setPaygrade} required>
@@ -233,7 +233,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="zipCode" className="text-slate-700 font-medium">
+              <Label htmlFor="zipCode" className="text-muted-foreground font-medium">
                 Zip Code
               </Label>
               <Input
@@ -251,7 +251,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-slate-700 font-medium">
+              <Label htmlFor="phone" className="text-muted-foreground font-medium">
                 Phone Number
               </Label>
               <Input
@@ -267,7 +267,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup-email" className="text-slate-700 font-medium">
+              <Label htmlFor="signup-email" className="text-muted-foreground font-medium">
                 Email
               </Label>
               <Input
@@ -283,7 +283,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
 
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
+              className="w-full bg-blue-600 dark:bg-blue-800 hover:bg-blue-700 dark:hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer"
               size="lg"
             >
               <Sparkles className="mr-2 h-5 w-5" />

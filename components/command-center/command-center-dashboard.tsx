@@ -6,13 +6,15 @@ import {
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink,
-  CreditCard, FileCheck, Wrench, Video, Car
+  CreditCard, Wrench, Video, Car, Circle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
+import { useLegalChecklist } from "@/hooks/use-legal"
+import { cn } from "@/lib/utils"
 
 export function CommandCenterDashboard() {
   const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
@@ -122,6 +124,45 @@ export function CommandCenterDashboard() {
       timeZoneName: "short",
     }).format(date)
   }
+
+  interface ChecklistDef {
+    id: string
+    label: string
+    priority: "critical" | "recommended" | "optional"
+  }
+
+  const LEGALCHECKLIST: ChecklistDef[] = [
+    { id: "will", label: "Will & Testament", priority: "critical" },
+    { id: "poa-general", label: "General Power of Attorney", priority: "critical" },
+    { id: "poa-special", label: "Special Power of Attorney", priority: "recommended" },
+    { id: "advance-directive", label: "Advance Medical Directive", priority: "critical" },
+    { id: "beneficiaries", label: "Review Beneficiaries", priority: "critical" },
+    { id: "sgli-review", label: "SGLI Coverage Review", priority: "critical" },
+    { id: "life-insurance-private", label: "Private Life Insurance", priority: "recommended" },
+    { id: "dd93", label: "DD Form 93", priority: "critical" },
+    { id: "allotments", label: "Pay Allotments", priority: "recommended" },
+    { id: "tax-documents", label: "Tax Documents", priority: "recommended" },
+    { id: "debt-inventory", label: "Debt & Account Inventory", priority: "optional" },
+    { id: "scra-interest", label: "SCRA Interest Rate Cap", priority: "recommended" },
+    { id: "family-care-plan", label: "Family Care Plan", priority: "critical" },
+    { id: "emergency-contacts", label: "Emergency Contacts", priority: "critical" },
+    { id: "childcare-poa", label: "Childcare POA", priority: "recommended" },
+    { id: "id-cards", label: "Dependent ID Cards", priority: "recommended" },
+    { id: "vehicle-storage", label: "Vehicle Storage & Insurance", priority: "recommended" },
+    { id: "lease-review", label: "Lease / Housing Review", priority: "recommended" },
+    { id: "scra-protections", label: "SCRA Protections Filed", priority: "recommended" },
+    { id: "mail-forwarding", label: "Mail Forwarding", priority: "optional" },
+  ]
+
+  const { completionMap } = useLegalChecklist()
+
+  const total = LEGALCHECKLIST.length
+  const done = LEGALCHECKLIST.filter((i) => completionMap[i.id]?.completed).length
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+  const criticalItems = LEGALCHECKLIST.filter((i) => i.priority === "critical")
+  const criticalDone = criticalItems.filter((i) => completionMap[i.id]?.completed).length
+  const criticalRemaining = criticalItems.length - criticalDone
+  const incompleteCritical = criticalItems.filter((i) => !completionMap[i.id]?.completed).slice(0, 3)
 
   return (
     <section className="py-6 md:py-10 bg-background">
@@ -283,11 +324,26 @@ export function CommandCenterDashboard() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Upcoming Events</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">8 events scheduled</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">8 events scheduled in next 30 days</p>
                 </div>
               </div>
 
               <div className="space-y-3 mb-4">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/40 flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="text-xs text-red-600 dark:text-red-400 font-bold">FEB</div>
+                    <div className="text-lg font-bold text-red-700 dark:text-red-300">14</div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Anniversary</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">Send care package</div>
+                  </div>
+                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded text-xs font-bold">
+                    <Clock className="w-3 h-3" />
+                    16d
+                  </div>
+                </div>
+
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
                   <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/40 flex flex-col items-center justify-center flex-shrink-0">
                     <div className="text-xs text-red-600 dark:text-red-400 font-bold">FEB</div>
@@ -316,7 +372,7 @@ export function CommandCenterDashboard() {
               </div>
 
               <Button variant="outline" className="w-full border-cyan-300 dark:border-cyan-700 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 hover:text-cyan-900 dark:hover:text-cyan-200" asChild>
-                <Link href="/services/command-center/calendar">
+                <Link href="/scheduler/calendar">
                   View Calendar
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Link>
@@ -326,41 +382,93 @@ export function CommandCenterDashboard() {
 
           {/* Legal Ready - Attention needed */}
           <div className="lg:col-span-3">
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/40 dark:to-red-950/30 rounded-2xl p-6 border-2 border-orange-300 dark:border-orange-700 shadow-lg hover:shadow-xl transition-all h-full">
+            <div className={"bg-gradient-to-br rounded-2xl p-6 border shadow-lg hover:shadow-xl transition-all h-full from-orange-50 to-red-50 dark:from-orange-950/40 dark:to-red-950/30 border-orange-300 dark:border-orange-700"}>
+              {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-orange-600 dark:bg-orange-500 flex items-center justify-center shadow-lg">
+                  <div className={"w-11 h-11 rounded-xl flex items-center justify-center shadow-lg bg-orange-200 dark:bg-orange-900"}>
                     <ShieldCheck className="w-6 h-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Legal Ready</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Stay prepared
+                    </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm animate-pulse">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  2
-                </div>
+                {criticalRemaining > 0 && (
+                  <div className="flex items-center gap-1.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {criticalRemaining}
+                  </div>
+                )}
               </div>
 
+              {/* Progress */}
               <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-orange-200/50 dark:border-orange-700/30 mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Documents</span>
-                  <FileCheck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Readiness</span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300">
+                    {pct}%
+                  </span>
                 </div>
-                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">8<span className="text-xl text-slate-500 dark:text-slate-400">/10</span></div>
-                <div className="flex-1 bg-orange-200 dark:bg-orange-900 rounded-full h-2 overflow-hidden">
-                  <div className="bg-orange-600 dark:bg-orange-500 h-full rounded-full w-4/5"></div>
+                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
+                  {done}<span className="text-xl text-slate-500 dark:text-slate-400">/{total}</span>
+                </div>
+                <div className={"flex-1 rounded-full h-2 overflow-hidden bg-orange-200 dark:bg-orange-900"}>
+                  <div
+                    className={"h-full rounded-full transition-all duration-700 ease-out, bg-orange-600 dark:bg-orange-500"}
+                    style={{ width: `${pct}%` }}
+                    role="progressbar"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Legal readiness: ${pct}% complete`}
+                  />
                 </div>
               </div>
 
-              <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded-lg p-3 mb-3">
-                <div className="text-xs text-red-700 dark:text-red-300 font-bold mb-1">ACTION REQUIRED</div>
-                <div className="text-sm text-red-900 dark:text-red-200">2 documents need renewal</div>
-              </div>
+              {/* Critical items or success state */}
+              {criticalRemaining > 0 ? (
+                <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded-lg p-3 mb-3">
+                  <div className="text-[10px] text-red-700 dark:text-red-300 font-bold uppercase tracking-wider mb-1.5">
+                    Critical — Action Required
+                  </div>
+                  <div className="space-y-1.5">
+                    {incompleteCritical.map((item) => (
+                      <div key={item.id} className="flex items-center gap-2">
+                        <Circle className="w-3 h-3 text-red-400 dark:text-red-500 flex-shrink-0" />
+                        <span className="text-xs text-red-900 dark:text-red-200 font-medium truncate">{item.label}</span>
+                      </div>
+                    ))}
+                    {criticalRemaining > 3 && (
+                      <p className="text-[11px] text-red-600 dark:text-red-400 font-medium pl-5">
+                        +{criticalRemaining - 3} more critical item{criticalRemaining - 3 !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : done === 0 ? (
+                <div className="bg-slate-100 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700 rounded-lg p-3 mb-3">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider mb-1">
+                    Get Started
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-300 dark:border-emerald-700 rounded-lg p-3 mb-3">
+                  <div className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold uppercase tracking-wider mb-1">
+                    {pct >= 100 ? "Fully Prepared" : "Critical Items Complete"}
+                  </div>
+                </div>
+              )}
 
-              <Button className="w-full bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500 text-white shadow-lg" asChild>
+              {/* CTA */}
+              <Button
+                className={"w-full text-white shadow-lg bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500"}
+                asChild
+              >
                 <Link href="/services/command-center/legal">
-                  Review Now
+                  {done === 0 ? "Get Started" : criticalRemaining > 0 ? "Review Now" : "View Checklist"}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Link>
               </Button>
