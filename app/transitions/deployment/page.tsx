@@ -1,4 +1,3 @@
-import { Card } from "@/components/ui/card"
 import { Header } from "@/components/header"
 import { Hero } from "@/components/deployment/hero"
 import { ChecklistSection } from "@/components/deployment/checklist-section"
@@ -37,7 +36,7 @@ export default function DeploymentPage() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <main className="flex-1 min-h-screen bg-background">
         <div className="items-center">
           <Hero />
 

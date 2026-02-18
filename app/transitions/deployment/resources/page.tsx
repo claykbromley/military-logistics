@@ -97,10 +97,10 @@ export default function DeploymentResourcesPage() {
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-180px)]">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r">
+        <aside className="w-full lg:w-80 bg-sidebar border-r">
           <div className="top-20 p-6">
             <a href="/transitions/deployment">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-6 pb-3 border-b-2 border-muted-foreground text-center">
                 Deployment
               </h2>
             </a>
@@ -110,7 +110,7 @@ export default function DeploymentResourcesPage() {
                 return (
                   <Card
                     key={category.name}
-                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
+                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-card border-2 hover:border-primary group"
                   >
                     <a key={category.name} href={category.link}>
                       <div className="flex items-start gap-3">
@@ -118,7 +118,7 @@ export default function DeploymentResourcesPage() {
                           <Icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
+                          <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
                             {category.name}
                           </h3>
                           <p className="text-xs text-muted-foreground">{category.description}</p>
@@ -133,7 +133,7 @@ export default function DeploymentResourcesPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex-1">
+        <main className="min-h-screen bg-background flex-1">
           <section id="resources" className="py-16 bg-muted/30">
             <div className="max-w-6xl mx-auto px-4 sm:px-6">
               <div className="text-center mb-10">

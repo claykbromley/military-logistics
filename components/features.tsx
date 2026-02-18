@@ -54,7 +54,7 @@ const features = [
 
 export function Features() {
   return (
-    <section className="py-16 md:py-24 bg-slate-50">
+    <section className="py-16 md:py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 text-balance">
@@ -75,7 +75,7 @@ export function Features() {
               >
                 <Card
                   key={index}
-                  className="border-border hover:border-navy-400 transition-colors bg-white shadow-sm hover:shadow-md cursor-pointer"
+                  className="border-border hover:border-navy-400 transition-colors bg-card shadow-sm hover:shadow-md cursor-pointer"
                 >
                   <CardHeader>
                     <div className="w-12 h-12 rounded-lg bg-navy-100 flex items-center justify-center mb-4">

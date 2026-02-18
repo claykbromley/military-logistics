@@ -1,548 +1,416 @@
-"use client"
-
-import { useEffect, useState, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 
-export type LegalDocumentType =
-  | "will"
-  | "poa_general"
-  | "poa_special"
-  | "poa_medical"
-  | "poa_financial"
-  | "living_will"
-  | "trust"
-  | "dd93"
-  | "sgli"
+/* ═══════════════════════════════════════════════════
+   Shared types
+   ═══════════════════════════════════════════════════ */
+
+export type AppointmentType =
+  | "jag"
+  | "legal_aid"
+  | "notary"
+  | "tax"
+  | "will_prep"
+  | "poa_signing"
+  | "scra_filing"
+  | "general"
+
+export type AppointmentStatus =
+  | "scheduled"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "no_show"
+
+export type OfficeType =
+  | "jag_office"
+  | "legal_aid"
+  | "notary"
+  | "tax_center"
+  | "veterans_clinic"
+  | "private_attorney"
+  | "military_onesource"
+  | "family_advocacy"
   | "other"
 
-export type DocumentStatus = "not_started" | "in_progress" | "completed" | "needs_update"
-
-export interface LegalDocument {
+export interface ChecklistRow {
   id: string
-  user_id?: string
-  type: LegalDocumentType
-  name: string
-  status: DocumentStatus
-  location: string
-  documentDate: string | null
-  lastUpdated: string | null
-  expirationDate: string | null
-  notes: string
-  attorney: string | null
-  attorneyPhone: string | null
-  witnessNames: string[]
-  createdAt?: string
-  updatedAt?: string
-}
-
-export interface JAGAppointment {
-  id: string
-  date: string
-  time: string
-  location: string
-  purpose: string
-  notes: string
+  user_id: string
+  item_key: string
   completed: boolean
+  completed_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
 }
 
-export interface LegalContact {
+export interface AppointmentRow {
   id: string
+  user_id: string
+  title: string
+  description: string | null
+  appointment_type: AppointmentType
+  status: AppointmentStatus
+  scheduled_date: string
+  scheduled_time: string
+  duration_min: number
+  timezone: string
+  provider_name: string | null
+  provider_phone: string | null
+  provider_email: string | null
+  location_name: string | null
+  location_address: string | null
+  location_lat: number | null
+  location_lng: number | null
+  is_virtual: boolean
+  virtual_link: string | null
+  office_id: string | null
+  reminder_sent: boolean
+  reminder_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OfficeRow {
+  id: string
+  user_id: string | null
   name: string
-  role: string
-  organization: string
-  phone: string
-  email: string
-  address: string
+  office_type: OfficeType
+  description: string | null
+  phone: string | null
+  email: string | null
+  website: string | null
+  address_line1: string | null
+  address_line2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  country: string | null
+  latitude: number | null
+  longitude: number | null
+  hours_json: Record<string, string> | null
+  walk_in: boolean
+  appointment_req: boolean
+  accepts_virtual: boolean
+  booking_url: string | null
+  booking_phone: string | null
+  installation: string | null
+  branch: string | null
+  is_verified: boolean
+  is_bookmarked: boolean
+  rating: number | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+  distance_miles?: number
 }
 
-interface LegalData {
-  documents: LegalDocument[]
-  appointments: JAGAppointment[]
-  contacts: LegalContact[]
+export interface NoteRow {
+  id: string
+  user_id: string
+  title: string
+  content: string | null
+  category: string | null
+  pinned: boolean
+  created_at: string
+  updated_at: string
 }
 
-const STORAGE_KEY = "deployment-legal-data"
+/* ═══════════════════════════════════════════════════
+   Hook: useLegalChecklist
+   ═══════════════════════════════════════════════════ */
 
-const defaultDocuments: LegalDocument[] = [
-  {
-    id: "1",
-    type: "will",
-    name: "Last Will and Testament",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "2",
-    type: "poa_general",
-    name: "General Power of Attorney",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "3",
-    type: "poa_medical",
-    name: "Medical Power of Attorney",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "4",
-    type: "poa_financial",
-    name: "Financial Power of Attorney",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "5",
-    type: "living_will",
-    name: "Living Will / Advance Directive",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "6",
-    type: "dd93",
-    name: "DD Form 93 (Record of Emergency Data)",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-  {
-    id: "7",
-    type: "sgli",
-    name: "SGLI Election & Certificate",
-    status: "not_started",
-    location: "",
-    documentDate: null,
-    lastUpdated: null,
-    expirationDate: null,
-    notes: "",
-    attorney: null,
-    attorneyPhone: null,
-    witnessNames: [],
-  },
-]
+export function useLegalChecklist() {
+  const [rows, setRows] = useState<ChecklistRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
 
-const defaultData: LegalData = {
-  documents: defaultDocuments,
-  appointments: [],
-  contacts: [],
+  const supabase = useMemo(() => createClient(), [])
+
+  // Auth + initial fetch
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!user) { setLoading(false); return }
+      setUserId(user.id)
+
+      const { data } = await supabase
+        .from("legal_checklist_items")
+        .select("*")
+        .eq("user_id", user.id)
+      if (!cancelled && data) setRows(data)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
+
+  const completionMap = useMemo(() => {
+    const map: Record<string, { completed: boolean; notes: string | null }> = {}
+    rows.forEach((r) => { map[r.item_key] = { completed: r.completed, notes: r.notes } })
+    return map
+  }, [rows])
+
+  const toggle = useCallback(async (itemKey: string) => {
+    if (!userId) return
+    const existing = rows.find((r) => r.item_key === itemKey)
+
+    if (existing) {
+      const newVal = !existing.completed
+      // Optimistic
+      setRows((prev) =>
+        prev.map((r) =>
+          r.item_key === itemKey
+            ? { ...r, completed: newVal, completed_at: newVal ? new Date().toISOString() : null }
+            : r
+        )
+      )
+      await supabase
+        .from("legal_checklist_items")
+        .update({ completed: newVal, completed_at: newVal ? new Date().toISOString() : null })
+        .eq("id", existing.id)
+    } else {
+      // Insert
+      const newRow: Partial<ChecklistRow> = {
+        user_id: userId,
+        item_key: itemKey,
+        completed: true,
+        completed_at: new Date().toISOString(),
+      }
+      const { data } = await supabase
+        .from("legal_checklist_items")
+        .insert(newRow)
+        .select()
+        .single()
+      if (data) setRows((prev) => [...prev, data])
+    }
+  }, [userId, rows, supabase])
+
+  const updateNotes = useCallback(async (itemKey: string, notes: string) => {
+    if (!userId) return
+    const existing = rows.find((r) => r.item_key === itemKey)
+    if (existing) {
+      setRows((prev) => prev.map((r) => r.item_key === itemKey ? { ...r, notes } : r))
+      await supabase.from("legal_checklist_items").update({ notes }).eq("id", existing.id)
+    } else {
+      const { data } = await supabase
+        .from("legal_checklist_items")
+        .insert({ user_id: userId, item_key: itemKey, completed: false, notes })
+        .select()
+        .single()
+      if (data) setRows((prev) => [...prev, data])
+    }
+  }, [userId, rows, supabase])
+
+  const resetAll = useCallback(async () => {
+    if (!userId) return
+    setRows([])
+    await supabase.from("legal_checklist_items").delete().eq("user_id", userId)
+  }, [userId, supabase])
+
+  return { completionMap, loading, toggle, updateNotes, resetAll, isAuthenticated: !!userId }
 }
 
-export function useLegal() {
-  const [data, setData] = useState<LegalData>(defaultData)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isSyncing, setIsSyncing] = useState(false)
-  const [syncError, setSyncError] = useState<string | null>(null)
+/* ═══════════════════════════════════════════════════
+   Hook: useLegalAppointments
+   ═══════════════════════════════════════════════════ */
+
+export function useLegalAppointments() {
+  const [appointments, setAppointments] = useState<AppointmentRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    const loadData = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!user) { setLoading(false); return }
+      setUserId(user.id)
 
-      setIsAuthenticated(!!user)
+      const { data } = await supabase
+        .from("legal_appointments")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("scheduled_date", { ascending: true })
+        .order("scheduled_time", { ascending: true })
+      if (!cancelled && data) setAppointments(data)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
 
-      if (user) {
-        try {
-          const { data: legalDocs, error } = await supabase
-            .from("legal_documents")
-            .select("*")
-            .order("created_at", { ascending: false })
+  const add = useCallback(async (appt: Partial<AppointmentRow>) => {
+    if (!userId) return null
+    const { data, error } = await supabase
+      .from("legal_appointments")
+      .insert({ ...appt, user_id: userId })
+      .select()
+      .single()
+    if (data) setAppointments((prev) => [...prev, data].sort((a, b) =>
+      `${a.scheduled_date}${a.scheduled_time}`.localeCompare(`${b.scheduled_date}${b.scheduled_time}`)
+    ))
+    return data
+  }, [userId, supabase])
 
-          if (error) throw error
+  const update = useCallback(async (id: string, data: Partial<AppointmentRow>) => {
+    const { data: updated } = await supabase
+      .from("legal_appointments")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single()
+    if (updated) setAppointments((prev) => prev.map((a) => a.id === id ? updated : a))
+  }, [supabase])
 
-          if (legalDocs && legalDocs.length > 0) {
-            const localDocs: LegalDocument[] = legalDocs.map((d) => ({
-              id: d.id,
-              user_id: d.user_id,
-              type: d.document_type as LegalDocumentType,
-              name: getDocumentName(d.document_type as LegalDocumentType),
-              status: d.status as DocumentStatus,
-              location: d.location || "",
-              documentDate: d.document_date,
-              lastUpdated: d.updated_at,
-              expirationDate: d.expiration_date,
-              notes: d.notes || "",
-              attorney: d.attorney_name,
-              attorneyPhone: d.attorney_phone,
-              witnessNames: [],
-              createdAt: d.created_at,
-              updatedAt: d.updated_at,
-            }))
+  const remove = useCallback(async (id: string) => {
+    await supabase.from("legal_appointments").delete().eq("id", id)
+    setAppointments((prev) => prev.filter((a) => a.id !== id))
+  }, [supabase])
 
-            setData((prev) => ({ ...prev, documents: localDocs }))
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, documents: localDocs }))
-          } else {
-            // Initialize with default documents in database
-            const docsToInsert = defaultDocuments.map((d) => ({
-              user_id: user.id,
-              document_type: d.type,
-              status: d.status,
-              location: d.location || null,
-              document_date: d.documentDate,
-              expiration_date: d.expirationDate,
-              notes: d.notes || null,
-              attorney_name: d.attorney,
-              attorney_phone: d.attorneyPhone,
-            }))
+  const upcoming = useMemo(() =>
+    appointments.filter((a) => a.status === "scheduled" || a.status === "confirmed"),
+    [appointments]
+  )
 
-            const { data: inserted, error: insertError } = await supabase
-              .from("legal_documents")
-              .insert(docsToInsert)
-              .select()
+  const past = useMemo(() =>
+    appointments.filter((a) => a.status === "completed" || a.status === "cancelled" || a.status === "no_show"),
+    [appointments]
+  )
 
-            if (insertError) throw insertError
+  return { appointments, upcoming, past, loading, add, update, remove, isAuthenticated: !!userId }
+}
 
-            if (inserted) {
-              const localDocs: LegalDocument[] = inserted.map((d) => ({
-                id: d.id,
-                user_id: d.user_id,
-                type: d.document_type as LegalDocumentType,
-                name: getDocumentName(d.document_type as LegalDocumentType),
-                status: d.status as DocumentStatus,
-                location: d.location || "",
-                documentDate: d.document_date,
-                lastUpdated: d.updated_at,
-                expirationDate: d.expiration_date,
-                notes: d.notes || "",
-                attorney: d.attorney_name,
-                attorneyPhone: d.attorney_phone,
-                witnessNames: [],
-                createdAt: d.created_at,
-                updatedAt: d.updated_at,
-              }))
+/* ═══════════════════════════════════════════════════
+   Hook: useLegalOffices
+   ═══════════════════════════════════════════════════ */
 
-              setData((prev) => ({ ...prev, documents: localDocs }))
-            }
-          }
-        } catch (error) {
-          console.error("Error loading legal documents from Supabase:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to load")
-          loadFromLocalStorage()
-        }
-      } else {
-        loadFromLocalStorage()
+export function useLegalOffices() {
+  const [offices, setOffices] = useState<OfficeRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  const supabase = useMemo(() => createClient(), [])
+
+  // Fetch all visible offices (global + user's own)
+  const fetchOffices = useCallback(async () => {
+    const { data } = await supabase
+      .from("legal_offices")
+      .select("*")
+      .order("is_verified", { ascending: false })
+      .order("name", { ascending: true })
+    if (data) setOffices(data)
+    setLoading(false)
+  }, [supabase])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!cancelled) {
+        setUserId(user?.id || null)
+        await fetchOffices()
       }
+    })()
+    return () => { cancelled = true }
+  }, [supabase, fetchOffices])
 
-      setIsLoaded(true)
-    }
-
-    const loadFromLocalStorage = () => {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        try {
-          setData(JSON.parse(stored))
-        } catch {
-          setData(defaultData)
-        }
-      }
-    }
-
-    loadData()
-
-    const supabase = createClient()
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user)
+  // Nearby search via RPC
+  const searchNearby = useCallback(async (lat: number, lng: number, radiusMiles = 50) => {
+    const { data } = await supabase.rpc("find_nearby_legal_offices", {
+      user_lat: lat,
+      user_lng: lng,
+      radius_miles: radiusMiles,
+      result_limit: 20,
     })
+    return (data as OfficeRow[]) || []
+  }, [supabase])
 
-    return () => subscription.unsubscribe()
-  }, [])
+  // Search by installation name
+  const searchByInstallation = useCallback(async (query: string) => {
+    const { data } = await supabase
+      .from("legal_offices")
+      .select("*")
+      .ilike("installation", `%${query}%`)
+      .order("name")
+    return (data as OfficeRow[]) || []
+  }, [supabase])
 
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-    }
-  }, [data, isLoaded])
+  const bookmarkOffice = useCallback(async (officeId: string, bookmarked: boolean) => {
+    // For global offices, we'd create a user-specific record.
+    // For simplicity, if the user owns it, just toggle.
+    await supabase
+      .from("legal_offices")
+      .update({ is_bookmarked: bookmarked })
+      .eq("id", officeId)
+    setOffices((prev) =>
+      prev.map((o) => o.id === officeId ? { ...o, is_bookmarked: bookmarked } : o)
+    )
+  }, [supabase])
 
-  const updateDocument = useCallback(
-    async (id: string, updates: Partial<LegalDocument>) => {
-      setData((prev) => ({
-        ...prev,
-        documents: prev.documents.map((doc) =>
-          doc.id === id ? { ...doc, ...updates, lastUpdated: new Date().toISOString() } : doc
-        ),
-      }))
-
-      if (isAuthenticated) {
-        setIsSyncing(true)
-        try {
-          const supabase = createClient()
-
-          const dbUpdates: Record<string, unknown> = {}
-          if (updates.type !== undefined) dbUpdates.document_type = updates.type
-          if (updates.status !== undefined) dbUpdates.status = updates.status
-          if (updates.location !== undefined) dbUpdates.location = updates.location || null
-          if (updates.documentDate !== undefined) dbUpdates.document_date = updates.documentDate
-          if (updates.expirationDate !== undefined) dbUpdates.expiration_date = updates.expirationDate
-          if (updates.notes !== undefined) dbUpdates.notes = updates.notes || null
-          if (updates.attorney !== undefined) dbUpdates.attorney_name = updates.attorney
-          if (updates.attorneyPhone !== undefined) dbUpdates.attorney_phone = updates.attorneyPhone
-
-          const { error } = await supabase.from("legal_documents").update(dbUpdates).eq("id", id)
-
-          if (error) throw error
-          setSyncError(null)
-        } catch (error) {
-          console.error("Error updating legal document:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to update")
-        } finally {
-          setIsSyncing(false)
-        }
-      }
-    },
-    [isAuthenticated]
-  )
-
-  const addDocument = useCallback(
-    async (document: Omit<LegalDocument, "id">) => {
-      const newDoc: LegalDocument = {
-        ...document,
-        id: crypto.randomUUID(),
-      }
-
-      if (isAuthenticated) {
-        setIsSyncing(true)
-        try {
-          const supabase = createClient()
-          const {
-            data: { user },
-          } = await supabase.auth.getUser()
-
-          if (user) {
-            const { data: created, error } = await supabase
-              .from("legal_documents")
-              .insert({
-                user_id: user.id,
-                document_type: document.type,
-                status: document.status,
-                location: document.location || null,
-                document_date: document.documentDate,
-                expiration_date: document.expirationDate,
-                notes: document.notes || null,
-                attorney_name: document.attorney,
-                attorney_phone: document.attorneyPhone,
-              })
-              .select()
-              .single()
-
-            if (error) throw error
-
-            const createdDoc: LegalDocument = {
-              id: created.id,
-              user_id: created.user_id,
-              type: created.document_type as LegalDocumentType,
-              name: document.name,
-              status: created.status as DocumentStatus,
-              location: created.location || "",
-              documentDate: created.document_date,
-              lastUpdated: created.updated_at,
-              expirationDate: created.expiration_date,
-              notes: created.notes || "",
-              attorney: created.attorney_name,
-              attorneyPhone: created.attorney_phone,
-              witnessNames: [],
-              createdAt: created.created_at,
-              updatedAt: created.updated_at,
-            }
-
-            setData((prev) => ({
-              ...prev,
-              documents: [...prev.documents, createdDoc],
-            }))
-            setSyncError(null)
-            return createdDoc
-          }
-        } catch (error) {
-          console.error("Error creating legal document:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to save")
-          setData((prev) => ({
-            ...prev,
-            documents: [...prev.documents, newDoc],
-          }))
-        } finally {
-          setIsSyncing(false)
-        }
-      } else {
-        setData((prev) => ({
-          ...prev,
-          documents: [...prev.documents, newDoc],
-        }))
-      }
-
-      return newDoc
-    },
-    [isAuthenticated]
-  )
-
-  const deleteDocument = useCallback(
-    async (id: string) => {
-      setData((prev) => ({
-        ...prev,
-        documents: prev.documents.filter((doc) => doc.id !== id),
-      }))
-
-      if (isAuthenticated) {
-        setIsSyncing(true)
-        try {
-          const supabase = createClient()
-          const { error } = await supabase.from("legal_documents").delete().eq("id", id)
-
-          if (error) throw error
-          setSyncError(null)
-        } catch (error) {
-          console.error("Error deleting legal document:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to delete")
-        } finally {
-          setIsSyncing(false)
-        }
-      }
-    },
-    [isAuthenticated]
-  )
-
-  const addAppointment = useCallback((appointment: Omit<JAGAppointment, "id">) => {
-    const newAppt: JAGAppointment = {
-      ...appointment,
-      id: crypto.randomUUID(),
-    }
-    setData((prev) => ({
-      ...prev,
-      appointments: [...prev.appointments, newAppt],
-    }))
-  }, [])
-
-  const updateAppointment = useCallback((id: string, updates: Partial<JAGAppointment>) => {
-    setData((prev) => ({
-      ...prev,
-      appointments: prev.appointments.map((appt) => (appt.id === id ? { ...appt, ...updates } : appt)),
-    }))
-  }, [])
-
-  const deleteAppointment = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      appointments: prev.appointments.filter((appt) => appt.id !== id),
-    }))
-  }, [])
-
-  const addContact = useCallback((contact: Omit<LegalContact, "id">) => {
-    const newContact: LegalContact = {
-      ...contact,
-      id: crypto.randomUUID(),
-    }
-    setData((prev) => ({
-      ...prev,
-      contacts: [...prev.contacts, newContact],
-    }))
-  }, [])
-
-  const updateContact = useCallback((id: string, updates: Partial<LegalContact>) => {
-    setData((prev) => ({
-      ...prev,
-      contacts: prev.contacts.map((contact) => (contact.id === id ? { ...contact, ...updates } : contact)),
-    }))
-  }, [])
-
-  const deleteContact = useCallback((id: string) => {
-    setData((prev) => ({
-      ...prev,
-      contacts: prev.contacts.filter((contact) => contact.id !== id),
-    }))
-  }, [])
-
-  const getCompletionStats = useCallback(() => {
-    const total = data.documents.length
-    const completed = data.documents.filter((d) => d.status === "completed").length
-    const inProgress = data.documents.filter((d) => d.status === "in_progress").length
-    const needsUpdate = data.documents.filter((d) => d.status === "needs_update").length
-    return {
-      total,
-      completed,
-      inProgress,
-      needsUpdate,
-      percentage: Math.round((completed / total) * 100),
-    }
-  }, [data.documents])
-
-  return {
-    documents: data.documents,
-    appointments: data.appointments,
-    contacts: data.contacts,
-    isLoaded,
-    isAuthenticated,
-    isSyncing,
-    syncError,
-    updateDocument,
-    addDocument,
-    deleteDocument,
-    addAppointment,
-    updateAppointment,
-    deleteAppointment,
-    addContact,
-    updateContact,
-    deleteContact,
-    getCompletionStats,
-  }
+  return { offices, loading, searchNearby, searchByInstallation, bookmarkOffice, isAuthenticated: !!userId }
 }
 
-function getDocumentName(type: LegalDocumentType): string {
-  const names: Record<LegalDocumentType, string> = {
-    will: "Last Will and Testament",
-    poa_general: "General Power of Attorney",
-    poa_special: "Special Power of Attorney",
-    poa_medical: "Medical Power of Attorney",
-    poa_financial: "Financial Power of Attorney",
-    living_will: "Living Will / Advance Directive",
-    trust: "Trust Document",
-    dd93: "DD Form 93 (Record of Emergency Data)",
-    sgli: "SGLI Election & Certificate",
-    other: "Other Legal Document",
-  }
-  return names[type] || "Unknown Document"
+/* ═══════════════════════════════════════════════════
+   Hook: useLegalNotes
+   ═══════════════════════════════════════════════════ */
+
+export function useLegalNotes() {
+  const [notes, setNotes] = useState<NoteRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (cancelled) return
+      if (!user) { setLoading(false); return }
+      setUserId(user.id)
+
+      const { data } = await supabase
+        .from("legal_notes")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("pinned", { ascending: false })
+        .order("updated_at", { ascending: false })
+      if (!cancelled && data) setNotes(data)
+      setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
+
+  const add = useCallback(async (note: Partial<NoteRow>) => {
+    if (!userId) return null
+    const { data } = await supabase
+      .from("legal_notes")
+      .insert({ ...note, user_id: userId })
+      .select()
+      .single()
+    if (data) setNotes((prev) => [data, ...prev])
+    return data
+  }, [userId, supabase])
+
+  const update = useCallback(async (id: string, data: Partial<NoteRow>) => {
+    const { data: updated } = await supabase
+      .from("legal_notes")
+      .update(data)
+      .eq("id", id)
+      .select()
+      .single()
+    if (updated) setNotes((prev) => prev.map((n) => n.id === id ? updated : n))
+  }, [supabase])
+
+  const remove = useCallback(async (id: string) => {
+    await supabase.from("legal_notes").delete().eq("id", id)
+    setNotes((prev) => prev.filter((n) => n.id !== id))
+  }, [supabase])
+
+  return { notes, loading, add, update, remove, isAuthenticated: !!userId }
 }

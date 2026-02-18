@@ -34,7 +34,6 @@ export function CommandCenterDashboard() {
 
   const formatDate = (dateStr?: string, year?: boolean) => {
     if (!dateStr) return '—'
-
     if (year) {
       return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
         month: 'short',
@@ -42,7 +41,7 @@ export function CommandCenterDashboard() {
         year: 'numeric'
       })
     }
-        return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+    return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
       month: 'short',
       day: '2-digit',
     })
@@ -50,10 +49,8 @@ export function CommandCenterDashboard() {
 
   const daysUntil = (dateStr?: string) => {
     if (!dateStr) return null
-
     const today = new Date()
     const target = new Date(`${dateStr}T00:00:00`)
-
     today.setHours(0, 0, 0, 0)
     const diffMs = target.getTime() - today.getTime()
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
@@ -66,10 +63,8 @@ export function CommandCenterDashboard() {
     return items.reduce<T | null>((earliest, item) => {
       const currentDate = item[dateKey]
       const earliestDate = earliest?.[dateKey]
-
       if (!currentDate) return earliest
       if (!earliestDate) return item
-
       return new Date(currentDate as string) < new Date(earliestDate as string)
         ? item
         : earliest
@@ -84,7 +79,7 @@ export function CommandCenterDashboard() {
   }
 
   const soonestMaintenance = getSoonestByDate(maintenance, "nextDue")
-  const soonestMaintenanceType = vehicles.some(item => item['id'] === soonestMaintenance?.propertyId)?"vehicle":"other"
+  const soonestMaintenanceType = vehicles.some(item => item['id'] === soonestMaintenance?.propertyId) ? "vehicle" : "other"
   const soonestExpItem = getSoonestByDate(expiringItems, "date")
   const soonestExpItemStatus = daysUntil(soonestExpItem?.date)
   const soonestExpDoc = getSoonestByDate(expiringDocuments, "expirationDate")
@@ -94,7 +89,6 @@ export function CommandCenterDashboard() {
     const now = Date.now()
     const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
     const cutoff = now + THIRTY_DAYS
-
     return scheduledEvents
       .filter((e) => e.status === "scheduled" && new Date(e.startTime) >= new Date())
       .filter((e) => {
@@ -113,17 +107,13 @@ export function CommandCenterDashboard() {
   function formatEventTime(iso: string) {
     const date = new Date(iso)
     const now = new Date()
-
     const isToday = date.toDateString() === now.toDateString()
-
     const time = new Intl.DateTimeFormat(undefined, {
       hour: "numeric",
       minute: "2-digit",
       timeZoneName: "short",
     }).format(date)
-
     if (isToday) return `Today, ${time}`
-
     return new Intl.DateTimeFormat(undefined, {
       month: "short",
       day: "numeric",
@@ -133,42 +123,41 @@ export function CommandCenterDashboard() {
     }).format(date)
   }
 
-
   return (
-    <section className="py-6 md:py-10">
+    <section className="py-6 md:py-10 bg-background">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         {/* Main Grid Layout - Asymmetric */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
           
           {/* Financial Command - Large, 2x height */}
           <div className="lg:col-span-5 lg:row-span-2">
-            <div className="h-full bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-6 border border-emerald-200/50 shadow-lg hover:shadow-xl transition-all">
+            <div className="h-full bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 rounded-2xl p-6 border border-emerald-200/50 dark:border-emerald-800/50 shadow-lg hover:shadow-xl transition-all">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-emerald-600 flex items-center justify-center shadow-lg">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center shadow-lg">
                     <DollarSign className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">Financial Management</h3>
-                    <p className="text-xs text-slate-600">Real-time overview</p>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Financial Management</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Real-time overview</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-amber-100 text-amber-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
                   <Bell className="w-3.5 h-3.5" />
                   2
                 </div>
               </div>
 
               {/* Large Savings Display */}
-              <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-6 mb-4 border border-emerald-200/30">
-                <div className="text-sm text-slate-600 mb-2 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-600" />
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-6 mb-4 border border-emerald-200/30 dark:border-emerald-700/30">
+                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                   Deployment Savings
                 </div>
-                <div className="text-5xl font-bold text-emerald-700 mb-2">$2,450</div>
-                <div className="flex items-center gap-2 text-sm text-emerald-700">
-                  <div className="flex-1 bg-emerald-200 rounded-full h-2 overflow-hidden">
-                    <div className="bg-emerald-600 h-full rounded-full w-2/3"></div>
+                <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2">$2,450</div>
+                <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                  <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
+                    <div className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full w-2/3"></div>
                   </div>
                   <span className="font-semibold">67% of goal</span>
                 </div>
@@ -176,47 +165,47 @@ export function CommandCenterDashboard() {
 
               {/* Financial Stats Grid */}
               <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 font-medium">Bills Due Soon</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Bills Due Soon</span>
                     <Clock className="w-4 h-4 text-amber-500" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">3</div>
-                  <div className="text-xs text-amber-600 font-medium mt-1">Next 7 days</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">3</div>
+                  <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">Next 7 days</div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 font-medium">Autopay Active</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Autopay Active</span>
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">12<span className="text-lg text-slate-500">/15</span></div>
-                  <div className="text-xs text-slate-600 mt-1">accounts</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">12<span className="text-lg text-slate-500 dark:text-slate-400">/15</span></div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">accounts</div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 font-medium">Accounts</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Accounts</span>
                     <CreditCard className="w-4 h-4 text-blue-500" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900">8</div>
-                  <div className="text-xs text-emerald-600 font-medium mt-1">All monitored</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">8</div>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">All monitored</div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 font-medium">Net Worth</span>
-                    <Sparkles className="w-4 h-4 text-purple-500" />
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Net Worth</span>
+                    <Sparkles className="w-4 h-4 text-purple-500 dark:text-purple-400" />
                   </div>
-                  <div className="text-2xl font-bold text-slate-900">$48.2K</div>
-                  <div className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">$48.2K</div>
+                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
                     <TrendingUp className="w-3 h-3" />
                     +$2.4K
                   </div>
                 </div>
               </div>
 
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/30" asChild>
+              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 dark:shadow-emerald-900/50" asChild>
                 <Link href="/services/command-center/financial">
                   Manage Finances
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -227,43 +216,43 @@ export function CommandCenterDashboard() {
 
           {/* Communication Hub - Wide */}
           <div className="lg:col-span-7">
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200/50 shadow-lg hover:shadow-xl transition-all h-full">
+            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/40 dark:to-pink-950/30 rounded-2xl p-6 border border-purple-200/50 dark:border-purple-800/50 shadow-lg hover:shadow-xl transition-all h-full">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-purple-600 flex items-center justify-center shadow-lg">
+                  <div className="w-11 h-11 rounded-xl bg-purple-600 dark:bg-purple-500 flex items-center justify-center shadow-lg">
                     <MessageSquare className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900">Communication Hub</h3>
-                    <p className="text-xs text-slate-600">Stay connected with your contacts</p>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Communication Hub</h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">Stay connected with your contacts</p>
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
-                  <Video className="w-5 h-5 text-purple-600 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">{upcomingCalls.length}</div>
-                  <div className="text-xs text-slate-600">Scheduled Calls</div>
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
+                  <Video className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2" />
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{upcomingCalls.length}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Scheduled Calls</div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
-                  <MessageSquare className="w-5 h-5 text-blue-600 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">{unreadCount > 0 ? unreadCount : messageThreads.length}</div>
-                  <div className="text-xs text-slate-600 flex items-center gap-1">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
+                  <MessageSquare className="w-5 h-5 text-blue-600 dark:text-blue-400 mb-2" />
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{unreadCount > 0 ? unreadCount : messageThreads.length}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
                     {unreadCount > 0 ? "Unread Messages" : "Total Threads"}
-                    <TrendingUp className="w-3 h-3 text-emerald-600" />
+                    <TrendingUp className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50">
-                  <History className="w-5 h-5 text-amber-500 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900">{communicationLog.length}</div>
-                  <div className="text-xs text-slate-600">Communication Logs</div>
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
+                  <History className="w-5 h-5 text-amber-500 dark:text-amber-400 mb-2" />
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{communicationLog.length}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Communication Logs</div>
                 </div>
               </div>
 
-              <div className="bg-purple-600 rounded-xl p-4 text-white">
+              <div className="bg-purple-600 dark:bg-purple-700 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between">
                   {upcomingCalls.length > 0 ?
                     <div>
@@ -276,7 +265,7 @@ export function CommandCenterDashboard() {
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full mt-4 border-purple-300 hover:bg-purple-100 hover:text-black-400" asChild>
+              <Button variant="outline" className="w-full mt-4 border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:text-purple-900 dark:hover:text-purple-200" asChild>
                 <Link href="/services/command-center/communication">
                   View Communications
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -287,46 +276,46 @@ export function CommandCenterDashboard() {
 
           {/* Calendar & Events - Medium */}
           <div className="lg:col-span-4">
-            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-2xl p-6 border border-cyan-200/50 shadow-lg hover:shadow-xl transition-all h-full">
+            <div className="bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/40 dark:to-blue-950/30 rounded-2xl p-6 border border-cyan-200/50 dark:border-cyan-800/50 shadow-lg hover:shadow-xl transition-all h-full">
               <div className="flex items-center gap-3 mb-5">
-                <div className="w-11 h-11 rounded-xl bg-cyan-600 flex items-center justify-center shadow-lg">
+                <div className="w-11 h-11 rounded-xl bg-cyan-600 dark:bg-cyan-500 flex items-center justify-center shadow-lg">
                   <Calendar className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">Upcoming Events</h3>
-                  <p className="text-xs text-slate-600">8 events scheduled</p>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Upcoming Events</h3>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">8 events scheduled</p>
                 </div>
               </div>
 
               <div className="space-y-3 mb-4">
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-red-100 flex flex-col items-center justify-center flex-shrink-0">
-                    <div className="text-xs text-red-600 font-bold">FEB</div>
-                    <div className="text-lg font-bold text-red-700">14</div>
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/40 flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="text-xs text-red-600 dark:text-red-400 font-bold">FEB</div>
+                    <div className="text-lg font-bold text-red-700 dark:text-red-300">14</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 text-sm">Anniversary</div>
-                    <div className="text-xs text-slate-600">Send care package</div>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Anniversary</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">Send care package</div>
                   </div>
-                  <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded text-xs font-bold">
+                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded text-xs font-bold">
                     <Clock className="w-3 h-3" />
                     16d
                   </div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-blue-100 flex flex-col items-center justify-center flex-shrink-0">
-                    <div className="text-xs text-blue-600 font-bold">FEB</div>
-                    <div className="text-lg font-bold text-blue-700">22</div>
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex flex-col items-center justify-center flex-shrink-0">
+                    <div className="text-xs text-blue-600 dark:text-blue-400 font-bold">FEB</div>
+                    <div className="text-lg font-bold text-blue-700 dark:text-blue-300">22</div>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 text-sm">Emma's Birthday</div>
-                    <div className="text-xs text-slate-600">Video call scheduled</div>
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Emma&apos;s Birthday</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">Video call scheduled</div>
                   </div>
                 </div>
               </div>
 
-              <Button variant="outline" className="w-full border-cyan-300 hover:bg-cyan-100 hover:text-black-400" asChild>
+              <Button variant="outline" className="w-full border-cyan-300 dark:border-cyan-700 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 hover:text-cyan-900 dark:hover:text-cyan-200" asChild>
                 <Link href="/services/command-center/calendar">
                   View Calendar
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -337,39 +326,39 @@ export function CommandCenterDashboard() {
 
           {/* Legal Ready - Attention needed */}
           <div className="lg:col-span-3">
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-6 border-2 border-orange-300 shadow-lg hover:shadow-xl transition-all h-full">
+            <div className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/40 dark:to-red-950/30 rounded-2xl p-6 border-2 border-orange-300 dark:border-orange-700 shadow-lg hover:shadow-xl transition-all h-full">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-orange-600 flex items-center justify-center shadow-lg">
+                  <div className="w-11 h-11 rounded-xl bg-orange-600 dark:bg-orange-500 flex items-center justify-center shadow-lg">
                     <ShieldCheck className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Legal Ready</h3>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Legal Ready</h3>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-red-100 text-red-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm animate-pulse">
+                <div className="flex items-center gap-1.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm animate-pulse">
                   <AlertCircle className="w-3.5 h-3.5" />
                   2
                 </div>
               </div>
 
-              <div className="bg-white/60 backdrop-blur-sm rounded-xl p-4 border border-orange-200/50 mb-3">
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-orange-200/50 dark:border-orange-700/30 mb-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-slate-600 font-medium">Documents</span>
-                  <FileCheck className="w-4 h-4 text-orange-600" />
+                  <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Documents</span>
+                  <FileCheck className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                 </div>
-                <div className="text-3xl font-bold text-slate-900 mb-2">8<span className="text-xl text-slate-500">/10</span></div>
-                <div className="flex-1 bg-orange-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-orange-600 h-full rounded-full w-4/5"></div>
+                <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">8<span className="text-xl text-slate-500 dark:text-slate-400">/10</span></div>
+                <div className="flex-1 bg-orange-200 dark:bg-orange-900 rounded-full h-2 overflow-hidden">
+                  <div className="bg-orange-600 dark:bg-orange-500 h-full rounded-full w-4/5"></div>
                 </div>
               </div>
 
-              <div className="bg-red-100 border border-red-300 rounded-lg p-3 mb-3">
-                <div className="text-xs text-red-700 font-bold mb-1">ACTION REQUIRED</div>
-                <div className="text-sm text-red-900">2 documents need renewal</div>
+              <div className="bg-red-100 dark:bg-red-900/40 border border-red-300 dark:border-red-700 rounded-lg p-3 mb-3">
+                <div className="text-xs text-red-700 dark:text-red-300 font-bold mb-1">ACTION REQUIRED</div>
+                <div className="text-sm text-red-900 dark:text-red-200">2 documents need renewal</div>
               </div>
 
-              <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white shadow-lg" asChild>
+              <Button className="w-full bg-orange-600 hover:bg-orange-700 dark:bg-orange-600 dark:hover:bg-orange-500 text-white shadow-lg" asChild>
                 <Link href="/services/command-center/legal">
                   Review Now
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -379,145 +368,145 @@ export function CommandCenterDashboard() {
           </div>
         </div>
 
-        {/* Secondary Services Grid - Aesthetic cards with useful info */}
+        {/* Secondary Services Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
           
           {/* Document Vault */}
           <Link href="/services/command-center/documents" className="group">
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200/50 shadow-sm hover:shadow-lg hover:border-blue-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/30 rounded-xl p-5 border border-blue-200/50 dark:border-blue-800/50 shadow-sm hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-600 transition-all h-full">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-blue-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <div className="w-11 h-11 rounded-xl bg-blue-600 dark:bg-blue-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <FileText className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Document Vault</h3>
-                    <span className="text-xs text-slate-600">{documents.length} document{documents.length != 1 && 's'}</span>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Document Vault</h3>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{documents.length} document{documents.length != 1 && 's'}</span>
                   </div>
                 </div>
                 {expiringDocuments.length > 0 &&
                 <div>
-                  {soonestExpDocStatus && soonestExpDocStatus <= 0?
-                  <div className="flex items-center gap-1 bg-red-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
+                  {soonestExpDocStatus && soonestExpDocStatus <= 0 ?
+                  <div className="flex items-center gap-1 bg-red-100 dark:bg-red-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full text-xs font-bold">
                     <Clock className="w-3 h-3" />
                     {expiringDocuments.length}
-                  </div>:
-                  <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
+                  </div> :
+                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full text-xs font-bold">
                     <Clock className="w-3 h-3" />
                     {expiringDocuments.length}
                   </div>}
                 </div>}
               </div>
               
-              {expiringDocuments.length > 0?
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30">
+              {expiringDocuments.length > 0 ?
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30 dark:border-blue-700/30">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-600 font-medium">{soonestExpDoc?.documentName} ({soonestExpDoc?.documentType})</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{soonestExpDoc?.documentName} ({soonestExpDoc?.documentType})</span>
                   <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                 </div>
-                {soonestExpDocStatus && soonestExpDocStatus <= 0?
+                {soonestExpDocStatus && soonestExpDocStatus <= 0 ?
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Expired {formatDate(soonestExpDoc?.expirationDate?.split('T')[0], true)}</div>
-                  <div className="text-xs text-red-600 mt-1">Expired</div>
-                </div>:
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Expired {formatDate(soonestExpDoc?.expirationDate?.split('T')[0], true)}</div>
+                  <div className="text-xs text-red-600 dark:text-red-400 mt-1">Expired</div>
+                </div> :
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">Expires {formatDate(soonestExpDoc?.expirationDate?.split('T')[0], true)}</div>
-                    <div className="text-xs text-amber-600 mt-1">{(() => {
-                      if (soonestExpDocStatus === null) return '—'
-                      if (soonestExpDocStatus === 1) return '1 day remaining'
-                      return `${soonestExpDocStatus} days remaining`
-                    })()}
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Expires {formatDate(soonestExpDoc?.expirationDate?.split('T')[0], true)}</div>
+                  <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">{(() => {
+                    if (soonestExpDocStatus === null) return '—'
+                    if (soonestExpDocStatus === 1) return '1 day remaining'
+                    return `${soonestExpDocStatus} days remaining`
+                  })()}
                   </div>
                 </div>}
-              </div>:
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30">
+              </div> :
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30 dark:border-blue-700/30">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-600 font-medium">DOCUMENTS</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">DOCUMENTS</span>
                 </div>
                 <div>
-                  <div className="text-sm font-semibold text-slate-900">All documents are up to date</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">All documents are up to date</div>
                 </div>
               </div>}
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">Storage: {formatFileSize(totalSize)} / 1 GB</span>
-                <span className="text-blue-600 font-semibold">{Math.round(totalSize * 100 / (1024 * 1024 * 1024))}% used</span>
+                <span className="text-slate-600 dark:text-slate-400">Storage: {formatFileSize(totalSize)} / 1 GB</span>
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">{Math.round(totalSize * 100 / (1024 * 1024 * 1024))}% used</span>
               </div>
             </div>
           </Link>
 
           {/* Property & Vehicles */}
           <Link href="/services/command-center/property" className="group">
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-5 border border-amber-200/50 shadow-sm hover:shadow-lg hover:border-amber-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 rounded-xl p-5 border border-amber-200/50 dark:border-amber-800/50 shadow-sm hover:shadow-lg hover:border-amber-300 dark:hover:border-amber-600 transition-all h-full">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-xl bg-amber-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <div className="w-11 h-11 rounded-xl bg-amber-600 dark:bg-amber-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <Home className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Property</h3>
-                    <span className="text-xs text-slate-600">{homes} home{homes !== 1 && 's'}, {vehicles.length} vehicle{vehicles.length !== 1 && 's'}</span>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Property</h3>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{homes} home{homes !== 1 && 's'}, {vehicles.length} vehicle{vehicles.length !== 1 && 's'}</span>
                   </div>
                 </div>
                 {expiringItems.length > 0 &&
                 <div>
-                  {soonestExpItemStatus && soonestExpItemStatus <= 0?
-                  <div className="flex items-center gap-1 bg-red-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
+                  {soonestExpItemStatus && soonestExpItemStatus <= 0 ?
+                  <div className="flex items-center gap-1 bg-red-100 dark:bg-red-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full text-xs font-bold">
                     <Clock className="w-3 h-3" />
                     {expiringItems.length}
-                  </div>:
-                  <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
+                  </div> :
+                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full text-xs font-bold">
                     <Clock className="w-3 h-3" />
                     {expiringItems.length}
                   </div>}
                 </div>}
               </div>
               
-              {maintenance.length > 0?
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-amber-200/30">
+              {maintenance.length > 0 ?
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-amber-200/30 dark:border-amber-700/30">
                 <div className="flex items-center gap-2 mb-1">
-                  {soonestMaintenanceType === 'vehicle'?
-                  <Car className="w-3.5 h-3.5 text-amber-600" />:
-                  <Home className="w-3.5 h-3.5 text-amber-600" />}
-                  <span className="text-xs text-slate-600 font-medium">{soonestMaintenance?.propertyName}</span>
+                  {soonestMaintenanceType === 'vehicle' ?
+                  <Car className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" /> :
+                  <Home className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />}
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{soonestMaintenance?.propertyName}</span>
                 </div>
-                <div className="text-sm font-semibold text-slate-900">{soonestMaintenance?.taskName}</div>
-                <div className="text-xs text-amber-600 mt-1">{formatDate(soonestMaintenance?.nextDue)} • {soonestMaintenance?.assignedToName}</div>
-              </div>:
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{soonestMaintenance?.taskName}</div>
+                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">{formatDate(soonestMaintenance?.nextDue)} • {soonestMaintenance?.assignedToName}</div>
+              </div> :
               <div>
-                {expiringItems.length > 0?
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30">
+                {expiringItems.length > 0 ?
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-amber-200/30 dark:border-amber-700/30">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 font-medium">{soonestExpItem?.propertyName}: {soonestExpItem?.type}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{soonestExpItem?.propertyName}: {soonestExpItem?.type}</span>
                     <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                   </div>
-                  {soonestExpItemStatus && soonestExpItemStatus <= 0?
+                  {soonestExpItemStatus && soonestExpItemStatus <= 0 ?
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Expired {formatDate(soonestExpItem?.date, true)}</div>
-                    <div className="text-xs text-red-600 mt-1">Expired</div>
-                  </div>:
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Expired {formatDate(soonestExpItem?.date, true)}</div>
+                    <div className="text-xs text-red-600 dark:text-red-400 mt-1">Expired</div>
+                  </div> :
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">Expires {formatDate(soonestExpItem?.date, true)}</div>
-                    <div className="text-xs text-amber-600 mt-1">{(() => {
-                        if (soonestExpItemStatus === null) return '—'
-                        if (soonestExpItemStatus === 1) return '1 day remaining'
-                        return `${soonestExpItemStatus} days remaining`
-                      })()}
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Expires {formatDate(soonestExpItem?.date, true)}</div>
+                    <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">{(() => {
+                      if (soonestExpItemStatus === null) return '—'
+                      if (soonestExpItemStatus === 1) return '1 day remaining'
+                      return `${soonestExpItemStatus} days remaining`
+                    })()}
                     </div>
                   </div>}
-                </div>:
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-blue-200/30">
+                </div> :
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-amber-200/30 dark:border-amber-700/30">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 font-medium">MAINTENANCE</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">MAINTENANCE</span>
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">No upcoming maintenance</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">No upcoming maintenance</div>
                   </div>
                 </div>}
               </div>}
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">{maintenance.length} upcoming maintenance item{maintenance.length !== 1 && 's'}</span>
+                <span className="text-slate-600 dark:text-slate-400">{maintenance.length} upcoming maintenance item{maintenance.length !== 1 && 's'}</span>
                 <Wrench className="w-3.5 h-3.5 text-emerald-500" />
               </div>
             </div>
@@ -525,126 +514,126 @@ export function CommandCenterDashboard() {
 
           {/* Emergency Contacts */}
           <Link href="/services/command-center/contacts" className="group">
-            <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-5 border border-red-200/50 shadow-sm hover:shadow-lg hover:border-red-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/40 dark:to-rose-950/30 rounded-xl p-5 border border-red-200/50 dark:border-red-800/50 shadow-sm hover:shadow-lg hover:border-red-300 dark:hover:border-red-600 transition-all h-full">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-11 h-11 rounded-xl bg-red-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                  <div className="w-11 h-11 rounded-xl bg-red-600 dark:bg-red-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <Users className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">Emergency Contacts</h3>
-                    <span className="text-xs text-slate-600">{contacts.length} contact{contacts.length !== 1 && 's'}</span>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Emergency Contacts</h3>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{contacts.length} contact{contacts.length !== 1 && 's'}</span>
                   </div>
                 </div>
                 {(emergencyContactsList.length === 0 || poaHolders.length === 0) && (
-                <div className="flex items-center gap-1 bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-bold">
+                <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded-full text-xs font-bold">
                   <AlertTriangle className="w-3 h-3" />
                   {Number(emergencyContactsList.length === 0) + Number(poaHolders.length === 0)}
                 </div>)}
               </div>
               
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-red-200/30">
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-red-200/30 dark:border-red-700/30">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-600 font-medium uppercase tracking-wide">Primary Contact</span>
-                  <Star className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium uppercase tracking-wide">Primary Contact</span>
+                  <Star className="w-3.5 h-3.5 text-red-500 fill-red-500 dark:text-red-400 dark:fill-red-400" />
                 </div>
-                {primaryContact?
+                {primaryContact ?
                 <div>
-                  <div className="text-sm font-bold text-slate-900 mb-1">{primaryContact?.contactName} ({primaryContact?.relationship})</div>
+                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">{primaryContact?.contactName} ({primaryContact?.relationship})</div>
                   <div className="flex items-center gap-2">
-                    <Phone className="w-3 h-3 text-slate-500" />
-                    <span className="text-xs text-slate-700 font-mono">{primaryContact?.phonePrimary}</span>
+                    <Phone className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                    <span className="text-xs text-slate-700 dark:text-slate-300 font-mono">{primaryContact?.phonePrimary}</span>
                   </div>
-                </div>:
-                <div className="text-sm font-bold text-slate-900 mb-1">No Primary Contact</div>
+                </div> :
+                <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">No Primary Contact</div>
                 }
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">Emergency Contacts: {emergencyContactsList.length}, POA Holders: {poaHolders.length}</span>
-                <span className="text-red-600 font-semibold">View all →</span>
+                <span className="text-slate-600 dark:text-slate-400">Emergency Contacts: {emergencyContactsList.length}, POA Holders: {poaHolders.length}</span>
+                <span className="text-red-600 dark:text-red-400 font-semibold">View all →</span>
               </div>
             </div>
           </Link>
 
           {/* Pet Care */}
           <Link href="/services/command-center/pets" className="group">
-            <div className="bg-gradient-to-br from-pink-50 to-fuchsia-50 rounded-xl p-5 border border-pink-200/50 shadow-sm hover:shadow-lg hover:border-pink-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-pink-50 to-fuchsia-50 dark:from-pink-950/40 dark:to-fuchsia-950/30 rounded-xl p-5 border border-pink-200/50 dark:border-pink-800/50 shadow-sm hover:shadow-lg hover:border-pink-300 dark:hover:border-pink-600 transition-all h-full">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-pink-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                <div className="w-11 h-11 rounded-xl bg-pink-600 dark:bg-pink-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                   <PawPrint className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Pet Care</h3>
-                  <span className="text-xs text-slate-600">2 pets in care</span>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Pet Care</h3>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">2 pets in care</span>
                 </div>
               </div>
               
               <div className="space-y-2 mb-3">
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 flex items-center gap-2">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center text-white text-xs font-bold">
                     🐕
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">Max (Golden Retriever)</div>
-                    <div className="text-xs text-slate-600">With Johnson Family</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Max (Golden Retriever)</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">With Johnson Family</div>
                   </div>
                 </div>
                 
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 flex items-center gap-2">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 flex items-center justify-center text-white text-xs font-bold">
                     🐱
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">Luna (Tabby Cat)</div>
-                    <div className="text-xs text-slate-600">With Johnson Family</div>
+                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Luna (Tabby Cat)</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">With Johnson Family</div>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-600 flex items-center gap-1">
+                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" />
                   All covered
                 </span>
-                <span className="text-slate-600">No vet visits</span>
+                <span className="text-slate-600 dark:text-slate-400">No vet visits</span>
               </div>
             </div>
           </Link>
 
           {/* Wellness */}
           <Link href="/services/command-center/wellness" className="group">
-            <div className="bg-gradient-to-br from-rose-50 to-pink-50 rounded-xl p-5 border border-rose-200/50 shadow-sm hover:shadow-lg hover:border-rose-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/40 dark:to-pink-950/30 rounded-xl p-5 border border-rose-200/50 dark:border-rose-800/50 shadow-sm hover:shadow-lg hover:border-rose-300 dark:hover:border-rose-600 transition-all h-full">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-rose-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                <div className="w-11 h-11 rounded-xl bg-rose-600 dark:bg-rose-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                   <Heart className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Wellness Journal</h3>
-                  <span className="text-xs text-slate-600">34 entries</span>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Wellness Journal</h3>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">34 entries</span>
                 </div>
               </div>
               
-              <div className="bg-white/60 backdrop-blur-sm rounded-lg p-3 mb-3 border border-rose-200/30">
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-rose-200/30 dark:border-rose-700/30">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-600 font-medium">Current Mood</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Current Mood</span>
                   <div className="flex gap-0.5">
                     {[1, 2, 3, 4].map(i => (
                       <Star key={i} className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                     ))}
-                    <Star className="w-3.5 h-3.5 text-slate-300" />
+                    <Star className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
                   </div>
                 </div>
-                <div className="text-sm font-semibold text-slate-900 mb-1">7.2 / 10 average</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">7.2 / 10 average</div>
                 <div className="flex gap-1.5">
                   {[8, 7, 9, 6, 8, 7, 7].map((val, i) => (
                     <div 
                       key={i} 
-                      className="flex-1 bg-rose-200 rounded-sm overflow-hidden"
+                      className="flex-1 bg-rose-200 dark:bg-rose-900 rounded-sm overflow-hidden"
                       style={{ height: '24px' }}
                     >
                       <div 
-                        className="bg-rose-500 w-full rounded-sm"
+                        className="bg-rose-500 dark:bg-rose-400 w-full rounded-sm"
                         style={{ height: `${val * 10}%` }}
                       ></div>
                     </div>
@@ -653,61 +642,61 @@ export function CommandCenterDashboard() {
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-600 flex items-center gap-1 font-semibold">
+                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
                   <Sparkles className="w-3 h-3" />
                   7-day streak
                 </span>
-                <span className="text-slate-600">Last: Today</span>
+                <span className="text-slate-600 dark:text-slate-400">Last: Today</span>
               </div>
             </div>
           </Link>
 
           {/* Career & Benefits */}
           <Link href="/services/command-center/career" className="group">
-            <div className="bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-5 border border-violet-200/50 shadow-sm hover:shadow-lg hover:border-violet-300 transition-all h-full">
+            <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/40 dark:to-purple-950/30 rounded-xl p-5 border border-violet-200/50 dark:border-violet-800/50 shadow-sm hover:shadow-lg hover:border-violet-300 dark:hover:border-violet-600 transition-all h-full">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-violet-600 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                <div className="w-11 h-11 rounded-xl bg-violet-600 dark:bg-violet-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                   <Briefcase className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900">Career & Benefits</h3>
-                  <span className="text-xs text-slate-600">Active duty</span>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Career & Benefits</h3>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Active duty</span>
                 </div>
               </div>
               
               <div className="space-y-2 mb-3">
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30 dark:border-violet-700/30">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 font-medium">TSP Contribution</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">TSP Contribution</span>
                     <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
                   </div>
-                  <div className="text-lg font-bold text-violet-700">15%</div>
-                  <div className="flex-1 bg-violet-200 rounded-full h-1.5 overflow-hidden mt-1">
-                    <div className="bg-violet-600 h-full rounded-full w-3/4"></div>
+                  <div className="text-lg font-bold text-violet-700 dark:text-violet-400">15%</div>
+                  <div className="flex-1 bg-violet-200 dark:bg-violet-900 rounded-full h-1.5 overflow-hidden mt-1">
+                    <div className="bg-violet-600 dark:bg-violet-500 h-full rounded-full w-3/4"></div>
                   </div>
                 </div>
 
-                <div className="bg-white/60 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30">
+                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30 dark:border-violet-700/30">
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-xs text-slate-600 font-medium mb-0.5">Leave Balance</div>
-                      <div className="text-lg font-bold text-slate-900">28.5 <span className="text-sm text-slate-600">days</span></div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-0.5">Leave Balance</div>
+                      <div className="text-lg font-bold text-slate-900 dark:text-slate-100">28.5 <span className="text-sm text-slate-600 dark:text-slate-400">days</span></div>
                     </div>
-                    <Calendar className="w-8 h-8 text-violet-300" />
+                    <Calendar className="w-8 h-8 text-violet-300 dark:text-violet-700" />
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600">GI Bill: 100%</span>
-                <span className="text-violet-600 font-semibold">View benefits →</span>
+                <span className="text-slate-600 dark:text-slate-400">GI Bill: 100%</span>
+                <span className="text-violet-600 dark:text-violet-400 font-semibold">View benefits →</span>
               </div>
             </div>
           </Link>
         </div>
 
         {/* Bottom CTA */}
-        <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 text-white rounded-2xl p-8 text-center shadow-xl border border-white/10 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 dark:from-slate-800 dark:via-blue-800 dark:to-slate-800 text-white rounded-2xl p-8 text-center shadow-xl border border-white/10 dark:border-white/5 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjA1IiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-30"></div>
           
           <div className="relative z-10">
@@ -719,7 +708,7 @@ export function CommandCenterDashboard() {
               Your feedback shapes the tools that support you. Tell us what matters most.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="min-w-[200px] bg-white text-slate-900 hover:bg-slate-100" asChild>
+              <Button size="lg" className="min-w-[200px] bg-white text-slate-900 hover:bg-slate-100 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200" asChild>
                 <Link href="/contact-us/feedback">
                   Share Your Ideas
                   <ExternalLink className="w-4 h-4 ml-2" />

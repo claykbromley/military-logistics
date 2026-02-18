@@ -3,6 +3,7 @@ import { Footer } from "@/components/footer"
 import { CircleCheck, BookOpen, CircleAlert, ChevronRight } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { EmergencyContacts } from "@/components/deployment/emergency-contacts"
+import { CommunicationHubProvider } from "@/hooks/use-communication-hub"
 
 const serviceCategories = [
   { name: "Checklist", icon: CircleCheck, link: "/transitions/deployment", description: "Make sure you are ready for deployment" },
@@ -11,6 +12,14 @@ const serviceCategories = [
 ]
 
 export default function DeploymentEmergencyPage() {
+  return (
+    <CommunicationHubProvider>
+      <DeploymentEmergencyPageContent />
+    </CommunicationHubProvider>
+  )
+}
+
+function DeploymentEmergencyPageContent() {
   return (
     <>
       <Header />
@@ -38,10 +47,10 @@ export default function DeploymentEmergencyPage() {
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-180px)]">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-slate-100 border-r">
+        <aside className="w-full lg:w-80 bg-sidebar border-r">
           <div className="top-20 p-6">
             <a href="/transitions/deployment">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6 pb-3 border-b-2 border-slate-300 text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-6 pb-3 border-b-2 border-muted-foreground text-center">
                 Deployment
               </h2>
             </a>
@@ -51,7 +60,7 @@ export default function DeploymentEmergencyPage() {
                 return (
                   <Card
                     key={category.name}
-                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-white border-2 hover:border-primary group"
+                    className="p-4 hover:shadow-md transition-all cursor-pointer bg-card border-2 hover:border-primary group"
                   >
                     <a key={category.name} href={category.link}>
                       <div className="flex items-start gap-3">
@@ -59,7 +68,7 @@ export default function DeploymentEmergencyPage() {
                           <Icon className="h-5 w-5 text-primary" />
                         </div>
                         <div className="flex-1">
-                          <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-primary transition-colors">
+                          <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
                             {category.name}
                           </h3>
                           <p className="text-xs text-muted-foreground">{category.description}</p>
