@@ -34,6 +34,7 @@ import {
   isBefore,
   isAfter,
   subDays,
+  addDays,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -416,15 +417,22 @@ function ScheduleTabInner({
 
   const now = new Date();
   const thirtyDaysAgo = subDays(now, 30);
+  const thirtyDaysFromNow = addDays(now, 30);
 
   const upcomingEntries = useMemo(() => {
     return entries
-      .filter((e) => !e.is_completed && isAfter(new Date(e.start_time), now) && e.source == "meeting")
+      .filter(
+        (e) =>
+          !e.is_completed &&
+          isAfter(new Date(e.start_time), now) &&
+          isBefore(new Date(e.start_time), thirtyDaysFromNow) &&
+          e.source == "meeting"
+      )
       .sort(
         (a, b) =>
           new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
       );
-  }, [entries, now]);
+  }, [entries, now, thirtyDaysFromNow]);
 
   const pastEntries = useMemo(() => {
     return entries
@@ -494,7 +502,7 @@ function ScheduleTabInner({
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {upcomingEntries.map((entry) => (
+              {upcomingEntries.slice(0, 2).map((entry) => (
                 <EventCard
                   key={entry.id}
                   entry={entry}
