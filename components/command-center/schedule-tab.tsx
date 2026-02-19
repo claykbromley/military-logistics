@@ -148,7 +148,12 @@ function EventCard({
   onComplete,
 }: EventCardProps) {
   const Icon = eventTypeIcons[entry.type];
-  const isPast = isBefore(new Date(entry.start_time), new Date());
+  const startPassed = isBefore(new Date(entry.start_time), new Date());
+  // Recurring entries with future occurrences should not appear "past"
+  // recurrence_end can be null, undefined, or empty string — all mean "indefinite"
+  const recEnd = entry.recurrence_end && entry.recurrence_end.trim() ? entry.recurrence_end : null;
+  const hasMore = entry.is_recurring && (!recEnd || isAfter(new Date(recEnd), new Date()));
+  const isPast = startPassed && !hasMore;
   const isCompleted = entry.is_completed;
 
   return (
@@ -419,29 +424,55 @@ function ScheduleTabInner({
   const thirtyDaysAgo = subDays(now, 30);
   const thirtyDaysFromNow = addDays(now, 30);
 
+  /**
+   * Returns true if a recurring entry still has at least one future occurrence.
+   * - Non-recurring: just checks start_time > now
+   * - Recurring with no end date: always has future occurrences
+   * - Recurring with end date: future if recurrence_end > now
+   */
+  const hasFutureOccurrences = (e: CalendarEntry): boolean => {
+    if (!e.is_recurring) return isAfter(new Date(e.start_time), now);
+    const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null;
+    if (!recEnd) return true; // repeats indefinitely
+    return isAfter(new Date(recEnd), now);
+  };
+
   const upcomingEntries = useMemo(() => {
     return entries
       .filter(
         (e) =>
           !e.is_completed &&
-          isAfter(new Date(e.start_time), now) &&
-          isBefore(new Date(e.start_time), thirtyDaysFromNow) &&
+          hasFutureOccurrences(e) &&
           e.source == "meeting"
       )
       .sort(
-        (a, b) =>
-          new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
+        (a, b) => {
+          // For recurring entries whose start_time is in the past,
+          // sort by next occurrence (approximated by now) so they
+          // don't float to the top above truly-soon entries.
+          const aTime = Math.max(new Date(a.start_time).getTime(), now.getTime());
+          const bTime = Math.max(new Date(b.start_time).getTime(), now.getTime());
+          return aTime - bTime;
+        },
       );
-  }, [entries, now, thirtyDaysFromNow]);
+  }, [entries, now]);
 
   const pastEntries = useMemo(() => {
     return entries
       .filter((e) => {
+        if (e.source !== "meeting") return false;
         const startTime = new Date(e.start_time);
-        return (
-          (e.is_completed || isBefore(startTime, now)) &&
-          isAfter(startTime, thirtyDaysAgo) && e.source == "meeting"
-        );
+
+        // Completed entries are always "past"
+        if (e.is_completed) {
+          return isAfter(startTime, thirtyDaysAgo);
+        }
+
+        // Recurring entries with future occurrences stay in upcoming
+        if (hasFutureOccurrences(e)) return false;
+
+        // Non-recurring or fully-elapsed recurring: past if start < now
+        return isBefore(startTime, now) && isAfter(startTime, thirtyDaysAgo);
       })
       .sort(
         (a, b) =>
@@ -449,9 +480,19 @@ function ScheduleTabInner({
       );
   }, [entries, now, thirtyDaysAgo]);
 
+  // Badge count: only meetings with a next occurrence within 30 days
+  const upcomingCount = upcomingEntries.filter((e) => {
+    if (!e.is_recurring || isAfter(new Date(e.start_time), now)) {
+      // Non-recurring or hasn't started yet: check start_time
+      return isBefore(new Date(e.start_time), thirtyDaysFromNow);
+    }
+    // Recurring that already started: it recurs, so next occurrence is ~now
+    return true;
+  }).length;
+
   const visiblePastEntries = showAllPast
     ? pastEntries
-    : pastEntries.slice(0, 6);
+    : pastEntries.slice(0, 3);
 
   // Simple delete handler (doesn't need modal state)
   const handleDeleteEntry = async (id: string) => {
@@ -493,7 +534,7 @@ function ScheduleTabInner({
                   Upcoming Meetings
                 </h2>
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {upcomingEntries.length}
+                  {upcomingCount}
                 </span>
               </div>
               <Button variant="outline" size="sm" onClick={() => openModal()}>
@@ -502,7 +543,7 @@ function ScheduleTabInner({
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {upcomingEntries.slice(0, 2).map((entry) => (
+              {upcomingEntries.slice(0, 3).map((entry) => (
                 <EventCard
                   key={entry.id}
                   entry={entry}
