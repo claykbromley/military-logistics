@@ -482,7 +482,7 @@ function ScheduleTabInner({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-foreground">
-                  Upcoming Events
+                  Upcoming Meetings
                 </h2>
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                   {upcomingEntries.length}
@@ -513,14 +513,14 @@ function ScheduleTabInner({
               <Calendar className="w-8 h-8 text-indigo-600" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
-              No upcoming events
+              No upcoming meetings
             </h3>
             <p className="text-muted-foreground mb-6">
-              Schedule events and tasks to stay organized
+              Schedule meetings and tasks to stay organized
             </p>
             <Button onClick={() => openModal()}>
               <Calendar className="w-4 h-4 mr-2" />
-              Schedule Your First Event
+              Schedule Your First Meeting
             </Button>
           </div>
         )}
@@ -531,7 +531,7 @@ function ScheduleTabInner({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-foreground">
-                  Past Events (Last 30 Days)
+                  Past Meetings (Last 30 Days)
                 </h2>
                 <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                   {pastEntries.length}
