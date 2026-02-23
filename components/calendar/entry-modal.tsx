@@ -30,7 +30,7 @@ import type {
   EventInvitation,
 } from "@/app/scheduler/calendar/types"
 import { COLOR_OPTIONS, DAY_NAMES } from "@/app/scheduler/calendar/constants"
-import { getMonthlyDayOfWeekLabel } from "@/app/scheduler/calendar/utils"
+import { getMonthlyDayOfWeekLabel, toLocalTimeStr } from "@/app/scheduler/calendar/utils"
 import { useEntryModal, type RecurringDeleteMode } from "./use-entry-modal"
 
 // ─── Time generation helpers ──────────────────────────────
@@ -230,6 +230,8 @@ interface EntryModalProps {
   forceEntryType?: EntryType
   onFormChange: (data: EntryFormData) => void
   onSave: () => void
+  onSaveRecurring: (mode: "this" | "all") => void
+  isEditingRecurring: boolean
   onDelete: () => void
   onDeleteRecurring: (mode: RecurringDeleteMode, occurrenceDate?: string) => void
   onClose: () => void
@@ -247,6 +249,8 @@ export function EntryModal({
   forceEntryType,
   onFormChange,
   onSave,
+  onSaveRecurring,
+  isEditingRecurring,
   onDelete,
   onDeleteRecurring,
   onClose,
@@ -255,6 +259,7 @@ export function EntryModal({
 }: EntryModalProps) {
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
+  const [showRecurringSavePrompt, setShowRecurringSavePrompt] = useState(false)
 
   // Monthly day-of-week label (e.g. "third Monday")
   // Parse with T12:00 to avoid UTC midnight rolling back a day in western timezones
@@ -316,6 +321,11 @@ export function EntryModal({
     return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
   }
 
+  /**
+   * When start_time changes, auto-adjust end_time to preserve the current duration.
+   * If that would push end past midnight, cap at 23:45 on the same day.
+   * Also handles the case where start_date changes to push end_date forward.
+   */
   const handleStartTimeChange = (newStartTime: string) => {
     const oldStartMins = timeToMinutes(formData.start_time)
     const oldEndMins = timeToMinutes(formData.end_time)
@@ -993,13 +1003,64 @@ export function EntryModal({
             >
               Cancel
             </button>
-            <button
-              onClick={onSave}
-              disabled={saving || !formData.title.trim()}
-              className="px-5 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
-            >
-              {saving ? "Saving..." : editingEntry ? "Update" : "Save"}
-            </button>
+            {showRecurringSavePrompt ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setShowRecurringSavePrompt(false)
+                    onSaveRecurring("this")
+                  }}
+                  disabled={saving}
+                  className="px-3 py-2 text-xs font-medium bg-muted text-foreground rounded-md hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 border border-border"
+                >
+                  This event
+                </button>
+                <button
+                  onClick={() => {
+                    setShowRecurringSavePrompt(false)
+                    onSaveRecurring("all")
+                  }}
+                  disabled={saving}
+                  className="px-3 py-2 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                >
+                  All events
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  if (editingEntry && isEditingRecurring) {
+                    // Check if only the title changed — if so, apply to all without prompting
+                    const titleChanged = formData.title.trim() !== (editingEntry.title || "")
+                    const s = new Date(editingEntry.start_time)
+                    const e = editingEntry.end_time ? new Date(editingEntry.end_time) : new Date(s.getTime() + 3600000)
+                    const otherFieldsChanged =
+                      formData.description !== (editingEntry.description || "") ||
+                      formData.color !== editingEntry.color ||
+                      formData.start_time !== toLocalTimeStr(s) ||
+                      formData.end_time !== toLocalTimeStr(e) ||
+                      formData.all_day !== editingEntry.all_day ||
+                      formData.location !== (editingEntry.location || "") ||
+                      formData.meeting_link !== (editingEntry.meeting_link || "") ||
+                      formData.recurrence_freq !== (editingEntry.recurrence_freq || "weekly") ||
+                      formData.recurrence_interval !== (editingEntry.recurrence_interval || 1)
+
+                    if (titleChanged && !otherFieldsChanged) {
+                      // Title-only change: apply to all events automatically
+                      onSaveRecurring("all")
+                    } else {
+                      setShowRecurringSavePrompt(true)
+                    }
+                  } else {
+                    onSave()
+                  }
+                }}
+                disabled={saving || !formData.title.trim()}
+                className="px-5 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+              >
+                {saving ? "Saving..." : editingEntry ? "Update" : "Save"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1018,8 +1079,10 @@ export function ConnectedEntryModal() {
     showDeleteConfirm,
     existingInvitations,
     forceEntryType,
+    isEditingRecurring,
     setFormData,
     save,
+    saveRecurring,
     deleteEntry,
     deleteRecurring,
     close,
@@ -1036,8 +1099,10 @@ export function ConnectedEntryModal() {
       showDeleteConfirm={showDeleteConfirm}
       existingInvitations={existingInvitations}
       forceEntryType={forceEntryType}
+      isEditingRecurring={isEditingRecurring}
       onFormChange={setFormData}
       onSave={save}
+      onSaveRecurring={saveRecurring}
       onDelete={deleteEntry}
       onDeleteRecurring={(mode, date) => {
         if (editingEntry) {
