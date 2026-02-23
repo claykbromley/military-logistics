@@ -25,10 +25,13 @@ import type {
   EntryFormData,
   EntryType,
   RecurrenceFreq,
+  RecurrenceEndMode,
+  RecurrenceMonthlyMode,
   EventInvitation,
 } from "@/app/scheduler/calendar/types"
 import { COLOR_OPTIONS, DAY_NAMES } from "@/app/scheduler/calendar/constants"
-import { useEntryModal } from "./use-entry-modal"
+import { getMonthlyDayOfWeekLabel } from "@/app/scheduler/calendar/utils"
+import { useEntryModal, type RecurringDeleteMode } from "./use-entry-modal"
 
 // ─── Time generation helpers ──────────────────────────────
 
@@ -228,6 +231,7 @@ interface EntryModalProps {
   onFormChange: (data: EntryFormData) => void
   onSave: () => void
   onDelete: () => void
+  onDeleteRecurring: (mode: RecurringDeleteMode, occurrenceDate?: string) => void
   onClose: () => void
   onShowDeleteConfirm: (show: boolean) => void
   onRemoveInvitation: (invitationId: string) => void
@@ -244,6 +248,7 @@ export function EntryModal({
   onFormChange,
   onSave,
   onDelete,
+  onDeleteRecurring,
   onClose,
   onShowDeleteConfirm,
   onRemoveInvitation,
@@ -251,10 +256,28 @@ export function EntryModal({
   const [inviteEmail, setInviteEmail] = useState("")
   const [inviteName, setInviteName] = useState("")
 
-  // Recurrence end mode derived from formData
-  const recurrenceEndMode: "never" | "on_date" = formData.recurrence_end
-    ? "on_date"
-    : "never"
+  // Monthly day-of-week label (e.g. "third Monday")
+  // Parse with T12:00 to avoid UTC midnight rolling back a day in western timezones
+  const monthlyDowLabel = useMemo(() => {
+    try {
+      const d = new Date(formData.start_date + "T12:00:00")
+      if (isNaN(d.getTime())) return "this day of the week"
+      return getMonthlyDayOfWeekLabel(d)
+    } catch {
+      return "this day of the week"
+    }
+  }, [formData.start_date])
+
+  // Day-of-month number for the "Day X of each month" label
+  const monthlyDayNumber = useMemo(() => {
+    try {
+      const d = new Date(formData.start_date + "T12:00:00")
+      if (isNaN(d.getTime())) return "—"
+      return d.getDate()
+    } catch {
+      return "—"
+    }
+  }, [formData.start_date])
 
   // Timezone label for display
   const currentTzLabel = useMemo(() => {
@@ -676,112 +699,185 @@ export function EntryModal({
             </label>
 
             {formData.is_recurring && (
-              <div className="ml-6 space-y-3 p-3 bg-muted/30 rounded-lg border border-border">
-                {/* Frequency */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm text-muted-foreground">Every</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={formData.recurrence_interval}
-                    onChange={(e) =>
-                      update({
-                        recurrence_interval: parseInt(e.target.value) || 1,
-                      })
-                    }
-                    className="w-14 bg-card rounded-md px-2 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 text-center"
-                  />
-                  <select
-                    value={formData.recurrence_freq}
-                    onChange={(e) =>
-                      update({
-                        recurrence_freq: e.target.value as RecurrenceFreq,
-                      })
-                    }
-                    className="bg-card rounded-md px-3 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
-                  >
-                    <option value="daily">day(s)</option>
-                    <option value="weekly">week(s)</option>
-                    <option value="monthly">month(s)</option>
-                    <option value="yearly">year(s)</option>
-                  </select>
+              <div className="ml-6 space-y-4 p-4 bg-muted/20 rounded-xl border border-border">
+                {/* Frequency row */}
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Frequency
+                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-foreground">Every</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={formData.recurrence_interval}
+                      onChange={(e) =>
+                        update({
+                          recurrence_interval: parseInt(e.target.value) || 1,
+                        })
+                      }
+                      className="w-14 bg-card rounded-lg px-2 py-1.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 text-center"
+                    />
+                    <select
+                      value={formData.recurrence_freq}
+                      onChange={(e) =>
+                        update({
+                          recurrence_freq: e.target.value as RecurrenceFreq,
+                        })
+                      }
+                      className="bg-card rounded-lg px-3 py-1.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+                    >
+                      <option value="daily">day(s)</option>
+                      <option value="weekly">week(s)</option>
+                      <option value="monthly">month(s)</option>
+                      <option value="yearly">year(s)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Weekly day buttons */}
                 {formData.recurrence_freq === "weekly" && (
-                  <div className="flex gap-1.5">
-                    {DAY_NAMES.map((d, i) => (
-                      <button
-                        key={d}
-                        onClick={() => {
-                          const days = formData.recurrence_days.includes(i)
-                            ? formData.recurrence_days.filter((x) => x !== i)
-                            : [...formData.recurrence_days, i]
-                          update({ recurrence_days: days })
-                        }}
-                        className={`w-8 h-8 rounded-full text-xs font-medium transition-all cursor-pointer ${
-                          formData.recurrence_days.includes(i)
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-card text-muted-foreground border border-border hover:border-primary/50"
-                        }`}
-                      >
-                        {d[0]}
-                      </button>
-                    ))}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      On Days
+                    </span>
+                    <div className="flex gap-1.5">
+                      {DAY_NAMES.map((d, i) => (
+                        <button
+                          key={d}
+                          onClick={() => {
+                            const days = formData.recurrence_days.includes(i)
+                              ? formData.recurrence_days.filter((x) => x !== i)
+                              : [...formData.recurrence_days, i]
+                            update({ recurrence_days: days })
+                          }}
+                          className={`w-9 h-9 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                            formData.recurrence_days.includes(i)
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "bg-card text-muted-foreground border border-border hover:border-primary/50 hover:text-foreground"
+                          }`}
+                        >
+                          {d[0]}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {/* End condition — clear radio choice */}
-                <div className="space-y-2 pt-1">
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {/* Monthly mode toggle */}
+                {formData.recurrence_freq === "monthly" && (
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Repeat On
+                    </span>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+                        <input
+                          type="radio"
+                          name="monthly_mode"
+                          checked={formData.recurrence_monthly_mode === "day_of_month"}
+                          onChange={() => update({ recurrence_monthly_mode: "day_of_month" as RecurrenceMonthlyMode })}
+                          className="w-4 h-4 text-primary accent-primary cursor-pointer"
+                        />
+                        <div className="text-sm text-foreground">
+                          Day <span className="font-semibold">{monthlyDayNumber}</span> of each month
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+                        <input
+                          type="radio"
+                          name="monthly_mode"
+                          checked={formData.recurrence_monthly_mode === "day_of_week"}
+                          onChange={() => update({ recurrence_monthly_mode: "day_of_week" as RecurrenceMonthlyMode })}
+                          className="w-4 h-4 text-primary accent-primary cursor-pointer"
+                        />
+                        <div className="text-sm text-foreground">
+                          The <span className="font-semibold">{monthlyDowLabel}</span> of each month
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* End condition */}
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Ends
                   </span>
-
-                  {/* Never option */}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="recurrence_end_mode"
-                      checked={recurrenceEndMode === "never"}
-                      onChange={() => update({ recurrence_end: "" })}
-                      className="w-4 h-4 text-primary border-border accent-primary cursor-pointer"
-                    />
-                    <span className="text-sm text-foreground">
-                      Never — repeats indefinitely
-                    </span>
-                  </label>
-
-                  {/* On date option */}
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="recurrence_end_mode"
-                      checked={recurrenceEndMode === "on_date"}
-                      onChange={() => {
-                        // Default to 3 months from start if switching
-                        const d = new Date(formData.start_date)
-                        d.setMonth(d.getMonth() + 3)
-                        const y = d.getFullYear()
-                        const m = String(d.getMonth() + 1).padStart(2, "0")
-                        const dd = String(d.getDate()).padStart(2, "0")
-                        update({ recurrence_end: `${y}-${m}-${dd}` })
-                      }}
-                      className="w-4 h-4 text-primary border-border accent-primary cursor-pointer"
-                    />
-                    <span className="text-sm text-foreground">On date</span>
-                    {recurrenceEndMode === "on_date" && (
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {/* Never */}
+                    <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
                       <input
-                        type="date"
-                        value={formData.recurrence_end}
-                        onChange={(e) =>
-                          update({ recurrence_end: e.target.value })
-                        }
-                        min={formData.start_date}
-                        className="ml-1 bg-card rounded-md px-3 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30"
+                        type="radio"
+                        name="recurrence_end_mode"
+                        checked={formData.recurrence_end_mode === "never"}
+                        onChange={() => update({ recurrence_end_mode: "never" as RecurrenceEndMode, recurrence_end: "" })}
+                        className="w-4 h-4 text-primary accent-primary cursor-pointer"
                       />
-                    )}
-                  </label>
+                      <span className="text-sm text-foreground">Never</span>
+                    </label>
+
+                    {/* On date */}
+                    <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+                      <input
+                        type="radio"
+                        name="recurrence_end_mode"
+                        checked={formData.recurrence_end_mode === "on_date"}
+                        onChange={() => {
+                          const d = new Date(formData.start_date + "T12:00:00")
+                          d.setMonth(d.getMonth() + 3)
+                          const y = d.getFullYear()
+                          const m = String(d.getMonth() + 1).padStart(2, "0")
+                          const dd = String(d.getDate()).padStart(2, "0")
+                          update({ recurrence_end_mode: "on_date" as RecurrenceEndMode, recurrence_end: `${y}-${m}-${dd}` })
+                        }}
+                        className="w-4 h-4 text-primary accent-primary cursor-pointer"
+                      />
+                      <span className="text-sm text-foreground">On date</span>
+                      {formData.recurrence_end_mode === "on_date" && (
+                        <input
+                          type="date"
+                          value={formData.recurrence_end}
+                          onChange={(e) =>
+                            update({ recurrence_end: e.target.value })
+                          }
+                          min={formData.start_date}
+                          className="ml-auto bg-card rounded-lg px-3 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30"
+                        />
+                      )}
+                    </label>
+
+                    {/* After N occurrences */}
+                    <label className="flex items-center gap-2.5 p-2.5 rounded-lg border border-border bg-card cursor-pointer hover:bg-muted/30 transition-colors has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+                      <input
+                        type="radio"
+                        name="recurrence_end_mode"
+                        checked={formData.recurrence_end_mode === "after_count"}
+                        onChange={() => update({ recurrence_end_mode: "after_count" as RecurrenceEndMode, recurrence_end: "" })}
+                        className="w-4 h-4 text-primary accent-primary cursor-pointer"
+                      />
+                      <span className="text-sm text-foreground">After</span>
+                      {formData.recurrence_end_mode === "after_count" && (
+                        <>
+                          <input
+                            type="number"
+                            min={1}
+                            max={999}
+                            value={formData.recurrence_count}
+                            onChange={(e) =>
+                              update({ recurrence_count: parseInt(e.target.value) || 1 })
+                            }
+                            className="w-16 bg-card rounded-lg px-2 py-1 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 text-center"
+                          />
+                          <span className="text-sm text-foreground">occurrences</span>
+                        </>
+                      )}
+                      {formData.recurrence_end_mode !== "after_count" && (
+                        <span className="text-sm text-muted-foreground">a number of occurrences</span>
+                      )}
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -802,23 +898,62 @@ export function EntryModal({
                     Delete
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-destructive">
-                      Are you sure?
-                    </span>
-                    <button
-                      onClick={onDelete}
-                      disabled={saving}
-                      className="text-xs bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                    <button
-                      onClick={() => onShowDeleteConfirm(false)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    >
-                      Cancel
-                    </button>
+                  <div className="space-y-2">
+                    {editingEntry.is_recurring ? (
+                      <>
+                        <span className="text-xs text-destructive font-medium block">
+                          Delete recurring series?
+                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            onClick={() => onDeleteRecurring("this", editingEntry.start_time)}
+                            disabled={saving}
+                            className="text-xs bg-muted text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 border border-border"
+                          >
+                            This event
+                          </button>
+                          <button
+                            onClick={() => onDeleteRecurring("future", editingEntry.start_time)}
+                            disabled={saving}
+                            className="text-xs bg-muted text-foreground px-2.5 py-1.5 rounded-md hover:bg-muted/80 transition-colors cursor-pointer disabled:opacity-50 border border-border"
+                          >
+                            This & future
+                          </button>
+                          <button
+                            onClick={() => onDeleteRecurring("all")}
+                            disabled={saving}
+                            className="text-xs bg-destructive text-destructive-foreground px-2.5 py-1.5 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            All events
+                          </button>
+                          <button
+                            onClick={() => onShowDeleteConfirm(false)}
+                            className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-2 py-1.5"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-destructive">
+                          Are you sure?
+                        </span>
+                        <button
+                          onClick={onDelete}
+                          disabled={saving}
+                          className="text-xs bg-destructive text-destructive-foreground px-3 py-1 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer disabled:opacity-50"
+                        >
+                          Delete
+                        </button>
+                        <button
+                          onClick={() => onShowDeleteConfirm(false)}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -859,6 +994,7 @@ export function ConnectedEntryModal() {
     setFormData,
     save,
     deleteEntry,
+    deleteRecurring,
     close,
     setShowDeleteConfirm,
     removeInvitation,
@@ -876,6 +1012,11 @@ export function ConnectedEntryModal() {
       onFormChange={setFormData}
       onSave={save}
       onDelete={deleteEntry}
+      onDeleteRecurring={(mode, date) => {
+        if (editingEntry) {
+          deleteRecurring(editingEntry.id, mode, date)
+        }
+      }}
       onClose={close}
       onShowDeleteConfirm={setShowDeleteConfirm}
       onRemoveInvitation={removeInvitation}

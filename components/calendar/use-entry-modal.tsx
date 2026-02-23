@@ -17,6 +17,10 @@ import type {
 } from "@/app/scheduler/calendar/types"
 import { defaultFormData, toLocalDateStr, toLocalTimeStr } from "@/app/scheduler/calendar/utils"
 
+// ─── Recurring delete mode ────────────────────────────────
+
+export type RecurringDeleteMode = "this" | "future" | "all"
+
 // ─── Context value ────────────────────────────────────────
 
 interface EntryModalContextValue {
@@ -25,26 +29,22 @@ interface EntryModalContextValue {
   formData: EntryFormData
   saving: boolean
   showDeleteConfirm: boolean
-  /** Existing invitations loaded when editing (read-only display) */
   existingInvitations: EventInvitation[]
-  /** When set, the modal is locked to this type — no toggle shown */
   forceEntryType?: EntryType
-  /** Entry currently shown in the detail popover (null = closed) */
   previewedEntry: CalendarEntry | null
-  /** Invitations loaded for the previewed entry */
   previewInvitations: EventInvitation[]
 
   open: (entry?: CalendarEntry, date?: Date) => void
   close: () => void
-  /** Open the read-only detail popover for an entry */
   preview: (entry: CalendarEntry) => void
   closePreview: () => void
   setFormData: (data: EntryFormData) => void
   setShowDeleteConfirm: (show: boolean) => void
   save: () => Promise<void>
   deleteEntry: () => Promise<void>
-  /** Delete an entry by ID (used from preview popover) */
   deleteEntryById: (id: string) => Promise<void>
+  /** Delete a recurring entry with mode: this occurrence, future, or all */
+  deleteRecurring: (id: string, mode: RecurringDeleteMode, occurrenceDate?: string) => Promise<void>
   toggleComplete: (entry: CalendarEntry) => Promise<void>
   removeInvitation: (invitationId: string) => Promise<void>
 }
@@ -66,11 +66,6 @@ interface EntryModalProviderProps {
   onAuthRequired?: () => void
   onMutate?: () => void | Promise<void>
   defaultEntryOverrides?: Partial<Record<string, any>>
-  /**
-   * Lock the modal to a specific entry type. Hides the Event/Task toggle
-   * and uses this type for all new entries.
-   * Example: "meeting" → header shows "New Meeting", no toggle.
-   */
   forceEntryType?: EntryType
   children: ReactNode
 }
@@ -131,6 +126,14 @@ export function EntryModalProvider({
           ? new Date(entry.end_time)
           : new Date(s.getTime() + 3600000)
 
+        // Derive recurrence_end_mode from DB fields
+        let endMode: "never" | "on_date" | "after_count" = "never"
+        if (entry.recurrence_count && entry.recurrence_count > 0) {
+          endMode = "after_count"
+        } else if (entry.recurrence_end) {
+          endMode = "on_date"
+        }
+
         setFormData({
           type: entry.source === "meeting" ? "meeting" : entry.type,
           title: entry.title,
@@ -148,15 +151,17 @@ export function EntryModalProvider({
           recurrence_end: entry.recurrence_end
             ? toLocalDateStr(new Date(entry.recurrence_end))
             : "",
+          recurrence_end_mode: endMode,
+          recurrence_monthly_mode: entry.recurrence_monthly_mode || "day_of_month",
+          recurrence_count: entry.recurrence_count || 10,
           location: entry.location || "",
           timezone:
             entry.timezone ||
             Intl.DateTimeFormat().resolvedOptions().timeZone,
           meeting_link: entry.meeting_link || "",
-          invitees: [], // New invitees to add (existing ones shown separately)
+          invitees: [],
         })
 
-        // Load existing invitations
         await fetchInvitations(entry.id)
       } else {
         // Create mode
@@ -202,9 +207,15 @@ export function EntryModalProvider({
       const isMeeting = formData.type === "meeting"
       const isEvent = formData.type === "event" || isMeeting
 
+      // Determine recurrence_end based on end mode
+      let recurrenceEnd: string | null = null
+      if (formData.is_recurring && formData.recurrence_end_mode === "on_date" && formData.recurrence_end) {
+        recurrenceEnd = new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
+      }
+
       const payload: Record<string, any> = {
         user_id: userId,
-        type: isMeeting ? "event" : formData.type, // DB enum only has event|task
+        type: isMeeting ? "event" : formData.type,
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         color: formData.color,
@@ -223,16 +234,19 @@ export function EntryModalProvider({
           formData.is_recurring && formData.recurrence_freq === "weekly"
             ? formData.recurrence_days
             : null,
-        recurrence_end:
-          formData.is_recurring && formData.recurrence_end
-            ? new Date(`${formData.recurrence_end}T23:59:59`).toISOString()
+        recurrence_end: recurrenceEnd,
+        recurrence_monthly_mode:
+          formData.is_recurring && formData.recurrence_freq === "monthly"
+            ? formData.recurrence_monthly_mode
+            : null,
+        recurrence_count:
+          formData.is_recurring && formData.recurrence_end_mode === "after_count"
+            ? formData.recurrence_count
             : null,
         location: isEvent ? formData.location.trim() || null : null,
         timezone: formData.all_day ? null : (formData.timezone || null),
         meeting_link: isEvent ? formData.meeting_link.trim() || null : null,
-        // Auto-tag meetings with source: "meeting"
         source: isMeeting ? "meeting" : (defaultEntryOverrides?.source || null),
-        // Page-level overrides (can still override source, etc.)
         ...defaultEntryOverrides,
       }
 
@@ -258,7 +272,6 @@ export function EntryModalProvider({
       // ── Save new invitations ────────────────────────────
       const newInvitees = formData.invitees.filter((inv) => inv.email.trim())
       if (newInvitees.length > 0) {
-        // Deduplicate against existing invitations
         const existingEmails = new Set(
           existingInvitations.map((inv) => inv.invitee_email.toLowerCase()),
         )
@@ -294,14 +307,13 @@ export function EntryModalProvider({
     }
   }, [userId, formData, editingEntry, existingInvitations, supabase, onMutate, defaultEntryOverrides])
 
-  // ── Delete entry ────────────────────────────────────────
+  // ── Delete entry (entire entry — used from modal footer) ─
 
   const deleteEntry = useCallback(async () => {
     if (!editingEntry) return
     setSaving(true)
 
     try {
-      // Invitations are CASCADE deleted via FK
       const { error } = await supabase
         .from("calendar_entries")
         .delete()
@@ -330,7 +342,6 @@ export function EntryModalProvider({
           .eq("id", invitationId)
         if (error) throw error
 
-        // Update local state immediately
         setExistingInvitations((prev) =>
           prev.filter((inv) => inv.id !== invitationId),
         )
@@ -365,7 +376,6 @@ export function EntryModalProvider({
   const preview = useCallback(
     async (entry: CalendarEntry) => {
       setPreviewedEntry(entry)
-      // Load invitations for the preview
       try {
         const { data, error } = await supabase
           .from("event_invitations")
@@ -389,7 +399,7 @@ export function EntryModalProvider({
     setPreviewInvitations([])
   }, [])
 
-  // ── Delete entry by ID (from preview popover) ───────────
+  // ── Delete entry by ID (simple — from preview popover for non-recurring) ──
 
   const deleteEntryById = useCallback(
     async (id: string) => {
@@ -404,6 +414,71 @@ export function EntryModalProvider({
         await onMutate?.()
       } catch (err) {
         console.error("Delete entry failed:", err)
+      }
+    },
+    [supabase, onMutate],
+  )
+
+  // ── Delete recurring entry with mode ────────────────────
+  //
+  // "this"   → Add the occurrence date to excluded_dates
+  // "future" → Set recurrence_end to the day before occurrenceDate
+  // "all"    → Delete the entire entry
+  //
+  const deleteRecurring = useCallback(
+    async (id: string, mode: RecurringDeleteMode, occurrenceDate?: string) => {
+      try {
+        if (mode === "all") {
+          const { error } = await supabase
+            .from("calendar_entries")
+            .delete()
+            .eq("id", id)
+          if (error) throw error
+        } else if (mode === "this" && occurrenceDate) {
+          // Get current excluded_dates, then append
+          const { data: entry, error: fetchErr } = await supabase
+            .from("calendar_entries")
+            .select("excluded_dates")
+            .eq("id", id)
+            .single()
+          if (fetchErr) throw fetchErr
+
+          const existing: string[] = entry?.excluded_dates || []
+          // Use toLocalDateStr to match how expandRecurring checks excluded dates
+          const dateStr = toLocalDateStr(new Date(occurrenceDate))
+          if (!existing.includes(dateStr)) {
+            existing.push(dateStr)
+          }
+
+          const { error } = await supabase
+            .from("calendar_entries")
+            .update({ excluded_dates: existing })
+            .eq("id", id)
+          if (error) throw error
+        } else if (mode === "future" && occurrenceDate) {
+          // Set recurrence_end to the day before this occurrence
+          const occ = new Date(occurrenceDate)
+          occ.setDate(occ.getDate() - 1)
+          occ.setHours(23, 59, 59, 0)
+
+          const { error } = await supabase
+            .from("calendar_entries")
+            .update({
+              recurrence_end: occ.toISOString(),
+              recurrence_count: null, // Clear count if setting end date
+            })
+            .eq("id", id)
+          if (error) throw error
+        }
+
+        setPreviewedEntry(null)
+        setPreviewInvitations([])
+        setIsOpen(false)
+        setEditingEntry(null)
+        setShowDeleteConfirm(false)
+        await onMutate?.()
+      } catch (err) {
+        console.error("Recurring delete failed:", err)
       }
     },
     [supabase, onMutate],
@@ -430,6 +505,7 @@ export function EntryModalProvider({
     save,
     deleteEntry,
     deleteEntryById,
+    deleteRecurring,
     toggleComplete,
     removeInvitation,
   }

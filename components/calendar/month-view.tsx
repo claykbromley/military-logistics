@@ -47,7 +47,7 @@ export function MonthView({
         ))}
       </div>
       <div
-        className="grid grid-cols-7 grid-rows-6 flex-1"
+        className="grid grid-cols-7 grid-rows-5 flex-1"
         style={{ minHeight: "calc(100vh - 260px)" }}
       >
         {days.map((d, i) => {

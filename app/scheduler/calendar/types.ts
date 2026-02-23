@@ -1,5 +1,7 @@
 export type EntryType = "event" | "task" | "meeting"
 export type RecurrenceFreq = "daily" | "weekly" | "monthly" | "yearly"
+export type RecurrenceMonthlyMode = "day_of_month" | "day_of_week"
+export type RecurrenceEndMode = "never" | "on_date" | "after_count"
 export type CalendarView = "day" | "week" | "month" | "year"
 export type InvitationStatus = "pending" | "accepted" | "declined" | "tentative"
 
@@ -18,6 +20,9 @@ export interface CalendarEntry {
   recurrence_interval: number
   recurrence_days: number[] | null
   recurrence_end: string | null
+  recurrence_monthly_mode: RecurrenceMonthlyMode | null
+  recurrence_count: number | null
+  excluded_dates: string[] | null
   is_completed: boolean
   source: string | null
   location: string | null
@@ -63,6 +68,9 @@ export interface EntryFormData {
   recurrence_interval: number
   recurrence_days: number[]
   recurrence_end: string
+  recurrence_end_mode: RecurrenceEndMode
+  recurrence_monthly_mode: RecurrenceMonthlyMode
+  recurrence_count: number
   location: string
   timezone: string
   meeting_link: string

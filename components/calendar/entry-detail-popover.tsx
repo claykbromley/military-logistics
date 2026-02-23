@@ -18,7 +18,7 @@ import {
   Check,
 } from "lucide-react"
 import type { CalendarEntry, EventInvitation } from "@/app/scheduler/calendar/types"
-import { useEntryModal } from "./use-entry-modal"
+import { useEntryModal, type RecurringDeleteMode } from "./use-entry-modal"
 
 // ─── Helpers ──────────────────────────────────────────────
 
@@ -121,6 +121,7 @@ interface EntryDetailPopoverProps {
   invitations: EventInvitation[]
   onEdit: (entry: CalendarEntry) => void
   onDelete: (id: string) => void
+  onDeleteRecurring: (id: string, mode: RecurringDeleteMode, occurrenceDate?: string) => void
   onClose: () => void
   onToggleComplete?: (entry: CalendarEntry) => void
 }
@@ -130,13 +131,13 @@ export function EntryDetailPopover({
   invitations,
   onEdit,
   onDelete,
+  onDeleteRecurring,
   onClose,
   onToggleComplete,
 }: EntryDetailPopoverProps) {
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteStep, setDeleteStep] = useState<"hidden" | "confirm">("hidden")
   const typeLabel = getEntryTypeLabel(entry)
   const TypeIcon = getEntryTypeIcon(entry)
-  const isEvent = entry.type === "event" || entry.source === "meeting"
 
   return (
     <div
@@ -167,6 +168,12 @@ export function EntryDetailPopover({
                 >
                   {typeLabel}
                 </span>
+                {entry.is_recurring && (
+                  <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground flex items-center gap-1">
+                    <Repeat className="w-2.5 h-2.5" />
+                    Series
+                  </span>
+                )}
                 {entry.is_completed && (
                   <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
                     Completed
@@ -201,7 +208,7 @@ export function EntryDetailPopover({
               <Pencil className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={() => setDeleteStep("confirm")}
               className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors cursor-pointer text-muted-foreground hover:text-destructive"
               title={`Delete ${typeLabel}`}
             >
@@ -217,25 +224,61 @@ export function EntryDetailPopover({
         </div>
 
         {/* Delete confirmation */}
-        {showDeleteConfirm && (
-          <div className="px-4 py-3 bg-destructive/5 border-b border-border flex items-center justify-between">
-            <span className="text-sm text-destructive font-medium">
-              Delete this {typeLabel.toLowerCase()}?
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => onDelete(entry.id)}
-                className="text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer font-medium"
-              >
-                Delete
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-2 py-1.5"
-              >
-                Cancel
-              </button>
-            </div>
+        {deleteStep === "confirm" && (
+          <div className="px-4 py-3 bg-destructive/5 border-b border-border">
+            {entry.is_recurring ? (
+              <div className="space-y-2.5">
+                <span className="text-sm text-destructive font-medium block">
+                  Delete from recurring series?
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => onDeleteRecurring(entry.id, "this", entry.start_time)}
+                    className="text-xs bg-card text-foreground px-3 py-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer font-medium border border-border"
+                  >
+                    This event only
+                  </button>
+                  <button
+                    onClick={() => onDeleteRecurring(entry.id, "future", entry.start_time)}
+                    className="text-xs bg-card text-foreground px-3 py-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer font-medium border border-border"
+                  >
+                    This & future events
+                  </button>
+                  <button
+                    onClick={() => onDeleteRecurring(entry.id, "all")}
+                    className="text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer font-medium"
+                  >
+                    All events in series
+                  </button>
+                </div>
+                <button
+                  onClick={() => setDeleteStep("hidden")}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-destructive font-medium">
+                  Delete this {typeLabel.toLowerCase()}?
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => onDelete(entry.id)}
+                    className="text-xs bg-destructive text-destructive-foreground px-3 py-1.5 rounded-md hover:bg-destructive/90 transition-colors cursor-pointer font-medium"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => setDeleteStep("hidden")}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer px-2 py-1.5"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -315,7 +358,13 @@ export function EntryDetailPopover({
                     on {entry.recurrence_days.map((d) => DAY_NAMES[d]).join(", ")}
                   </span>
                 ) : null}
-                {entry.recurrence_end && (
+                {entry.recurrence_freq === "monthly" && entry.recurrence_monthly_mode === "day_of_week" && (
+                  <span className="ml-1">(by day of week)</span>
+                )}
+                {entry.recurrence_count && entry.recurrence_count > 0 && (
+                  <span className="ml-1">· {entry.recurrence_count} occurrences</span>
+                )}
+                {entry.recurrence_end && !entry.recurrence_count && (
                   <span className="ml-1">
                     · until {new Date(entry.recurrence_end).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
@@ -372,6 +421,7 @@ export function ConnectedEntryDetailPopover() {
     open,
     closePreview,
     deleteEntryById,
+    deleteRecurring,
     toggleComplete,
   } = useEntryModal()
 
@@ -387,6 +437,9 @@ export function ConnectedEntryDetailPopover() {
       }}
       onDelete={(id) => {
         deleteEntryById(id)
+      }}
+      onDeleteRecurring={(id, mode, date) => {
+        deleteRecurring(id, mode, date)
       }}
       onClose={closePreview}
       onToggleComplete={toggleComplete}
