@@ -95,10 +95,11 @@ export function CalendarToolbar({
             {hasUser && (
               <button
                 onClick={onIcalClick}
-                className="p-1.5 rounded-md hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-border rounded-md text-sm font-medium hover:bg-muted transition-colors cursor-pointer text-foreground"
                 title="Subscribe to calendar"
               >
                 <ExternalLink className="w-4 h-4" />
+                <span className="hidden sm:inline">Google Calendar</span>
               </button>
             )}
 
