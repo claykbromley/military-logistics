@@ -302,6 +302,33 @@ export function EntryModal({
     onFormChange({ ...formData, ...partial })
   }
 
+  /** Convert "HH:MM" to minutes since midnight */
+  const timeToMinutes = (t: string): number => {
+    const [h, m] = t.split(":").map(Number)
+    return (h || 0) * 60 + (m || 0)
+  }
+
+  /** Convert minutes since midnight back to "HH:MM" */
+  const minutesToTime = (mins: number): string => {
+    const clamped = Math.min(Math.max(0, mins), 23 * 60 + 45)
+    const h = Math.floor(clamped / 60)
+    const m = clamped % 60
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+  }
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    const oldStartMins = timeToMinutes(formData.start_time)
+    const oldEndMins = timeToMinutes(formData.end_time)
+    const duration = Math.max(oldEndMins - oldStartMins, 60) // at least 1 hour
+    const newStartMins = timeToMinutes(newStartTime)
+    const newEndMins = Math.min(newStartMins + duration, 23 * 60 + 45)
+
+    update({
+      start_time: newStartTime,
+      end_time: minutesToTime(newEndMins),
+    })
+  }
+
   const addInvitee = () => {
     const email = inviteEmail.trim()
     if (!email) return
@@ -456,7 +483,7 @@ export function EntryModal({
                 {!formData.all_day && (
                   <TimePicker
                     value={formData.start_time}
-                    onChange={(val) => update({ start_time: val })}
+                    onChange={handleStartTimeChange}
                   />
                 )}
                 {isEvent && (
