@@ -4,7 +4,7 @@ import { useMemo } from "react"
 import { 
   DollarSign, FileText, Home, Users, Calendar, MessageSquare, History,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
-  AlertCircle, AlertTriangle, Clock, CheckCircle2, TrendingUp, Bell,
+  AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink,
   CreditCard, Wrench, Video, Car, Circle
 } from "lucide-react"
@@ -14,7 +14,7 @@ import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 import { useLegalChecklist } from "@/hooks/use-legal"
-import { cn } from "@/lib/utils"
+import { usePets } from "@/hooks/use-pets"
 
 export function CommandCenterDashboard() {
   const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
@@ -58,16 +58,20 @@ export function CommandCenterDashboard() {
     return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
   }
 
-  function getSoonestByDate<T extends Record<string, any>, K extends keyof T>(
+  function getSoonestByDate<T>(
     items: T[],
-    dateKey: K
+    getDate: (item: T) => string | null | undefined
   ): T | null {
     return items.reduce<T | null>((earliest, item) => {
-      const currentDate = item[dateKey]
-      const earliestDate = earliest?.[dateKey]
+      const currentDate = getDate(item)
       if (!currentDate) return earliest
+
+      if (!earliest) return item
+
+      const earliestDate = getDate(earliest)
       if (!earliestDate) return item
-      return new Date(currentDate as string) < new Date(earliestDate as string)
+
+      return new Date(currentDate) < new Date(earliestDate)
         ? item
         : earliest
     }, null)
@@ -80,11 +84,24 @@ export function CommandCenterDashboard() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  const soonestMaintenance = getSoonestByDate(maintenance, "nextDue")
+  const { pets, getUpcomingVetVisits } = usePets()
+  const uncoveredPets = pets.filter(pet => !pet.caregiverName)
+  const vetVisit = getSoonestByDate(getUpcomingVetVisits(60), (visit) => visit.record.nextDue)
+  const petEmoji = (petType: String) => {
+    if (petType === 'dog') {return "🐕"}
+    if (petType === 'cat') {return "🐈"}
+    if (petType === 'bird') {return "🐦"}
+    if (petType === 'fish') {return "🐟"}
+    if (petType === 'reptile') {return "🦎"}
+    if (petType === 'small_mammal') {return "🐹"}
+    return "🐾"
+  }
+
+  const soonestMaintenance = getSoonestByDate(maintenance, item => item.nextDue)
   const soonestMaintenanceType = vehicles.some(item => item['id'] === soonestMaintenance?.propertyId) ? "vehicle" : "other"
-  const soonestExpItem = getSoonestByDate(expiringItems, "date")
+  const soonestExpItem = getSoonestByDate(expiringItems, item => item.date)
   const soonestExpItemStatus = daysUntil(soonestExpItem?.date)
-  const soonestExpDoc = getSoonestByDate(expiringDocuments, "expirationDate")
+  const soonestExpDoc = getSoonestByDate(expiringDocuments, item => item.expirationDate)
   const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
 
   const upcomingCalls = useMemo(() => {
@@ -382,7 +399,7 @@ export function CommandCenterDashboard() {
 
           {/* Legal Ready - Attention needed */}
           <div className="lg:col-span-3">
-            <div className={"bg-gradient-to-br rounded-2xl p-6 border shadow-lg hover:shadow-xl transition-all h-full from-orange-50 to-red-50 dark:from-orange-950/40 dark:to-red-950/30 border-orange-300 dark:border-orange-700"}>
+            <div className={"bg-gradient-to-br rounded-2xl p-6 border shadow-lg hover:shadow-xl transition-all h-full from-orange-50 to-red-50 dark:from-orange-950/40 dark:to-red-950/30 border border-orange-200/50 dark:border-orange-800/50"}>
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
@@ -667,44 +684,64 @@ export function CommandCenterDashboard() {
           {/* Pet Care */}
           <Link href="/services/command-center/pets" className="group">
             <div className="bg-gradient-to-br from-pink-50 to-fuchsia-50 dark:from-pink-950/40 dark:to-fuchsia-950/30 rounded-xl p-5 border border-pink-200/50 dark:border-pink-800/50 shadow-sm hover:shadow-lg hover:border-pink-300 dark:hover:border-pink-600 transition-all h-full">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-11 h-11 rounded-xl bg-pink-600 dark:bg-pink-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                  <PawPrint className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl bg-pink-600 dark:bg-pink-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                    <PawPrint className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Pet Care</h3>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">{pets.length} pet{pets.length !== 1 && 's'} in care</span>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Pet Care</h3>
-                  <span className="text-xs text-slate-600 dark:text-slate-400">2 pets in care</span>
-                </div>
+                {uncoveredPets.length > 0 && (
+                  <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-ambebr-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    {uncoveredPets.length}
+                  </div>
+                )}
               </div>
               
               <div className="space-y-2 mb-3">
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center text-white text-xs font-bold">
-                    🐕
+                {pets.length>0 ? 
+                  pets.slice(0,2).map((pet) => 
+                    <div key={pet.id} className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-pink-400 flex items-center justify-center text-white text-xs font-bold">
+                        {petEmoji(pet.petType)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">{pet.name}{pet.breed ? ` (${pet.breed})` : ""}</div>
+                        {pet.caregiverName && <div className="text-xs text-slate-600 dark:text-slate-400">With {pet.caregiverName}</div>}
+                      </div>
+                    </div>
+                  ) :
+                  <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-pink-400 flex items-center justify-center text-white text-xs font-bold">
+                      🐾
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">No Saved Pets</div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">Click to add a pet</div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Max (Golden Retriever)</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">With Johnson Family</div>
-                  </div>
-                </div>
-                
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-pink-200/30 dark:border-pink-700/30 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 flex items-center justify-center text-white text-xs font-bold">
-                    🐱
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Luna (Tabby Cat)</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">With Johnson Family</div>
-                  </div>
-                </div>
+                }
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3" />
-                  All covered
-                </span>
-                <span className="text-slate-600 dark:text-slate-400">No vet visits</span>
+                {uncoveredPets.length>0 ?
+                  <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                    <XCircle className="w-3 h-3" />
+                    {uncoveredPets.length} pet{uncoveredPets.length !== 1 && 's'} without caregiver
+                  </span> :
+                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    All covered
+                  </span>
+                }
+                {vetVisit?
+                  <span className="text-slate-600 dark:text-slate-400">Vet visit for {vetVisit.petName} on {formatDate(vetVisit.record.nextDue)}</span>:
+                  <span className="text-slate-600 dark:text-slate-400">No vet visits</span>
+                }
               </div>
             </div>
           </Link>

@@ -118,7 +118,6 @@ export function useProperties() {
       .select("*")
       .eq("id", user.id)
       .single()
-    console.log(myData)
 
     if (error) {
       console.error("Failed to load emergency contacts:", error)

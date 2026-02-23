@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, Suspense, useRef, useEffect, useMemo } from "react"
+import { useState, Suspense, useRef, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { FileText, Plus, Search, AlertTriangle, Calendar, Lock, Shield, ChevronsUpDown, ArrowLeft, Filter, ChevronDown, Trash2, Edit, Share2, Star, StarOff, Clock, Upload, Download, X, Mail, Check } from "lucide-react"
+import { FileText, Plus, Search, AlertTriangle, Calendar, Lock, Shield, ChevronsUpDown, ArrowLeft, Filter, ChevronDown, Trash2, Edit, Share2, Star, StarOff, Clock, Upload, Download, X, Mail, Check, Scale } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -33,6 +33,13 @@ const documentTypes: { value: DocumentType; label: string; icon: string }[] = [
   { value: "property", label: "Property & Deeds", icon: "home" },
   { value: "other", label: "Other", icon: "file" },
 ]
+
+/** Document types that are automatically shared with POA contacts */
+const LEGAL_DOCUMENT_TYPES: DocumentType[] = ["will", "poa"]
+
+function isLegalDocument(type: DocumentType): boolean {
+  return LEGAL_DOCUMENT_TYPES.includes(type)
+}
 
 interface QuickAdd {
   value: string,
@@ -67,6 +74,20 @@ function formatFileSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+/** Get emails of contacts who have POA access */
+function getPoaContactEmails(contacts: Contact[]): string[] {
+  return contacts
+    .filter((c) => c.isPoaHolder && c.email)
+    .map((c) => c.email!.trim().toLowerCase())
+}
+
+/** Merge POA emails into an existing sharedWith list (deduplicated) */
+function mergePoaEmails(existing: string[], poaEmails: string[]): string[] {
+  const set = new Set(existing.map((e) => e.trim().toLowerCase()))
+  poaEmails.forEach((e) => set.add(e))
+  return Array.from(set)
 }
 
 /* ─── Colour helpers for document type badges ─── */
@@ -109,6 +130,7 @@ function DocumentCard({
   onShare,
   onDownload,
   isOwner,
+  poaEmails,
 }: {
   document: Document
   onEdit: () => void
@@ -117,6 +139,7 @@ function DocumentCard({
   onShare: () => void
   onDownload: () => void
   isOwner: boolean
+  poaEmails: string[]
 }) {
   const daysUntilExpiration = document.expirationDate
     ? getDaysUntilExpiration(document.expirationDate)
@@ -124,13 +147,22 @@ function DocumentCard({
   const isExpiringSoon = daysUntilExpiration !== null && daysUntilExpiration <= 90
   const isExpired = daysUntilExpiration !== null && daysUntilExpiration <= 0
 
+  // Determine how many POA contacts this doc is shared with
+  const sharedPoaCount = useMemo(() => {
+    return document.sharedWith.filter((email) =>
+      poaEmails.includes(email.trim().toLowerCase())
+    ).length
+  }, [document.sharedWith, poaEmails])
+
+  const isSharedWithPoa = sharedPoaCount > 0
+
   return (
     <div
       className={cn(
         "group relative bg-card border rounded-xl p-5 transition-all duration-200",
         "hover:shadow-md hover:shadow-black/5 dark:hover:shadow-black/20 hover:-translate-y-0.5",
         document.isCritical
-          ? "border-accent/40 ring-1 ring-accent/10 bg-accent/[0.02]"
+          ? "border-accent/40 ring-1 ring-accent/10"
           : "border-border",
         !isOwner && "bg-muted/30"
       )}
@@ -170,15 +202,27 @@ function DocumentCard({
               )}
             </div>
 
-            {/* Type badge */}
-            <span
-              className={cn(
-                "inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide",
-                getTypeBadgeClasses(document.documentType)
+            {/* Type badge + POA badge */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span
+                className={cn(
+                  "inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide",
+                  getTypeBadgeClasses(document.documentType)
+                )}
+              >
+                {getTypeLabel(document.documentType)}
+              </span>
+
+              {isSharedWithPoa && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium tracking-wide bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                  <Scale className="w-3 h-3" />
+                  POA Access
+                  {sharedPoaCount > 1 && (
+                    <span className="opacity-70">· {sharedPoaCount}</span>
+                  )}
+                </span>
               )}
-            >
-              {getTypeLabel(document.documentType)}
-            </span>
+            </div>
 
             {/* File info */}
             {document.fileName && (
@@ -242,24 +286,24 @@ function DocumentCard({
           <DropdownMenuContent align="end" className="w-48">
             {document.fileUrl && (
               <>
-                <DropdownMenuItem onClick={onDownload}>
+                <DropdownMenuItem onClick={onDownload} className="cursor-pointer">
                   <Download className="w-4 h-4 mr-2" />
                   Download File
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
               </>
             )}
             {isOwner && (
               <>
-                <DropdownMenuItem onClick={onEdit}>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Details
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onShare}>
+                <DropdownMenuItem onClick={onShare} className="cursor-pointer">
                   <Share2 className="w-4 h-4 mr-2" />
                   Share Document
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onToggleCritical}>
+                <DropdownMenuItem onClick={onToggleCritical} className="cursor-pointer">
                   {document.isCritical ? (
                     <>
                       <StarOff className="w-4 h-4 mr-2" />
@@ -273,7 +317,12 @@ function DocumentCard({
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (confirm("Are you sure you want to delete this document?")) {
+                      onDelete()
+                    }}}
+                  className="text-destructive focus:bg-destructive focus:text-destructive-foreground cursor-pointer">
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </DropdownMenuItem>
@@ -301,6 +350,7 @@ function AddDocumentDialog({
   editingDocument,
   isUploading,
   isQuickAdd,
+  poaEmails,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -308,6 +358,7 @@ function AddDocumentDialog({
   editingDocument?: Document | null
   isUploading: boolean
   isQuickAdd: QuickAdd | null
+  poaEmails: string[]
 }) {
   const [name, setName] = useState("")
   const [type, setType] = useState<DocumentType>("other")
@@ -317,6 +368,8 @@ function AddDocumentDialog({
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [replaceFile, setReplaceFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const willAutoShare = isLegalDocument(type) && poaEmails.length > 0
 
   useEffect(() => {
     if (editingDocument) {
@@ -349,6 +402,13 @@ function AddDocumentDialog({
 
   const handleSave = async () => {
     if (!name.trim()) return
+
+    // Auto-merge POA emails for legal documents
+    const existingShared = editingDocument?.sharedWith || []
+    const sharedWith = willAutoShare
+      ? mergePoaEmails(existingShared, poaEmails)
+      : existingShared
+
     try {
       await onSave(
         {
@@ -357,7 +417,7 @@ function AddDocumentDialog({
           expirationDate: expirationDate || undefined,
           notes: notes.trim() || undefined,
           isCritical,
-          sharedWith: editingDocument?.sharedWith || [],
+          sharedWith,
           fileUrl: editingDocument?.fileUrl,
           fileName: editingDocument?.fileName,
           fileSize: editingDocument?.fileSize,
@@ -501,6 +561,25 @@ function AddDocumentDialog({
             </Select>
           </div>
 
+          {/* POA auto-share notice */}
+          {willAutoShare && (
+            <div className="flex items-start gap-3 p-3.5 rounded-xl border bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/40">
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0">
+                <Scale className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+                  Auto-shared with POA contacts
+                </p>
+                <p className="text-xs text-indigo-700 dark:text-indigo-300/80 mt-0.5 leading-relaxed">
+                  This legal document will be automatically shared with {poaEmails.length} POA
+                  {poaEmails.length === 1 ? " contact" : " contacts"}:{" "}
+                  {poaEmails.join(", ")}
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="expiration" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Expiration Date
@@ -571,17 +650,21 @@ function ShareDialog({
   onOpenChange,
   document,
   onShare,
-  contacts
+  contacts,
+  poaEmails,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   document: Document | null
   onShare: (emails: string[]) => void
   contacts: Contact[]
+  poaEmails: string[]
 }) {
   const [emails, setEmails] = useState<string[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [search, setSearch] = useState("")
+
+  const isLegal = document ? isLegalDocument(document.documentType) : false
 
   useEffect(() => {
     if (document) {
@@ -608,6 +691,10 @@ function ShareDialog({
   }
 
   const removeEmail = (email: string) => {
+    // Prevent removing POA contacts from legal documents
+    if (isLegal && poaEmails.includes(email.trim().toLowerCase())) {
+      return
+    }
     setEmails(emails.filter((e) => e !== email))
   }
 
@@ -616,9 +703,11 @@ function ShareDialog({
     onOpenChange(false)
   }
 
+  const isPoaEmail = (email: string) => poaEmails.includes(email.trim().toLowerCase())
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90%] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share Document</DialogTitle>
           <DialogDescription>
@@ -671,6 +760,11 @@ function ShareDialog({
                         }}
                       >
                         {contact.contactName}
+                        {contact.isPoaHolder && (
+                          <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                            POA
+                          </Badge>
+                        )}
                         <span className="ml-2 text-muted-foreground text-xs">
                           {contact.email}
                         </span>
@@ -696,27 +790,70 @@ function ShareDialog({
                 Shared with
               </Label>
               <div className="space-y-1.5">
-                {emails.map((email) => (
-                  <div
-                    key={email}
-                    className="flex items-center justify-between p-2.5 border rounded-xl bg-muted/20"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center">
-                        <Mail className="w-3.5 h-3.5 text-accent" />
-                      </div>
-                      <span className="text-sm">{email}</span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => removeEmail(email)}
+                {emails.map((email) => {
+                  const isPoa = isPoaEmail(email)
+                  const isLockedPoa = isLegal && isPoa
+
+                  return (
+                    <div
+                      key={email}
+                      className={cn(
+                        "flex items-center justify-between p-2.5 border rounded-xl",
+                        isLockedPoa
+                          ? "bg-indigo-50/50 dark:bg-indigo-950/10 border-indigo-200/50 dark:border-indigo-800/30"
+                          : "bg-muted/20"
+                      )}
                     >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          "w-7 h-7 rounded-full flex items-center justify-center",
+                          isPoa
+                            ? "bg-indigo-100 dark:bg-indigo-900/40"
+                            : "bg-accent/10"
+                        )}>
+                          {isPoa ? (
+                            <Scale className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          ) : (
+                            <Mail className="w-3.5 h-3.5 text-accent" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">{email}</span>
+                          {isPoa && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                              POA
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      {isLockedPoa ? (
+                        <Lock className="w-3.5 h-3.5 text-indigo-400 mr-2" />
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => removeEmail(email)}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* POA info for legal docs */}
+          {isLegal && poaEmails.length > 0 && (
+            <div className="rounded-xl border bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/40 p-3.5 text-sm leading-relaxed">
+              <div className="flex items-start gap-2">
+                <Scale className="w-4 h-4 text-indigo-600 dark:text-indigo-400 mt-0.5 flex-shrink-0" />
+                <p className="text-indigo-700 dark:text-indigo-300/80">
+                  POA contacts are automatically included on legal documents and cannot be removed here.
+                  To change POA access, update the contact&apos;s POA status.
+                </p>
               </div>
             </div>
           )}
@@ -779,6 +916,9 @@ function DocumentVaultPageContent() {
   const [quickAdd, setQuickAdd] = useState<QuickAdd | null>(null)
   const [showCritDocs, setShowCritDocs] = useState(false)
 
+  // Memoize POA contact emails
+  const poaEmails = useMemo(() => getPoaContactEmails(contacts), [contacts])
+  
   useEffect(() => {
     const getCurrentUser = async () => {
       const supabase = createClient()
@@ -1113,6 +1253,7 @@ function DocumentVaultPageContent() {
                 onShare={() => handleShare(doc)}
                 onDownload={() => handleDownload(doc)}
                 isOwner={doc.user_id === currentUserId}
+                poaEmails={poaEmails}
               />
             ))}
           </div>
@@ -1185,6 +1326,7 @@ function DocumentVaultPageContent() {
           editingDocument={editingDocument}
           isUploading={isUploading}
           isQuickAdd={quickAdd}
+          poaEmails={poaEmails}
         />
       </Suspense>
 
@@ -1195,6 +1337,7 @@ function DocumentVaultPageContent() {
           document={sharingDocument}
           onShare={handleSaveSharing}
           contacts={contacts}
+          poaEmails={poaEmails}
         />
       </Suspense>
       <Footer />

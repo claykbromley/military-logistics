@@ -624,7 +624,7 @@ function AddPropertyDialog({
             </h4>
             <div className="space-y-2">
               <Label className="text-sm">
-                Select from Emergency Contacts
+                Select from Contacts
               </Label>
 
               <Popover open={caretakerOpen} onOpenChange={setCaretakerOpen}>

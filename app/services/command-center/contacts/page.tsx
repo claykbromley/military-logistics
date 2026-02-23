@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge"
 import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { Contact, SharedContact } from "@/lib/types"
 import { format, formatDistanceToNow } from "date-fns"
+import { useDocuments } from "@/hooks/use-documents"
 
 // ============================================
 // HELPER FUNCTIONS
@@ -965,6 +966,7 @@ function EmergencyContactsPageContent() {
     reorderEmergencyPriorities,
     exportToPDF,
   } = useCommunicationHub()
+  const { documents, shareDocument } = useDocuments()
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -1050,6 +1052,19 @@ function EmergencyContactsPageContent() {
       updates.isPoaHolder = !contact.isPoaHolder
       if (!contact.isPoaHolder && !contact.isEmergencyContact) {
         updates.role = "legal"
+      }
+
+      if (!contact.isPoaHolder && contact.email) {
+        const legalTypes: string[] = ["will", "poa"]
+        const legalDocs = documents.filter((doc) =>
+          legalTypes.includes(doc.documentType)
+        )
+        for (const doc of legalDocs) {
+          const email = contact.email.trim().toLowerCase()
+          if (!doc.sharedWith.includes(email)) {
+            await shareDocument(doc.id, [...doc.sharedWith, email])
+          }
+        }
       }
     }
     if (role === "accounts") {
