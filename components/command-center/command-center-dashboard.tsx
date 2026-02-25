@@ -363,16 +363,25 @@ export function CommandCenterDashboard() {
               </div>
 
               <div className="bg-purple-600 dark:bg-purple-700 rounded-xl p-4 text-white">
-                <div className="flex items-center justify-between">
-                  {upcomingMeetings.length > 0 ?
-                    <div>
-                      <div className="text-sm opacity-90 mb-1">Next scheduled meeting</div>
-                      <div className="text-xl font-bold">{formatEventTime(upcomingMeetings[0]._nextOccurrence.toISOString())}</div>
-                      <div className="text-sm opacity-75 mt-1">{upcomingMeetings[0].title}</div>
-                    </div>
-                  : <div className="text-xl font-bold">No Upcoming Meetings</div>}
-                  <Phone className="w-8 h-8 opacity-50" />
-                </div>
+                {upcomingMeetings.length > 0 ? (
+                  <div className="space-y-3">
+                    {upcomingMeetings.slice(0, 2).map((meeting, i) => (
+                      <div key={meeting.id} className={`flex items-center justify-between ${i > 0 ? "pt-3 border-t border-white/15" : ""}`}>
+                        <div>
+                          {i === 0 && <div className="text-sm opacity-90 mb-1">Next scheduled meetings</div>}
+                          <div className={i === 0 ? "text-xl font-bold" : "text-base font-semibold opacity-90"}>{formatEventTime(meeting._nextOccurrence.toISOString())}</div>
+                          <div className="text-sm opacity-75 mt-0.5">{meeting.title}</div>
+                        </div>
+                        {i === 0 && <Phone className="w-8 h-8 opacity-50 flex-shrink-0" />}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="text-xl font-bold">No Upcoming Meetings</div>
+                    <Phone className="w-8 h-8 opacity-50" />
+                  </div>
+                )}
               </div>
 
               <Button variant="outline" className="w-full mt-4 border-purple-300 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/50 hover:text-purple-900 dark:hover:text-purple-200" asChild>
