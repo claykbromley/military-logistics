@@ -90,12 +90,14 @@ export function CommandCenterDashboard() {
   const soonestExpDoc = getSoonestByDate(expiringDocuments, "expirationDate")
   const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
 
-  // ── Fetch upcoming meetings directly from calendar_entries ──
-  // Matches the same source used by the comm hub page & schedule tab
+  // ── Fetch upcoming entries from calendar_entries ──────────
+  // Single query, then split into meetings (for comm hub card) and all events (for calendar card)
   const [upcomingMeetings, setUpcomingMeetings] = useState<(CalendarEntry & { _nextOccurrence: Date })[]>([])
   const [meetingCount, setMeetingCount] = useState(0)
+  const [upcomingEvents, setUpcomingEvents] = useState<(CalendarEntry & { _nextOccurrence: Date })[]>([])
+  const [eventCount, setEventCount] = useState(0)
 
-  const fetchUpcomingMeetings = useCallback(async () => {
+  const fetchUpcomingEntries = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -104,44 +106,45 @@ export function CommandCenterDashboard() {
       .from("calendar_entries")
       .select("*")
       .eq("user_id", user.id)
-      .eq("source", "meeting")
       .eq("is_completed", false)
       .order("start_time", { ascending: true })
 
     if (error || !data) {
       setUpcomingMeetings([])
       setMeetingCount(0)
+      setUpcomingEvents([])
+      setEventCount(0)
       return
     }
 
     const now = new Date()
     const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000)
 
-    // Resolve next occurrence for each entry and filter to those with future occurrences
-    const withNextOcc = (data as CalendarEntry[])
+    // Resolve next occurrence for all entries, filter to future only
+    const allResolved = (data as CalendarEntry[])
+      .filter((e) => e.source !== "holiday") // exclude federal holidays
       .map((e) => {
         const next = getNextOccurrence(e, now)
         return next ? { ...e, _nextOccurrence: next } : null
       })
       .filter((e): e is CalendarEntry & { _nextOccurrence: Date } =>
-        e !== null && e._nextOccurrence >= now
+        e !== null && e._nextOccurrence >= now && e._nextOccurrence < thirtyDaysOut
       )
+      .sort((a, b) => a._nextOccurrence.getTime() - b._nextOccurrence.getTime())
 
-    // Count within 30 days
-    const inWindow = withNextOcc.filter((e) => e._nextOccurrence < thirtyDaysOut)
-    setMeetingCount(inWindow.length)
+    // Split: meetings for comm hub card
+    const meetings = allResolved.filter((e) => e.source === "meeting")
+    setMeetingCount(meetings.length)
+    setUpcomingMeetings(meetings)
 
-    // Sort by next occurrence date
-    const sorted = inWindow.sort(
-      (a, b) => a._nextOccurrence.getTime() - b._nextOccurrence.getTime()
-    )
-
-    setUpcomingMeetings(sorted)
+    // All events for calendar card
+    setEventCount(allResolved.length)
+    setUpcomingEvents(allResolved)
   }, [])
 
   useEffect(() => {
-    fetchUpcomingMeetings()
-  }, [fetchUpcomingMeetings])
+    fetchUpcomingEntries()
+  }, [fetchUpcomingEntries])
 
   // Realtime subscription for meeting count changes
   useEffect(() => {
@@ -161,13 +164,13 @@ export function CommandCenterDashboard() {
             table: "calendar_entries",
             filter: `user_id=eq.${userId}`,
           },
-          () => fetchUpcomingMeetings()
+          () => fetchUpcomingEntries()
         )
         .subscribe()
 
       return () => { supabase.removeChannel(channel) }
     })
-  }, [fetchUpcomingMeetings])
+  }, [fetchUpcomingEntries])
 
   const unreadCount = useMemo(() => {
     return messageThreads
@@ -402,51 +405,64 @@ export function CommandCenterDashboard() {
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Upcoming Events</h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">8 events scheduled in next 30 days</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {eventCount} {eventCount === 1 ? "event" : "events"} in next 30 days
+                  </p>
                 </div>
               </div>
 
               <div className="space-y-3 mb-4">
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/40 flex flex-col items-center justify-center flex-shrink-0">
-                    <div className="text-xs text-red-600 dark:text-red-400 font-bold">FEB</div>
-                    <div className="text-lg font-bold text-red-700 dark:text-red-300">14</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Anniversary</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Send care package</div>
-                  </div>
-                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded text-xs font-bold">
-                    <Clock className="w-3 h-3" />
-                    16d
-                  </div>
-                </div>
+                {upcomingEvents.length > 0 ? (
+                  upcomingEvents.slice(0, 3).map((evt) => {
+                    const occ = evt._nextOccurrence
+                    const monthStr = occ.toLocaleDateString("en-US", { month: "short" }).toUpperCase()
+                    const dayNum = occ.getDate()
+                    const daysAway = Math.ceil((occ.getTime() - Date.now()) / 86400000)
+                    const color = evt.color || "#3b82f6"
 
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/40 flex flex-col items-center justify-center flex-shrink-0">
-                    <div className="text-xs text-red-600 dark:text-red-400 font-bold">FEB</div>
-                    <div className="text-lg font-bold text-red-700 dark:text-red-300">14</div>
+                    return (
+                      <div
+                        key={`${evt.id}-${occ.toISOString()}`}
+                        className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3"
+                      >
+                        {/* Color accent strip */}
+                        <div
+                          className="w-12 h-12 rounded-lg flex flex-col items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: `${color}18` }}
+                        >
+                          <div className="text-xs font-bold" style={{ color }}>{monthStr}</div>
+                          <div className="text-lg font-bold" style={{ color }}>{dayNum}</div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                           
+                            <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm truncate">{evt.title}</div>
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400">
+                            {evt.all_day
+                              ? "All day"
+                              : occ.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                            {evt.location ? ` · ${evt.location}` : ""}
+                          </div>
+                        </div>
+                        {daysAway >= 0 && daysAway <= 30 && (
+                          <div
+                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-bold flex-shrink-0"
+                            style={{ backgroundColor: `${color}18`, color }}
+                          >
+                            <Clock className="w-3 h-3" />
+                            {daysAway === 0 ? "Today" : daysAway === 1 ? "1d" : `${daysAway}d`}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-6 border border-cyan-200/30 dark:border-cyan-700/30 text-center">
+                    <Calendar className="w-8 h-8 text-cyan-300 dark:text-cyan-700 mx-auto mb-2" />
+                    <p className="text-sm text-slate-600 dark:text-slate-400">No upcoming events</p>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Anniversary</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Send care package</div>
-                  </div>
-                  <div className="flex items-center gap-1 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-1 rounded text-xs font-bold">
-                    <Clock className="w-3 h-3" />
-                    16d
-                  </div>
-                </div>
-
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 border border-cyan-200/30 dark:border-cyan-700/30 flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex flex-col items-center justify-center flex-shrink-0">
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-bold">FEB</div>
-                    <div className="text-lg font-bold text-blue-700 dark:text-blue-300">22</div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Emma&apos;s Birthday</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Meeting scheduled</div>
-                  </div>
-                </div>
+                )}
               </div>
 
               <Button variant="outline" className="w-full border-cyan-300 dark:border-cyan-700 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 hover:text-cyan-900 dark:hover:text-cyan-200" asChild>
