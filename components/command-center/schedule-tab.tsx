@@ -39,6 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import type { CalendarEntry } from "@/app/scheduler/calendar/types";
+import { getNextOccurrence } from "@/app/scheduler/calendar/utils";
 import {
   EntryModalProvider,
   useEntryModal,
@@ -132,6 +133,8 @@ interface EventCardProps {
   entry: CalendarEntry;
   user: string;
   compact?: boolean;
+  /** Resolved next occurrence date for recurring entries */
+  displayDate?: Date;
   onCardClick?: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -142,15 +145,16 @@ function EventCard({
   entry,
   user,
   compact = false,
+  displayDate,
   onCardClick,
   onEdit,
   onDelete,
   onComplete,
 }: EventCardProps) {
   const Icon = eventTypeIcons[entry.type];
-  const startPassed = isBefore(new Date(entry.start_time), new Date());
+  const effectiveDate = displayDate || new Date(entry.start_time);
+  const startPassed = isBefore(effectiveDate, new Date());
   // Recurring entries with future occurrences should not appear "past"
-  // recurrence_end can be null, undefined, or empty string — all mean "indefinite"
   const recEnd = entry.recurrence_end && entry.recurrence_end.trim() ? entry.recurrence_end : null;
   const hasMore = entry.is_recurring && (!recEnd || isAfter(new Date(recEnd), new Date()));
   const isPast = startPassed && !hasMore;
@@ -198,7 +202,11 @@ function EventCard({
             {/* Time */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
               <Clock className="w-3.5 h-3.5" />
-              <span>{formatEventDate(entry.start_time, entry.all_day, entry.timezone)}</span>
+              <span>{formatEventDate(
+                displayDate ? displayDate.toISOString() : entry.start_time,
+                entry.all_day,
+                entry.timezone
+              )}</span>
               {entry.all_day && (
                 <span className="text-xs bg-muted px-2 py-0.5 rounded">
                   All day
@@ -445,15 +453,12 @@ function ScheduleTabInner({
           hasFutureOccurrences(e) &&
           e.source == "meeting"
       )
+      .map((e) => ({
+        ...e,
+        _nextOccurrence: getNextOccurrence(e, now) || new Date(e.start_time),
+      }))
       .sort(
-        (a, b) => {
-          // For recurring entries whose start_time is in the past,
-          // sort by next occurrence (approximated by now) so they
-          // don't float to the top above truly-soon entries.
-          const aTime = Math.max(new Date(a.start_time).getTime(), now.getTime());
-          const bTime = Math.max(new Date(b.start_time).getTime(), now.getTime());
-          return aTime - bTime;
-        },
+        (a, b) => a._nextOccurrence.getTime() - b._nextOccurrence.getTime(),
       );
   }, [entries, now]);
 
@@ -482,12 +487,7 @@ function ScheduleTabInner({
 
   // Badge count: only meetings with a next occurrence within 30 days
   const upcomingCount = upcomingEntries.filter((e) => {
-    if (!e.is_recurring || isAfter(new Date(e.start_time), now)) {
-      // Non-recurring or hasn't started yet: check start_time
-      return isBefore(new Date(e.start_time), thirtyDaysFromNow);
-    }
-    // Recurring that already started: it recurs, so next occurrence is ~now
-    return true;
+    return isBefore(e._nextOccurrence, thirtyDaysFromNow);
   }).length;
 
   const visiblePastEntries = showAllPast
@@ -548,6 +548,7 @@ function ScheduleTabInner({
                   key={entry.id}
                   entry={entry}
                   user={currentUser?.id || ""}
+                  displayDate={entry._nextOccurrence}
                   onCardClick={() => previewEntry(entry)}
                   onEdit={() => openModal(entry)}
                   onDelete={() => handleDeleteEntry(entry.id)}

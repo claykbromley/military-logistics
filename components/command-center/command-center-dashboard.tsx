@@ -17,6 +17,7 @@ import { useLegalChecklist } from "@/hooks/use-legal"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import type { CalendarEntry } from "@/app/scheduler/calendar/types"
+import { getNextOccurrence } from "@/app/scheduler/calendar/utils"
 
 export function CommandCenterDashboard() {
   const { getEmergencyContacts, getPoaHolders, contacts, messageThreads, communicationLog } = useCommunicationHub()
@@ -91,7 +92,7 @@ export function CommandCenterDashboard() {
 
   // ── Fetch upcoming meetings directly from calendar_entries ──
   // Matches the same source used by the comm hub page & schedule tab
-  const [upcomingMeetings, setUpcomingMeetings] = useState<CalendarEntry[]>([])
+  const [upcomingMeetings, setUpcomingMeetings] = useState<(CalendarEntry & { _nextOccurrence: Date })[]>([])
   const [meetingCount, setMeetingCount] = useState(0)
 
   const fetchUpcomingMeetings = useCallback(async () => {
@@ -116,32 +117,24 @@ export function CommandCenterDashboard() {
     const now = new Date()
     const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000)
 
-    // Count meetings with future occurrences within 30 days
-    // (same logic as comm hub page & schedule tab)
-    const counted = (data as CalendarEntry[]).filter((e) => {
-      const start = new Date(e.start_time)
-      const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null
+    // Resolve next occurrence for each entry and filter to those with future occurrences
+    const withNextOcc = (data as CalendarEntry[])
+      .map((e) => {
+        const next = getNextOccurrence(e, now)
+        return next ? { ...e, _nextOccurrence: next } : null
+      })
+      .filter((e): e is CalendarEntry & { _nextOccurrence: Date } =>
+        e !== null && e._nextOccurrence >= now
+      )
 
-      if (e.is_recurring) {
-        const hasMore = !recEnd || new Date(recEnd) > now
-        if (!hasMore) return false
-        if (start > now) return start < thirtyDaysOut
-        return true
-      }
+    // Count within 30 days
+    const inWindow = withNextOcc.filter((e) => e._nextOccurrence < thirtyDaysOut)
+    setMeetingCount(inWindow.length)
 
-      return start > now && start < thirtyDaysOut
-    })
-
-    setMeetingCount(counted.length)
-
-    // Sort by next occurrence for display — recurring with past start sort by now
-    const sorted = counted.sort((a, b) => {
-      const aStart = new Date(a.start_time)
-      const bStart = new Date(b.start_time)
-      const aEffective = a.is_recurring && aStart < now ? now : aStart
-      const bEffective = b.is_recurring && bStart < now ? now : bStart
-      return aEffective.getTime() - bEffective.getTime()
-    })
+    // Sort by next occurrence date
+    const sorted = inWindow.sort(
+      (a, b) => a._nextOccurrence.getTime() - b._nextOccurrence.getTime()
+    )
 
     setUpcomingMeetings(sorted)
   }, [])
@@ -374,7 +367,7 @@ export function CommandCenterDashboard() {
                   {upcomingMeetings.length > 0 ?
                     <div>
                       <div className="text-sm opacity-90 mb-1">Next scheduled meeting</div>
-                      <div className="text-xl font-bold">{formatEventTime(upcomingMeetings[0].start_time)}</div>
+                      <div className="text-xl font-bold">{formatEventTime(upcomingMeetings[0]._nextOccurrence.toISOString())}</div>
                       <div className="text-sm opacity-75 mt-1">{upcomingMeetings[0].title}</div>
                     </div>
                   : <div className="text-xl font-bold">No Upcoming Meetings</div>}

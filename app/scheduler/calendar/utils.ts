@@ -103,6 +103,107 @@ function getNthWeekdayOfMonth(year: number, month: number, dayOfWeek: number, we
   return result
 }
 
+// ─── Next occurrence for recurring entries ──────────────────
+
+/**
+ * Returns the next occurrence date (at or after `asOf`) for a recurring entry.
+ * For non-recurring entries, returns start_time as-is.
+ * Returns null if the series has ended before `asOf`.
+ */
+export function getNextOccurrence(entry: CalendarEntry, asOf?: Date): Date | null {
+  const now = asOf || new Date()
+  const start = new Date(entry.start_time)
+
+  if (!entry.is_recurring || !entry.recurrence_freq) {
+    return start
+  }
+
+  const interval = entry.recurrence_interval || 1
+  const recEnd = entry.recurrence_end ? new Date(entry.recurrence_end) : null
+  const maxCount = entry.recurrence_count || Infinity
+  const excludedSet = new Set(
+    (entry.excluded_dates || []).map((d) => d.substring(0, 10))
+  )
+
+  let current = new Date(start)
+  let iterations = 0
+  let occurrenceCount = 0
+  const maxIterations = 500
+
+  while (iterations < maxIterations && occurrenceCount < maxCount) {
+    iterations++
+
+    if (recEnd && current > recEnd) break
+
+    // Generate candidate dates for this iteration
+    const candidates: Date[] = []
+
+    if (entry.recurrence_freq === "weekly" && entry.recurrence_days?.length) {
+      const weekStart = new Date(current)
+      weekStart.setDate(current.getDate() - current.getDay())
+      for (const dayNum of entry.recurrence_days) {
+        const dayDate = new Date(weekStart)
+        dayDate.setDate(weekStart.getDate() + dayNum)
+        dayDate.setHours(start.getHours(), start.getMinutes(), 0, 0)
+        if (dayDate >= start) candidates.push(dayDate)
+      }
+    } else if (
+      entry.recurrence_freq === "monthly" &&
+      entry.recurrence_monthly_mode === "day_of_week"
+    ) {
+      const weekOfMonth = getWeekOfMonth(start)
+      const dayOfWeek = start.getDay()
+      const target = getNthWeekdayOfMonth(
+        current.getFullYear(),
+        current.getMonth(),
+        dayOfWeek,
+        weekOfMonth
+      )
+      if (!isNaN(target.getTime())) {
+        target.setHours(start.getHours(), start.getMinutes(), 0, 0)
+        candidates.push(target)
+      }
+    } else {
+      candidates.push(new Date(current))
+    }
+
+    for (const cand of candidates) {
+      if (recEnd && cand > recEnd) continue
+      if (cand < start) continue
+
+      const dateKey = toLocalDateStr(cand)
+      if (excludedSet.has(dateKey)) {
+        occurrenceCount++
+        continue
+      }
+
+      occurrenceCount++
+      if (occurrenceCount > maxCount) return null
+
+      // This is the next occurrence at or after now
+      if (cand >= now) return cand
+    }
+
+    // Advance to next period
+    switch (entry.recurrence_freq) {
+      case "daily":
+        current.setDate(current.getDate() + interval)
+        break
+      case "weekly":
+        current.setDate(current.getDate() + 7 * interval)
+        break
+      case "monthly":
+        current.setMonth(current.getMonth() + interval)
+        break
+      case "yearly":
+        current.setFullYear(current.getFullYear() + interval)
+        break
+    }
+  }
+
+  return null // series ended or exhausted
+}
+
 // ─── Default form data ──────────────────────────────────────
 
 export function defaultFormData(date?: Date): EntryFormData {
