@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect, useCallback } from "react"
 import { 
   DollarSign, FileText, Home, Users, Calendar, MessageSquare, History,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
@@ -15,9 +15,11 @@ import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 import { useLegalChecklist } from "@/hooks/use-legal"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
+import type { CalendarEntry } from "@/app/scheduler/calendar/types"
 
 export function CommandCenterDashboard() {
-  const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
+  const { getEmergencyContacts, getPoaHolders, contacts, messageThreads, communicationLog } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
@@ -87,18 +89,92 @@ export function CommandCenterDashboard() {
   const soonestExpDoc = getSoonestByDate(expiringDocuments, "expirationDate")
   const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
 
-  const upcomingCalls = useMemo(() => {
-    const now = Date.now()
-    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
-    const cutoff = now + THIRTY_DAYS
-    return scheduledEvents
-      .filter((e) => e.status === "scheduled" && new Date(e.startTime) >= new Date())
-      .filter((e) => {
-        const start = new Date(e.startTime).getTime()
-        return start <= cutoff
-      })
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-  }, [scheduledEvents])
+  // ── Fetch upcoming meetings directly from calendar_entries ──
+  // Matches the same source used by the comm hub page & schedule tab
+  const [upcomingMeetings, setUpcomingMeetings] = useState<CalendarEntry[]>([])
+  const [meetingCount, setMeetingCount] = useState(0)
+
+  const fetchUpcomingMeetings = useCallback(async () => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const { data, error } = await supabase
+      .from("calendar_entries")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("source", "meeting")
+      .eq("is_completed", false)
+      .order("start_time", { ascending: true })
+
+    if (error || !data) {
+      setUpcomingMeetings([])
+      setMeetingCount(0)
+      return
+    }
+
+    const now = new Date()
+    const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000)
+
+    // Count meetings with future occurrences within 30 days
+    // (same logic as comm hub page & schedule tab)
+    const counted = (data as CalendarEntry[]).filter((e) => {
+      const start = new Date(e.start_time)
+      const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null
+
+      if (e.is_recurring) {
+        const hasMore = !recEnd || new Date(recEnd) > now
+        if (!hasMore) return false
+        if (start > now) return start < thirtyDaysOut
+        return true
+      }
+
+      return start > now && start < thirtyDaysOut
+    })
+
+    setMeetingCount(counted.length)
+
+    // Sort by next occurrence for display — recurring with past start sort by now
+    const sorted = counted.sort((a, b) => {
+      const aStart = new Date(a.start_time)
+      const bStart = new Date(b.start_time)
+      const aEffective = a.is_recurring && aStart < now ? now : aStart
+      const bEffective = b.is_recurring && bStart < now ? now : bStart
+      return aEffective.getTime() - bEffective.getTime()
+    })
+
+    setUpcomingMeetings(sorted)
+  }, [])
+
+  useEffect(() => {
+    fetchUpcomingMeetings()
+  }, [fetchUpcomingMeetings])
+
+  // Realtime subscription for meeting count changes
+  useEffect(() => {
+    const supabase = createClient()
+    let userId: string | null = null
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      userId = user.id
+      const channel = supabase
+        .channel("dashboard-meeting-count")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "calendar_entries",
+            filter: `user_id=eq.${userId}`,
+          },
+          () => fetchUpcomingMeetings()
+        )
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
+    })
+  }, [fetchUpcomingMeetings])
 
   const unreadCount = useMemo(() => {
     return messageThreads
@@ -273,8 +349,8 @@ export function CommandCenterDashboard() {
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <Video className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{upcomingCalls.length}</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Scheduled Calls</div>
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{meetingCount}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Scheduled Meetings</div>
                 </div>
 
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
@@ -295,13 +371,13 @@ export function CommandCenterDashboard() {
 
               <div className="bg-purple-600 dark:bg-purple-700 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between">
-                  {upcomingCalls.length > 0 ?
+                  {upcomingMeetings.length > 0 ?
                     <div>
-                      <div className="text-sm opacity-90 mb-1">Next scheduled call</div>
-                      <div className="text-xl font-bold">{formatEventTime(upcomingCalls[0].startTime)}</div>
-                      <div className="text-sm opacity-75 mt-1">{upcomingCalls[0].title}</div>
+                      <div className="text-sm opacity-90 mb-1">Next scheduled meeting</div>
+                      <div className="text-xl font-bold">{formatEventTime(upcomingMeetings[0].start_time)}</div>
+                      <div className="text-sm opacity-75 mt-1">{upcomingMeetings[0].title}</div>
                     </div>
-                  : <div className="text-xl font-bold">No Upcoming Calls</div>}
+                  : <div className="text-xl font-bold">No Upcoming Meetings</div>}
                   <Phone className="w-8 h-8 opacity-50" />
                 </div>
               </div>
@@ -366,7 +442,7 @@ export function CommandCenterDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Emma&apos;s Birthday</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Video call scheduled</div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">Meeting scheduled</div>
                   </div>
                 </div>
               </div>

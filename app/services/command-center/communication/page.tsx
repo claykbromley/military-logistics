@@ -42,12 +42,81 @@ function CommunicationHubPageContent() {
 
   // Get the authenticated user ID for the EntryModalProvider
   const [userId, setUserId] = useState<string | null>(null)
+  const [totalMeetings, setTotalMeetings] = useState(0)
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (user) setUserId(user.id)
     })
   }, [])
+
+  // Fetch upcoming meeting count directly from calendar_entries
+  // to stay in sync with the schedule tab
+  const fetchMeetingCount = useCallback(async () => {
+    if (!userId) return
+    const supabase = createClient()
+    const now = new Date()
+    const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000)
+
+    const { data, error } = await supabase
+      .from("calendar_entries")
+      .select("id, start_time, is_completed, is_recurring, recurrence_end, recurrence_count, source")
+      .eq("user_id", userId)
+      .eq("source", "meeting")
+      .eq("is_completed", false)
+
+    if (error || !data) {
+      setTotalMeetings(0)
+      return
+    }
+
+    // Count meetings with future occurrences within 30 days
+    // (same logic as schedule tab's hasFutureOccurrences + upcomingCount)
+    const count = data.filter((e) => {
+      const start = new Date(e.start_time)
+      const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null
+
+      if (e.is_recurring) {
+        // Recurring with future occurrences
+        const hasMore = !recEnd || new Date(recEnd) > now
+        if (!hasMore) return false
+        // If start is in the future, check within 30 days
+        if (start > now) return start < thirtyDaysOut
+        // Already started recurring = next occurrence is ~now, counts
+        return true
+      }
+
+      // Non-recurring: must be in the future and within 30 days
+      return start > now && start < thirtyDaysOut
+    }).length
+
+    setTotalMeetings(count)
+  }, [userId])
+
+  useEffect(() => {
+    fetchMeetingCount()
+  }, [fetchMeetingCount])
+
+  // Re-fetch count when schedule tab data changes (listen for realtime)
+  useEffect(() => {
+    if (!userId) return
+    const supabase = createClient()
+    const channel = supabase
+      .channel("comm-hub-meeting-count")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "calendar_entries",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => fetchMeetingCount()
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [userId, fetchMeetingCount])
 
   // Dialog states
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false)
@@ -73,13 +142,8 @@ function CommunicationHubPageContent() {
     return messageThreads.filter(t => !t.isArchived && t.unreadCount > 0).length
   }, [messageThreads])
 
-  // Stats — only count future meetings within the next 30 days
-  const totalEvents = scheduledEvents.filter((e) => {
-    const start = new Date(e.startTime)
-    const now = new Date()
-    const thirtyDaysOut = new Date(now.getTime() + 30 * 86400000)
-    return e.status === "scheduled" && start > now && start < thirtyDaysOut
-  }).length
+  // Stats
+  const totalEvents = totalMeetings
   const totalLogs = communicationLog.length
 
   if (!isLoaded) {
