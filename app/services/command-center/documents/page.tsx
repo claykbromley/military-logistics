@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, Suspense, useRef, useEffect, useMemo, useCallback } from "react"
+import { useState, Suspense, useRef, useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -1000,7 +1000,7 @@ function DocumentVaultPageContent() {
       <Header />
 
       {/* Hero Header */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

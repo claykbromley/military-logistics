@@ -43,10 +43,10 @@ export function ChecklistSection({
       <div className="bg-card border border-border rounded-lg overflow-hidden animate-pulse">
         <div className="p-4 md:p-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-muted" />
+            <div className="w-10 h-10 rounded-lg bg-muted dark:bg-background " />
             <div className="space-y-2">
-              <div className="h-5 w-24 bg-muted rounded" />
-              <div className="h-4 w-32 bg-muted rounded" />
+              <div className="h-5 w-24 bg-muted dark:bg-background rounded" />
+              <div className="h-4 w-32 bg-muted dark:bg-background rounded" />
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export function ChecklistSection({
     <div className="bg-card border border-border rounded-lg overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 md:p-5 hover:bg-muted/50 transition-colors text-left"
+        className="w-full flex items-center justify-between p-4 md:p-5 hover:bg-muted/50 transition-colors text-left cursor-pointer"
         aria-expanded={isOpen}
       >
         <div className="flex items-center gap-3">
@@ -74,7 +74,7 @@ export function ChecklistSection({
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-2">
-            <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+            <div className="w-24 h-2 bg-muted dark:bg-background rounded-full overflow-hidden">
               <div
                 className="h-full bg-accent transition-all duration-300"
                 style={{ width: `${progress}%` }}
@@ -92,8 +92,8 @@ export function ChecklistSection({
       </button>
 
       {isOpen && (
-        <div className="border-t border-border">
-          <div className="p-3 bg-muted/30 border-b border-border flex items-center justify-between">
+        <div className="border-t border-border dark:border-slate-500">
+          <div className="p-3 bg-muted/30 dark:bg-background border-b border-border dark:border-slate-500 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {progress === 100 ? (
                 <span className="text-accent font-medium">All items completed!</span>

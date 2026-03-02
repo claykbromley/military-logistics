@@ -36,6 +36,24 @@ function getInitials(name: string): string {
     .slice(0, 2)
 }
 
+function formatPhone(input: string | number): string | null {
+    if (input === null || input === undefined) return null;
+    let digits = String(input).replace(/\D/g, "");
+    if (digits.length < 10) return null;
+
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    const countryCodeLength = digits.length - 10;
+    const countryCode = digits.slice(0, countryCodeLength);
+    const rest = digits.slice(countryCodeLength);
+
+    return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+  }
+
 // ============================================
 // CONTACT CARD COMPONENT
 // ============================================
@@ -116,7 +134,7 @@ function EmergencyContactCard({
           {onEdit && onDelete && onToggleRole && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -198,7 +216,7 @@ function EmergencyContactCard({
                 href={`tel:${contact.phonePrimary}`}
                 className="text-foreground hover:text-indigo-600 transition-colors"
               >
-                {contact.phonePrimary}
+                {formatPhone(contact.phonePrimary)}
               </a>
               {contact.phoneSecondary && (
                 <>
@@ -207,7 +225,7 @@ function EmergencyContactCard({
                     href={`tel:${contact.phoneSecondary}`}
                     className="text-foreground hover:text-indigo-600 transition-colors"
                   >
-                    {contact.phoneSecondary}
+                    {formatPhone(contact.phoneSecondary)}
                   </a>
                 </>
               )}
@@ -241,13 +259,13 @@ function EmergencyContactCard({
         {(onScheduleCall || onSendMessage) && contact.email && (
           <div className="mt-4 pt-3 border-t flex gap-2">
             {onScheduleCall && (
-              <Button variant="outline" size="sm" className="flex-1" onClick={onScheduleCall}>
+              <Button variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={onScheduleCall}>
                 <CalendarPlus className="w-4 h-4 mr-2" />
                 Schedule
               </Button>
             )}
             {onSendMessage && (
-              <Button variant="outline" size="sm" className="flex-1" onClick={onSendMessage}>
+              <Button variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={onSendMessage}>
                 <Send className="w-4 h-4 mr-2" />
                 Message
               </Button>
@@ -338,7 +356,7 @@ function SharedContactCard({
               <p><span className="text-muted-foreground">Relationship:</span> {sharedContact.relationship}</p>
             )}
             {sharedContact.phone && (
-              <p><span className="text-muted-foreground">Phone:</span> {sharedContact.phone}</p>
+              <p><span className="text-muted-foreground">Phone:</span> {formatPhone(sharedContact.phone)}</p>
             )}
           </div>
         </div>
@@ -352,7 +370,7 @@ function SharedContactCard({
                 href={`tel:${sharedContact.ownerPhone}`}
                 className="text-foreground hover:text-indigo-600 transition-colors"
               >
-                {sharedContact.ownerPhone}
+                {formatPhone(sharedContact.ownerPhone)}
               </a>
             </div>
           </div>
@@ -1233,7 +1251,7 @@ function EmergencyContactsPageContent() {
       <Header />
 
       {/* Hero Header */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1268,7 +1286,7 @@ function EmergencyContactsPageContent() {
                 </Link>
               </Button>
               <Button
-                className="bg-white text-primary hover:bg-white/90 cursor-pointer"
+                className="bg-white text-primary dark:text-secondary hover:bg-white/70 cursor-pointer"
                 onClick={() => setIsDialogOpen(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1378,7 +1396,7 @@ function EmergencyContactsPageContent() {
                       className="text-indigo-600 hover:underline flex items-center gap-2 mt-1"
                     >
                       <Phone className="w-4 h-4" />
-                      {emergencyContacts[0].phonePrimary}
+                      {formatPhone(emergencyContacts[0].phonePrimary)}
                     </a>
                   )}
                 </div>
@@ -1398,7 +1416,7 @@ function EmergencyContactsPageContent() {
                       className="text-indigo-600 hover:underline flex items-center gap-2 mt-1"
                     >
                       <Phone className="w-4 h-4" />
-                      {poaHolders[0].phonePrimary}
+                      {formatPhone(poaHolders[0].phonePrimary)}
                     </a>
                   )}
                 </div>

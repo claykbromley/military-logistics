@@ -135,6 +135,24 @@ const EMERGENCY_HOTLINES = [
    SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
 
+function formatPhone(input: string | number): string | null {
+  if (input === null || input === undefined) return null;
+  let digits = String(input).replace(/\D/g, "");
+  if (digits.length < 10) return null;
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const countryCodeLength = digits.length - 10;
+  const countryCode = digits.slice(0, countryCodeLength);
+  const rest = digits.slice(countryCodeLength);
+
+  return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+}
+
 function ReadinessRing({ percentage, size = 136 }: { percentage: number; size?: number }) {
   const radius = (size / 2) - 10
   const circumference = 2 * Math.PI * radius
@@ -317,7 +335,7 @@ function LegalResourceCard({ resource }: { resource: LegalResourceLink }) {
           <p className="text-xs text-muted-foreground leading-relaxed">{resource.description}</p>
           {resource.phone && (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
-              <Phone className="w-3 h-3" aria-hidden="true" />{resource.phone}
+              <Phone className="w-3 h-3" aria-hidden="true" />{formatPhone(resource.phone)}
             </span>
           )}
         </div>
@@ -528,7 +546,7 @@ function LegalReadinessContent() {
       <Header />
 
       {/* ═══ HERO ═══ */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 relative">
           {/* Top row */}
           <div className="flex items-start sm:items-center justify-between gap-4">
@@ -811,7 +829,7 @@ function LegalReadinessContent() {
                           className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
                         >
                           <Phone className="w-4 h-4" />
-                          {emergencyContactsList[0].phonePrimary}
+                          {formatPhone(emergencyContactsList[0].phonePrimary)}
                         </a>
                       )}
                     </div>
@@ -833,7 +851,7 @@ function LegalReadinessContent() {
                           className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
                         >
                           <Phone className="w-4 h-4" />
-                          {poaHolders[0].phonePrimary}
+                          {formatPhone(poaHolders[0].phonePrimary)}
                         </a>
                       )}
                     </div>
@@ -911,7 +929,7 @@ function LegalReadinessContent() {
                   <div className="flex items-center gap-3 mt-2.5">
                     {h.phone ? (
                       <a href={`tel:${h.phone}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline" aria-label={`Call ${h.label}: ${h.phone}`}>
-                        <Phone className="w-3.5 h-3.5" aria-hidden="true" />{h.phone}
+                        <Phone className="w-3.5 h-3.5" aria-hidden="true" />{formatPhone(h.phone)}
                       </a>
                     ) : (
                       <a href={h.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline">
@@ -1148,9 +1166,9 @@ function LegalReadinessContent() {
                         <a
                           href={`tel:${contact.phone.replace(/[^0-9]/g, "")}`}
                           className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
-                          aria-label={`Call ${contact.name}: ${contact.phone}`}
+                          aria-label={`Call ${contact.name}: ${formatPhone(contact.phone)}`}
                         >
-                          <Phone className="w-3.5 h-3.5" aria-hidden="true" />{contact.phone}
+                          <Phone className="w-3.5 h-3.5" aria-hidden="true" />{formatPhone(contact.phone)}
                         </a>
                       )}
                       <a

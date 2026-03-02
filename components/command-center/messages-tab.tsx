@@ -904,8 +904,8 @@ export function MessagesTab() {
         <div className="bg-card border rounded-2xl overflow-hidden min-h-[600px]">
           <div className="grid grid-cols-1 md:grid-cols-3 h-[600px]">
             {/* Thread List */}
-            <div className="border-r flex flex-col h-full min-h-0">
-              <div className="p-3 border-b space-y-3">
+            <div className="border-r dark:border-slate-500 flex flex-col h-full min-h-0">
+              <div className="p-3 border-b dark:border-slate-500 space-y-3">
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -926,7 +926,7 @@ export function MessagesTab() {
                       key={filter}
                       variant={messageFilter === filter ? "default" : "ghost"}
                       size="sm"
-                      className="capitalize"
+                      className="capitalize cursor-pointer"
                       onClick={() => setMessageFilter(filter)}
                     >
                       {filter}

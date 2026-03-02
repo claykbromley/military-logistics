@@ -74,6 +74,24 @@ function formatDate(date: string): string {
   })
 }
 
+function formatPhone(input: string | number): string | null {
+  if (input === null || input === undefined) return null;
+  let digits = String(input).replace(/\D/g, "");
+  if (digits.length < 10) return null;
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const countryCodeLength = digits.length - 10;
+  const countryCode = digits.slice(0, countryCodeLength);
+  const rest = digits.slice(countryCodeLength);
+
+  return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+}
+
 // Animated gradient background component
 function AnimatedBackground() {
   return (
@@ -198,7 +216,7 @@ function PropertyCard({
               <Button 
                 variant="ghost" 
                 size="icon"
-                className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                className="rounded-xl opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               >
                 <ChevronDown className="w-4 h-4" />
               </Button>
@@ -223,7 +241,7 @@ function PropertyCard({
 
         {/* Caretaker Info */}
         {property.caretakerName && (
-          <div className="mt-4 p-3 rounded-xl bg-muted border border-border">
+          <div className="mt-4 p-3 rounded-xl bg-background border border-border">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center">
                 <User className="w-4 h-4 text-primary" />
@@ -231,7 +249,7 @@ function PropertyCard({
               <div>
                 <p className="font-medium text-card-foreground">{property.caretakerName}</p>
                 {property.caretakerPhone && (
-                  <p className="text-muted-foreground text-xs">{property.caretakerPhone}</p>
+                  <p className="text-muted-foreground text-xs">{formatPhone(property.caretakerPhone)}</p>
                 )}
               </div>
             </div>
@@ -270,7 +288,7 @@ function PropertyCard({
       {/* Maintenance Tasks */}
       {pendingTasks.length > 0 && (
         <div className="px-5 pb-5">
-          <div className="bg-muted/50 rounded-xl p-4 border border-border">
+          <div className="bg-background rounded-xl p-4 border border-border">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <Wrench className="w-3.5 h-3.5" />
               Maintenance ({pendingTasks.length})
@@ -297,7 +315,7 @@ function PropertyCard({
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="rounded-lg h-8 w-8 p-0">
+                      <Button variant="ghost" size="sm" className="rounded-lg h-8 w-8 p-0 cursor-pointer">
                         <ChevronDown className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -638,7 +656,7 @@ function AddPropertyDialog({
                       ? "None (Enter manually)"
                       : selectedCaretaker
                       ? `${selectedCaretaker.name}${
-                          selectedCaretaker.phone ? ` - ${selectedCaretaker.phone}` : ""
+                          selectedCaretaker.phone ? ` - ${formatPhone(selectedCaretaker.phone)}` : ""
                         }`
                       : "Search or choose a contact..."}
 
@@ -687,7 +705,7 @@ function AddPropertyDialog({
                           {contact.name}
                           {contact.phone && (
                             <span className="ml-2 text-muted-foreground text-xs">
-                              {contact.phone}
+                              {formatPhone(contact.phone)}
                             </span>
                           )}
 
@@ -958,7 +976,7 @@ function AddTaskDialog({
                         {contact.name}
                         {contact.phone && (
                           <span className="ml-2 text-muted-foreground text-xs">
-                            {contact.phone}
+                            {formatPhone(contact.phone)}
                           </span>
                         )}
 
@@ -1160,7 +1178,7 @@ export default function PropertyManagerPage() {
       <Header />
 
       {/* Hero Header */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -1197,7 +1215,7 @@ export default function PropertyManagerPage() {
                 </div>
               </Button>
               <Button
-                className="bg-white text-primary hover:bg-white/90 cursor-pointer"
+                className="bg-white text-primary dark:text-secondary hover:bg-white/70 cursor-pointer"
                 onClick={() => setIsAddDialogOpen(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1282,7 +1300,7 @@ export default function PropertyManagerPage() {
                   {upcomingMaintenance.slice(0, 5).map((task) => (
                     <div
                       key={task.id}
-                      className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
+                      className="flex items-center justify-between py-2.5 border-b border-border dark:border-slate-500 last:border-0"
                     >
                       <div>
                         <p className="font-medium text-sm text-card-foreground">{task.taskName}</p>

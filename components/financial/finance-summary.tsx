@@ -1,39 +1,76 @@
 "use client"
 
-import { Wallet, Shield, PiggyBank, AlertTriangle } from "lucide-react"
+import { Wallet, Shield, PiggyBank, AlertTriangle, CheckCircle2, Circle } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useAccounts, useBills, useInvestmentRules, useGoals } from "@/hooks/use-financial-manager"
 
-interface Account {
-  id: string
-  name: string
-  type: string
-  balance: number
-  institution: string
-}
+export function FinanceSummary() {
+  const { data: accountsData, isLoading: loadingAccounts } = useAccounts()
+  const { data: bills } = useBills()
+  const { data: rules } = useInvestmentRules()
+  const { data: goals } = useGoals()
 
-interface FinanceSummaryProps {
-  accounts: Account[]
-  isConnected: boolean
-}
+  const accounts = accountsData?.accounts || []
+  const billsList = bills || []
+  const rulesList = rules || []
+  const goalsList = goals || []
 
-export function FinanceSummary({ accounts, isConnected }: FinanceSummaryProps) {
-  const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0)
-  const checkingBalance = accounts.filter((a) => a.type === "checking").reduce((sum, acc) => sum + acc.balance, 0)
-  const savingsBalance = accounts.filter((a) => a.type === "savings").reduce((sum, acc) => sum + acc.balance, 0)
+  const isConnected = accounts.length > 0
+  const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance_current || 0), 0)
+  const checkingBalance = accounts
+    .filter((a) => a.subtype === "checking")
+    .reduce((sum, a) => sum + Number(a.balance_current || 0), 0)
+  const savingsBalance = accounts
+    .filter((a) => a.subtype === "savings")
+    .reduce((sum, a) => sum + Number(a.balance_current || 0), 0)
 
-  const deploymentReadiness = isConnected ? 75 : 0
+  // Calculate deployment readiness score
+  const bankConnected = isConnected
+  const billsReviewed = billsList.length > 0
+  const investmentsSet = rulesList.filter((r) => r.is_active).length > 0
+  const goalsSet = goalsList.length > 0
+  const billsOnHold = billsList.filter((b) => b.is_on_hold).length
+  const nonEssentialBills = billsList.filter((b) => !b.is_essential).length
+  const holdProgress = nonEssentialBills > 0 ? billsOnHold / nonEssentialBills : 0
+
+  const steps = [bankConnected, billsReviewed, investmentsSet, goalsSet]
+  const completedSteps = steps.filter(Boolean).length
+  const deploymentReadiness = Math.round(
+    ((completedSteps / steps.length) * 70) + (holdProgress * 30)
+  )
+
+  const onHoldSavings = billsList.reduce(
+    (sum, bill) => sum + (bill.is_on_hold ? Number(bill.amount) : 0), 0
+  )
+
+  if (loadingAccounts) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <Skeleton className="h-5 w-40" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-32 w-full rounded-lg" />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
+      {/* Deployment Readiness */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-secondary">
-              <Shield className="w-5 h-5 text-foreground" />
+              <Shield className="w-5 h-5 text-secondary-foreground" />
             </div>
             <div>
-              <CardTitle className="text-lg">Financial Readiness</CardTitle>
+              <CardTitle className="text-lg">Deployment Readiness</CardTitle>
               <CardDescription>Financial preparation status</CardDescription>
             </div>
           </div>
@@ -49,36 +86,31 @@ export function FinanceSummary({ accounts, isConnected }: FinanceSummaryProps) {
             </div>
 
             <div className="space-y-2 pt-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">✓ Bank Connected</span>
-                <span className={isConnected ? "text-accent" : "text-muted-foreground"}>
-                  {isConnected ? "Complete" : "Pending"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">✓ Bills Reviewed</span>
-                <span className={isConnected ? "text-accent" : "text-muted-foreground"}>
-                  {isConnected ? "Complete" : "Pending"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">○ Investments Set</span>
-                <span className="text-muted-foreground">In Progress</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">○ Emergency Fund</span>
-                <span className="text-muted-foreground">Review</span>
-              </div>
+              <ReadinessItem label="Bank Connected" done={bankConnected} />
+              <ReadinessItem label="Bills Reviewed" done={billsReviewed} />
+              <ReadinessItem label="Non-Essentail Bills on Hold" done={holdProgress === 1} />
+              <ReadinessItem label="Investments Set" done={investmentsSet} />
+              <ReadinessItem label="Goals Defined" done={goalsSet} />
             </div>
+
+            {onHoldSavings > 0 && (
+              <div className="pt-2 border-t border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Deployment savings</span>
+                  <span className="font-bold text-accent">${onHoldSavings.toFixed(2)}/mo</span>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
+      {/* Account Summary */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-secondary">
-              <Wallet className="w-5 h-5 text-foreground" />
+              <Wallet className="w-5 h-5 text-secondary-foreground" />
             </div>
             <div>
               <CardTitle className="text-lg">Account Summary</CardTitle>
@@ -90,24 +122,46 @@ export function FinanceSummary({ accounts, isConnected }: FinanceSummaryProps) {
           {isConnected ? (
             <div className="space-y-4">
               <div className="text-center p-4 rounded-lg bg-secondary">
-                <p className="text-sm">Total Balance</p>
-                <p className="text-3xl font-bold text-foreground">
+                <p className="text-sm text-secondary-foreground">Total Balance</p>
+                <p className="text-3xl font-bold text-secondary-foreground">
                   ${totalBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-lg border border-border">
+                <div className="p-3 rounded-lg border border-border dark:border-slate-500">
                   <p className="text-xs text-muted-foreground">Checking</p>
                   <p className="font-semibold text-foreground">
                     ${checkingBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="p-3 rounded-lg border border-border">
+                <div className="p-3 rounded-lg border border-border dark:border-slate-500">
                   <p className="text-xs text-muted-foreground">Savings</p>
                   <p className="font-semibold text-foreground">
                     ${savingsBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                   </p>
+                </div>
+              </div>
+
+              {/* Quick stats */}
+              <div className="pt-2 border-t border-border space-y-2 dark:border-slate-500">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Active bills</span>
+                  <span className="text-foreground font-medium">
+                    {billsList.filter((b) => !b.is_on_hold).length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Investment rules</span>
+                  <span className="text-foreground font-medium">
+                    {rulesList.filter((r) => r.is_active).length} active
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Goals progress</span>
+                  <span className="text-foreground font-medium">
+                    {goalsList.filter((g) => g.is_completed).length}/{goalsList.length} complete
+                  </span>
                 </div>
               </div>
             </div>
@@ -119,49 +173,24 @@ export function FinanceSummary({ accounts, isConnected }: FinanceSummaryProps) {
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-secondary">
-              <PiggyBank className="w-5 h-5 text-foreground" />
-            </div>
-            <div>
-              <CardTitle className="text-lg">Deployment Tips</CardTitle>
-              <CardDescription>Smart money moves</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-accent/10 border border-accent/20">
-              <AlertTriangle className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-foreground">TSP Contribution</p>
-                <p className="text-xs text-muted-foreground">
-                  Consider maxing out TSP contributions during deployment for tax-free growth.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary">
-              <Shield className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-foreground">SGLI Review</p>
-                <p className="text-xs">
-                  Verify your SGLI beneficiaries are up to date before deployment.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-secondary">
-              <PiggyBank className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Savings Deposit Program</p>
-                <p className="text-xs">SDP offers 10% guaranteed interest during deployment.</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+function ReadinessItem({ label, done }: { label: string; done: boolean }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-muted-foreground flex items-center gap-2">
+        {done ? (
+          <CheckCircle2 className="w-4 h-4 text-accent" />
+        ) : (
+          <Circle className="w-4 h-4 text-muted-foreground" />
+        )}
+        {label}
+      </span>
+      <span className={done ? "text-accent font-medium" : "text-muted-foreground"}>
+        {done ? "Complete" : "Pending"}
+      </span>
     </div>
   )
 }

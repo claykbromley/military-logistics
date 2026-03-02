@@ -88,6 +88,24 @@ const TIPS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function formatPhone(input: string | number): string | null {
+  if (input === null || input === undefined) return null;
+  let digits = String(input).replace(/\D/g, "");
+  if (digits.length < 10) return null;
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const countryCodeLength = digits.length - 10;
+  const countryCode = digits.slice(0, countryCodeLength);
+  const rest = digits.slice(countryCodeLength);
+
+  return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+}
+
 function formatDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number)
   const localDate = new Date(year, month - 1, day)
@@ -259,7 +277,7 @@ function PetCard({
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-3.5 h-3.5 text-text-muted-foreground" />
                 <a href={`tel:${pet.caregiverPhone}`} className="text-primary hover:underline">
-                  {pet.caregiverPhone}
+                  {formatPhone(pet.caregiverPhone)}
                 </a>
               </div>
             )}
@@ -269,7 +287,7 @@ function PetCard({
 
       {/* Vet Records Expandable */}
       {pet.vetRecords?.length > 0 && (
-        <div className="border-t border-border">
+        <div className="border-t border-border dark:border-slate-500">
           <button
             onClick={() => setExpanded(!expanded)}
             className="w-full px-4 py-3 flex items-center justify-between text-xs font-semibold text-muted-foreground hover:text-text-foreground transition-colors"
@@ -299,22 +317,39 @@ function PetCard({
           )}
         </div>
       )}
+      
+      {(pet.vetName || pet.insuranceCompany) &&
+        <div className="px-5 py-3 bg-muted/30 border-t border-border dark:border-slate-500">
+          {/* Vet Footer */}
+          {pet.vetName && (
+            <div className="flex items-center gap-2">
+              <Stethoscope className="w-3.5 h-3.5 text-text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">{pet.vetName}</span>
+              {pet.vetPhone && (
+                <>
+                  <span className="text-text-muted-foreground">·</span>
+                  <a href={`tel:${pet.vetPhone}`} className="text-sm text-sky-400 hover:underline">
+                    {formatPhone(pet.vetPhone)}
+                  </a>
+                </>
+              )}
+            </div>
+          )}
 
-      {/* Vet Footer */}
-      {pet.vetName && (
-        <div className="border-t border-border px-5 py-3 flex items-center gap-2">
-          <Stethoscope className="w-3.5 h-3.5 text-text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{pet.vetName}</span>
-          {pet.vetPhone && (
-            <>
-              <span className="text-text-muted-foreground">·</span>
-              <a href={`tel:${pet.vetPhone}`} className="text-sm text-sky-400 hover:underline">
-                {pet.vetPhone}
-              </a>
-            </>
+          {/* Insurance Footer */}
+          {pet.insuranceCompany && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Shield className="w-3.5 h-3.5 text-text-muted-foreground" />
+              <span>
+                {pet.insuranceCompany}
+                {pet.insurancePolicy && (
+                  <span className="text-muted-foreground/70"> • #{pet.insurancePolicy}</span>
+                )}
+              </span>
+            </div>
           )}
         </div>
-      )}
+      }
 
       {/* No caregiver warning */}
       {!pet.caregiverName && (
@@ -430,6 +465,8 @@ function PetFormDialog({
   const [caregiverContactId, setCaregiverContactId] = useState("")
   const [caregiverName, setCaregiverName] = useState(editingPet?.caregiverName || "")
   const [caregiverPhone, setCaregiverPhone] = useState(editingPet?.caregiverPhone || "")
+  const [insuranceCompany, setInsuranceCompany] = useState("")
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState("")
   const [feedingInstructions, setFeedingInstructions] = useState(editingPet?.feedingInstructions || "")
   const [medications, setMedications] = useState(editingPet?.medications || "")
   const [specialNeeds, setSpecialNeeds] = useState(editingPet?.specialNeeds || "")
@@ -454,7 +491,7 @@ function PetFormDialog({
     if (!name.trim() || saving) return
     setSaving(true)
     try {
-      await onSave({
+      onSave({
         name: name.trim(),
         petType,
         breed: breed.trim() || undefined,
@@ -464,6 +501,8 @@ function PetFormDialog({
         vetPhone: vetPhone.trim() || undefined,
         caregiverName: caregiverName.trim() || undefined,
         caregiverPhone: caregiverPhone.trim() || undefined,
+        insuranceCompany: insuranceCompany.trim() || undefined,
+        insurancePolicy: insurancePolicyNumber.trim() || undefined,
         feedingInstructions: feedingInstructions.trim() || undefined,
         medications: medications.trim() || undefined,
         specialNeeds: specialNeeds.trim() || undefined,
@@ -581,7 +620,7 @@ function PetFormDialog({
                       ? "None (Enter manually)"
                       : selectedCaregiver
                       ? `${selectedCaregiver.name}${
-                          selectedCaregiver.phone ? ` - ${selectedCaregiver.phone}` : ""
+                          selectedCaregiver.phone ? ` - ${formatPhone(selectedCaregiver.phone)}` : ""
                         }`
                       : "Search or choose a contact..."}
 
@@ -630,7 +669,7 @@ function PetFormDialog({
                           {contact.name}
                           {contact.phone && (
                             <span className="ml-2 text-muted-foreground text-xs">
-                              {contact.phone}
+                              {formatPhone(contact.phone)}
                             </span>
                           )}
 
@@ -676,6 +715,34 @@ function PetFormDialog({
                     setCaregiverContactId("")
                   }}
                   placeholder="e.g., (555) 123-4567"
+                  className="rounded-xl"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <h4 className="font-semibold text-card-foreground mb-4 flex items-center gap-2">
+              Insurance Information
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="insurance-company" className="text-sm">Company</Label>
+                <Input
+                  id="insurance-company"
+                  value={insuranceCompany}
+                  onChange={(e) => setInsuranceCompany(e.target.value)}
+                  placeholder="e.g., ASPCA"
+                  className="rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="insurance-policy" className="text-sm">Policy Number</Label>
+                <Input
+                  id="insurance-policy"
+                  value={insurancePolicyNumber}
+                  onChange={(e) => setInsurancePolicyNumber(e.target.value)}
+                  placeholder="e.g., ABC123456"
                   className="rounded-xl"
                 />
               </div>
@@ -919,7 +986,7 @@ export default function PetCarePage() {
       <Header />
 
       {/* Hero Header */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

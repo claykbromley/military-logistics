@@ -2,7 +2,7 @@
 
 import { useMemo } from "react"
 import { 
-  DollarSign, FileText, Home, Users, Calendar, MessageSquare, History,
+  DollarSign, FileText, Home, Users, Calendar, MessageSquare, NotebookText,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink,
@@ -33,6 +33,24 @@ export function CommandCenterDashboard() {
   const totalSize = documents.reduce((accumulator, currentItem) => {
     return accumulator + (currentItem.fileSize || 0);
   }, 0)
+
+  function formatPhone(input: string | number): string | null {
+    if (input === null || input === undefined) return null;
+    let digits = String(input).replace(/\D/g, "");
+    if (digits.length < 10) return null;
+
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    const countryCodeLength = digits.length - 10;
+    const countryCode = digits.slice(0, countryCodeLength);
+    const rest = digits.slice(countryCodeLength);
+
+    return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+  }
 
   const formatDate = (dateStr?: string, year?: boolean) => {
     if (!dateStr) return '—'
@@ -304,7 +322,7 @@ export function CommandCenterDashboard() {
                 </div>
 
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
-                  <History className="w-5 h-5 text-amber-500 dark:text-amber-400 mb-2" />
+                  <NotebookText className="w-5 h-5 text-amber-500 dark:text-amber-400 mb-2" />
                   <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{communicationLog.length}</div>
                   <div className="text-xs text-slate-600 dark:text-slate-400">Communication Logs</div>
                 </div>
@@ -667,7 +685,7 @@ export function CommandCenterDashboard() {
                   <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">{primaryContact?.contactName} ({primaryContact?.relationship})</div>
                   <div className="flex items-center gap-2">
                     <Phone className="w-3 h-3 text-slate-500 dark:text-slate-400" />
-                    <span className="text-xs text-slate-700 dark:text-slate-300 font-mono">{primaryContact?.phonePrimary}</span>
+                    <span className="text-xs text-slate-700 dark:text-slate-300 font-mono">{formatPhone(primaryContact?.phonePrimary || 0)}</span>
                   </div>
                 </div> :
                 <div className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-1">No Primary Contact</div>
