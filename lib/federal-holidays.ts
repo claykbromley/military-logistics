@@ -74,6 +74,7 @@ export function getFederalHolidays(year: number): CalendarEntry[] {
       meeting_link: null,
       created_at: startTime,
       updated_at: startTime,
+      linked_entity_tag: null,
     }
   })
 }

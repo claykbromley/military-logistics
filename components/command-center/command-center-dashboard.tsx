@@ -679,7 +679,7 @@ export function CommandCenterDashboard() {
                 {expiringItems.length > 0 ?
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-amber-200/30 dark:border-amber-700/30">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{soonestExpItem?.propertyName}: {soonestExpItem?.type}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">{soonestExpItem?.propertyName}: {soonestExpItem?.itemType}</span>
                     <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
                   </div>
                   {soonestExpItemStatus && soonestExpItemStatus <= 0 ?

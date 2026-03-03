@@ -28,6 +28,7 @@ export interface CalendarEntry {
   location: string | null
   timezone: string | null
   meeting_link: string | null
+  linked_entity_tag: string | null
   created_at: string
   updated_at: string
 }
