@@ -765,10 +765,10 @@ export function EntryModal({
                       }
                       className="bg-card rounded-lg px-3 py-1.5 text-sm text-foreground border border-border outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
                     >
-                      <option value="daily">day(s)</option>
-                      <option value="weekly">week(s)</option>
-                      <option value="monthly">month(s)</option>
-                      <option value="yearly">year(s)</option>
+                      <option value="daily">{`day${formData.recurrence_interval !== 1 ? "s" : ""}`}</option>
+                      <option value="weekly">{`week${formData.recurrence_interval !== 1 ? "s" : ""}`}</option>
+                      <option value="monthly">{`month${formData.recurrence_interval !== 1 ? "s" : ""}`}</option>
+                      <option value="yearly">{`year${formData.recurrence_interval !== 1 ? "s" : ""}`}</option>
                     </select>
                   </div>
                 </div>
