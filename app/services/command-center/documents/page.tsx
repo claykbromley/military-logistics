@@ -615,7 +615,7 @@ function AddDocumentDialog({
               id="critical"
               checked={isCritical}
               onCheckedChange={(checked) => setIsCritical(checked === true)}
-              className="mt-0.5"
+              className="mt-0.5 border-2 border-slate-500"
             />
             <div>
               <label

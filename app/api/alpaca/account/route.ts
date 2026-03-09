@@ -1,60 +1,48 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import {
+  isConfigured,
+  notConfiguredResponse,
+  brokerTradingFetch,
+  getAlpacaAccountRow,
+} from "@/lib/broker"
 
-// Alpaca Broker API
-const BROKER_BASE = process.env.ALPACA_BASE_URL || "https://broker-api.sandbox.alpaca.markets"
-const BROKER_KEY = process.env.ALPACA_API_KEY || ""
-const BROKER_SECRET = process.env.ALPACA_SECRET_KEY || ""
-
-function isConfigured() {
-  return BROKER_KEY.length > 0 && BROKER_SECRET.length > 0
-}
-
-function getAuthHeader() {
-  return `Basic ${Buffer.from(`${BROKER_KEY}:${BROKER_SECRET}`).toString("base64")}`
-}
-
+/**
+ * GET /api/alpaca/account
+ *
+ * Returns the user's Alpaca trading account details (cash, portfolio value,
+ * buying power, etc.).
+ *
+ * Response shapes the frontend expects:
+ *  - { not_configured: true }          → Alpaca keys missing
+ *  - { not_configured: true }          → No DB row (treat same as above)
+ *  - { cash, portfolio_value, ... }    → Success (AlpacaAccount type)
+ */
 export async function GET() {
-  if (!isConfigured()) {
-    return NextResponse.json({
-      not_configured: true,
-      message: "Alpaca Broker API keys not set. Add ALPACA_BROKER_API_KEY and ALPACA_BROKER_API_SECRET in the Vars sidebar.",
-    })
-  }
+  if (!isConfigured()) return notConfiguredResponse()
 
   try {
-    const supabase = await createClient()
+    const row = await getAlpacaAccountRow()
 
-    // Get user's Alpaca account ID
-    const { data: alpacaAccount, error: dbError } = await supabase
-      .from("alpaca_accounts")
-      .select("alpaca_account_id, status")
-      .single()
-
-    if (dbError || !alpacaAccount) {
-      return NextResponse.json({ no_account: true, message: "No Alpaca account found. Connect a bank to create one." })
+    if (!row) {
+      // Frontend checks for `not_configured` to know there's no account yet
+      return NextResponse.json({ not_configured: true })
     }
 
-    // Fetch account details from Alpaca Broker API
-    const res = await fetch(`${BROKER_BASE}/v1/trading/accounts/${alpacaAccount.alpaca_account_id}/account`, {
-      headers: {
-        Authorization: getAuthHeader(),
-      },
-    })
+    // Fetch live account data from Alpaca Broker API
+    const account = await brokerTradingFetch(
+      row.alpaca_account_id,
+      "/account"
+    )
 
-    if (!res.ok) {
-      const text = await res.text()
-      throw new Error(`Alpaca API error (${res.status}): ${text}`)
-    }
-
-    const account = await res.json()
     return NextResponse.json({
       ...account,
-      alpaca_account_id: alpacaAccount.alpaca_account_id,
-      db_status: alpacaAccount.status,
+      alpaca_account_id: row.alpaca_account_id,
+      db_status: row.status,
     })
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to fetch Alpaca account"
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch Alpaca account"
+    console.error("GET /api/alpaca/account error:", message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

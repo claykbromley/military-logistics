@@ -493,23 +493,43 @@ export interface FinancialGoal {
 }
 
 export interface Advisor {
-  id: string;
-  name: string;
-  credentials: string;
-  firm: string;
-  specialties: string[];
-  location: string;
-  state: string;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
-  bio: string;
-  accepts_tricare: boolean;
-  military_experience: boolean;
-  rating: number;
-  review_count: number;
-  image_url: string | null;
-  created_at: string;
+  id: string
+  name: string
+  credentials: string
+  firm: string
+  bio: string
+  specialties: string[]
+  rating: number
+  review_count: number
+  location: string
+  state: string
+  phone: string | null
+  email: string | null
+  website: string | null
+  military_experience: boolean
+  branch: string | null
+  accepts_tricare: boolean
+  fee_structure: "Fee-Only" | "Fee-Based" | "Free / Non-Profit"
+  virtual_available: boolean
+  languages: string[]
+  minimum_assets: string | null
+  photo_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdvisorFilters {
+  search?: string
+  specialty?: string
+  state?: string
+  branch?: string
+  feeType?: string
+  militaryOnly?: boolean
+  virtualOnly?: boolean
+  tricareOnly?: boolean
+  sortBy?: "rating" | "reviews" | "name"
+  limit?: number
+  offset?: number
 }
 
 export interface AlpacaOrder {

@@ -147,15 +147,15 @@ async function ensureBankLinked(plaidAccountId: string): Promise<{ success: bool
 
 const STRATEGIES: Record<string, { label: string; icon: typeof Zap; description: string; color: string }> = {
   dca: {
-    label: "Dollar-Cost Average", icon: Calendar, color: "text-blue-500",
+    label: "Dollar-Cost Average", icon: Calendar, color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border border-blue-500/30",
     description: "Invest a fixed amount on a regular schedule regardless of price. The simplest, most proven long-term strategy.",
   },
   smart_dip: {
-    label: "Buy the Dip", icon: TrendingUp, color: "text-emerald-500",
+    label: "Buy the Dip", icon: TrendingUp, color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30",
     description: "Checks continuously until the price drops below the recent moving average by your set %. If the dip never comes within the period, the purchase is skipped.",
   },
   threshold: {
-    label: "Price Threshold", icon: ShieldCheck, color: "text-amber-500",
+    label: "Price Threshold", icon: ShieldCheck, color: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30",
     description: "Monitors the price continuously and buys as soon as it drops below your limit. If the price never reaches your target within the period, the purchase is skipped.",
   },
 }
@@ -360,11 +360,11 @@ function FundManagementModal({ open, onOpenChange, alpacaCash, plaidAccounts, tr
 
   const getStatusBadge = (status: string) => {
     if (["COMPLETE", "APPROVED"].includes(status))
-      return <Badge className="bg-emerald-500/10 text-emerald-500 border-emerald-500/30 text-[9px]"><Check className="w-2.5 h-2.5 mr-0.5" />Complete</Badge>
+      return <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-[9px]"><Check className="w-2.5 h-2.5 mr-0.5" />Complete</Badge>
     if (["PENDING", "QUEUED", "SENT_TO_CLEARING"].includes(status))
-      return <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[9px]"><Clock className="w-2.5 h-2.5 mr-0.5" />Pending</Badge>
+      return <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-[9px]"><Clock className="w-2.5 h-2.5 mr-0.5" />Pending</Badge>
     if (["CANCELED", "RETURNED"].includes(status))
-      return <Badge className="bg-destructive/10 text-destructive border-destructive/30 text-[9px]"><X className="w-2.5 h-2.5 mr-0.5" />Failed</Badge>
+      return <Badge className="bg-destructive-500/15 text-destructive-700 dark:text-destructive-400 border border-destructive-500/30 text-[9px]"><X className="w-2.5 h-2.5 mr-0.5" />Failed</Badge>
     return <Badge variant="outline" className="text-[9px]">{status}</Badge>
   }
 
@@ -388,7 +388,7 @@ function FundManagementModal({ open, onOpenChange, alpacaCash, plaidAccounts, tr
               </div>
             </div>
             {pendingCount > 0 && (
-              <Badge variant="outline" className="text-amber-500 border-amber-500/30 text-[10px]">
+              <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-[10px]">
                 <Clock className="w-2.5 h-2.5 mr-0.5" />{pendingCount} pending
               </Badge>
             )}
@@ -477,7 +477,7 @@ function FundManagementModal({ open, onOpenChange, alpacaCash, plaidAccounts, tr
                 </>
               ) : (
                 <div className="space-y-4">
-                  <div className={`p-4 rounded-lg border space-y-3 ${direction === "deposit" ? "bg-emerald-500/5 border-emerald-500/20" : "bg-amber-500/5 border-amber-500/20"}`}>
+                  <div className={`p-4 rounded-lg border space-y-3 ${direction === "deposit" ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-700/40" : "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/40"}`}>
                     <h4 className="text-sm font-semibold text-foreground">Confirm {direction === "deposit" ? "Deposit" : "Withdrawal"}</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-muted-foreground">From</span>
@@ -906,7 +906,7 @@ function EditRuleModal({ open, onOpenChange, rule, plaidAccounts, onSave }: {
           </TabsList>
           <TabsContent value="amount" className="space-y-4 mt-4">
             <div className="flex gap-4 items-start">
-              <div className="flex-1 space-y-2"><Label>Amount per purchase ($)</Label><Input type="number" placeholder="100.00" className="bg-card" value={editState.value} onChange={(e) => setEditState({ ...editState, value: e.target.value })} /></div>
+              <div className="flex-1 space-y-2"><Label>Amount per purchase ($)</Label><Input type="number" placeholder="100.00" min="1" className="bg-card" value={editState.value} onChange={(e) => setEditState({ ...editState, value: e.target.value })} /></div>
               <div className="w-50 space-y-2"><Label>Frequency</Label>
                 <Select value={editState.frequency} onValueChange={(v) => setEditState({ ...editState, frequency: v as any })}>
                   <SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger>
@@ -916,7 +916,7 @@ function EditRuleModal({ open, onOpenChange, rule, plaidAccounts, onSave }: {
           </TabsContent>
           <TabsContent value="shares" className="space-y-4 mt-4">
             <div className="flex gap-4 items-start">
-              <div className="flex-1 space-y-2"><Label>Shares per purchase</Label><Input type="number" placeholder="1" className="!bg-card" value={editState.value} onChange={(e) => setEditState({ ...editState, value: e.target.value })} />
+              <div className="flex-1 space-y-2"><Label>Shares per purchase</Label><Input type="number" placeholder="1" className="!bg-card" min="1" value={editState.value} onChange={(e) => setEditState({ ...editState, value: e.target.value })} />
                 {editState.value && livePrice != null && <p className="text-xs text-muted-foreground px-1">&asymp; ${(parseFloat(editState.value) * livePrice).toFixed(2)} per purchase</p>}</div>
               <div className="w-50 space-y-2"><Label>Frequency</Label>
                 <Select value={editState.frequency} onValueChange={(v) => setEditState({ ...editState, frequency: v as any })}>
@@ -986,7 +986,7 @@ function EditRuleModal({ open, onOpenChange, rule, plaidAccounts, onSave }: {
           </div>
         )}
 
-        {previewCost() != null && (
+        {previewCost() != null && Number(editState.value) > 0 && (
           <div className="p-3 rounded-lg bg-accent/10 border border-accent/30">
             <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Est. monthly cost</span>
               <span className="text-lg font-bold text-accent">~${previewCost()!.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
@@ -995,7 +995,7 @@ function EditRuleModal({ open, onOpenChange, rule, plaidAccounts, onSave }: {
 
         <div className="flex gap-2">
           <Button variant="outline" className="flex-1 cursor-pointer" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button className="flex-1 bg-primary text-primary-foreground hover:bg-accent cursor-pointer" disabled={!editState.value || isSaving} onClick={handleSave}>
+          <Button className="flex-1 bg-primary text-primary-foreground hover:bg-accent cursor-pointer" disabled={!editState.value || isSaving || Number(editState.value) < 1} onClick={handleSave}>
             {isSaving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : "Save Changes"}
           </Button>
         </div>
@@ -1063,11 +1063,6 @@ export function InvestmentControls() {
       async (event) => {
         if (event === "SIGNED_IN") {
           setIsLoggedIn(true)
-          mutate([], false)
-          mutatePositions(undefined, false)
-          mutateAccount(undefined, false)
-          mutateTransfers([], false)
-
           await Promise.all([
             mutate(),
             mutatePositions(),
@@ -1209,7 +1204,7 @@ export function InvestmentControls() {
                   <Briefcase className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium text-foreground">Alpaca Brokerage</span>
                   <Badge variant="outline" className="text-[10px]">{alpacaAccount!.status === "ACTIVE" ? "Paper Trading" : alpacaAccount!.status}</Badge>
-                  {pendingTransfers.length > 0 && <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/30"><Clock className="w-2.5 h-2.5 mr-0.5" />{pendingTransfers.length} pending</Badge>}
+                  {pendingTransfers.length > 0 && <Badge className="text-[10px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"><Clock className="w-2.5 h-2.5 mr-0.5" />{pendingTransfers.length} pending</Badge>}
                 </div>
                 <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-secondary-foreground cursor-pointer" onClick={() => setIsInfoModalOpen(true)}>
                   <InfoIcon className="w-3.5 h-3.5 mr-1" />How it works</Button>
@@ -1223,7 +1218,7 @@ export function InvestmentControls() {
                 <Button variant="outline" size="sm" className="w-full text-xs bg-white/5 hover:bg-white/20 border-border text-foreground hover:text-foreground cursor-pointer" onClick={() => setIsFundModalOpen(true)}>
                   <Wallet className="w-3.5 h-3.5 mr-1.5" />Manage Funds — Deposit or Withdraw
                   {plaidAccounts.filter((a: any) => a.type === "depository").length > 0 && (
-                    <Badge variant="outline" className="ml-2 text-[9px] text-emerald-700 border-emerald-500/70">
+                    <Badge variant="outline" className="ml-2 text-[9px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                       <CheckCircle2 className="w-2.5 h-2.5 mr-0.5" />{plaidAccounts.filter((a: any) => a.type === "depository").length} bank{plaidAccounts.filter((a: any) => a.type === "depository").length > 1 ? "s" : ""} linked
                     </Badge>
                   )}
@@ -1260,7 +1255,7 @@ export function InvestmentControls() {
 
           {/* Rules list */}
           {rulesList.length > 0 ? (
-            <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+            <div className="space-y-3 mb-4 max-h-120 overflow-y-auto">
               {rulesList.map((rule) => (
                 <div key={rule.id} className={`p-4 rounded-lg border transition-all ${rule.is_active ? "border-border bg-primary/20" : "border-accent/50 bg-accent/5 opacity-75"}`}>
                   <div className="flex items-center justify-between">
@@ -1349,11 +1344,11 @@ export function InvestmentControls() {
                     <TabsTrigger value="shares" className="flex items-center gap-2 data-[state=active]:!bg-primary data-[state=active]:!text-primary-foreground"><Hash className="w-4 h-4" />Share Count</TabsTrigger>
                   </TabsList>
                   <TabsContent value="amount" className="space-y-4 mt-4">
-                    <div className="flex gap-4 items-start"><div className="flex-1 space-y-2"><Label>Amount per purchase ($)</Label><Input type="number" placeholder="100.00" className="bg-card" value={newRule.value} onChange={(e) => setNewRule({ ...newRule, value: e.target.value })} /></div>
+                    <div className="flex gap-4 items-start"><div className="flex-1 space-y-2"><Label>Amount per purchase ($)</Label><Input type="number" placeholder="100.00" className="bg-card" min="1" value={newRule.value} onChange={(e) => setNewRule({ ...newRule, value: e.target.value })} /></div>
                       <div className="w-50 space-y-2"><Label>Frequency</Label><Select value={newRule.frequency} onValueChange={(v) => setNewRule({ ...newRule, frequency: v as any })}><SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="biweekly">Bi-weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></div></div>
                   </TabsContent>
                   <TabsContent value="shares" className="space-y-4 mt-4">
-                    <div className="flex gap-4 items-start"><div className="flex-1 space-y-2"><Label>Shares per purchase</Label><Input type="number" placeholder="1" className="!bg-card" value={newRule.value} onChange={(e) => setNewRule({ ...newRule, value: e.target.value })} />
+                    <div className="flex gap-4 items-start"><div className="flex-1 space-y-2"><Label>Shares per purchase</Label><Input type="number" placeholder="1" min="1" className="!bg-card" value={newRule.value} onChange={(e) => setNewRule({ ...newRule, value: e.target.value })} />
                       {newRule.value && currentPrice != null && <p className="text-xs text-muted-foreground px-1">&asymp; ${(parseFloat(newRule.value) * currentPrice).toFixed(2)} per purchase</p>}</div>
                       <div className="w-50 space-y-2"><Label>Frequency</Label><Select value={newRule.frequency} onValueChange={(v) => setNewRule({ ...newRule, frequency: v as any })}><SelectTrigger className="w-full bg-card"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="biweekly">Bi-weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem></SelectContent></Select></div></div>
                   </TabsContent>
@@ -1386,7 +1381,7 @@ export function InvestmentControls() {
                   )}
                 </div>
 
-                {previewMonthlyCost() != null && (
+                {previewMonthlyCost() != null && Number(newRule.value) > 0 && (
                   <div className="p-3 rounded-lg bg-accent/10 border border-accent/30">
                     <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Est. monthly cost</span>
                       <span className="text-lg font-bold text-accent">~${previewMonthlyCost()!.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
@@ -1419,7 +1414,7 @@ export function InvestmentControls() {
                   </div>
                 )}
 
-                <Button onClick={handleAddRule} disabled={!newRule.symbol || !newRule.value || !newRule.fundingAccountId}
+                <Button onClick={handleAddRule} disabled={!newRule.symbol || !newRule.value || !newRule.fundingAccountId || Number(newRule.value) < 1}
                   className="w-full mt-2 bg-primary text-primary-foreground hover:bg-accent cursor-pointer">Create Investment Rule</Button>
               </DialogContent>
             </Dialog>

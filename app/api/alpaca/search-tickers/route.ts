@@ -1,145 +1,95 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isConfigured, getAuthHeader } from "@/lib/broker"
 
-// Alpaca asset search endpoint
-// Docs: https://docs.alpaca.markets/reference/get-v2-assets
-const ALPACA_BASE_URL = process.env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets"
-const ALPACA_KEY = process.env.ALPACA_API_KEY
-const ALPACA_SECRET = process.env.ALPACA_SECRET_KEY
+const BROKER_BASE =
+  process.env.ALPACA_BASE_URL ||
+  "https://broker-api.sandbox.alpaca.markets"
 
-// Known ETF keywords / suffixes in asset names — Alpaca doesn't expose a
-// dedicated "etf" flag, so we infer from the name and exchange.
-const ETF_KEYWORDS = [
-  "etf", "fund", "trust", "index", "ishares", "vanguard", "spdr",
-  "proshares", "invesco", "schwab", "wisdomtree", "vaneck",
-]
-
-function inferAssetType(asset: { name: string; exchange: string; class?: string }): string {
-  if (asset.class && asset.class !== "us_equity") return asset.class
-  const nameLower = asset.name.toLowerCase()
-  if (ETF_KEYWORDS.some((kw) => nameLower.includes(kw))) return "etf"
-  if (asset.exchange === "ARCA" || asset.exchange === "BATS") return "etf"
-  return "stock"
-}
-
+/**
+ * GET /api/alpaca/search-tickers?q=...
+ *
+ * Searches Alpaca's assets endpoint for matching symbols/names.
+ * The frontend TickerSearchInput component calls this.
+ */
 export async function GET(req: NextRequest) {
-  const q = req.nextUrl.searchParams.get("q")?.trim()
-  if (!q) return NextResponse.json({ results: [] })
+  const q = req.nextUrl.searchParams.get("q")?.trim().toUpperCase()
 
-  if (!ALPACA_KEY || !ALPACA_SECRET) {
-    return NextResponse.json({ results: [], error: "Alpaca not configured" }, { status: 200 })
+  if (!q || q.length < 1) {
+    return NextResponse.json({ results: [] })
+  }
+
+  if (!isConfigured()) {
+    return NextResponse.json({ results: [] })
   }
 
   try {
-    // Search Alpaca assets — the API doesn't have a dedicated search endpoint,
-    // so we fetch all tradable US equities filtered client-side, or use the
-    // assets endpoint with a symbol prefix.  For a better UX you could use a
-    // third-party API like Alpha Vantage SYMBOL_SEARCH or Finnhub /search.
-
-    // Option 1: Direct symbol lookup (fast, exact)
-    const directRes = await fetch(`${ALPACA_BASE_URL}/v2/assets/${q.toUpperCase()}`, {
-      headers: {
-        "APCA-API-KEY-ID": ALPACA_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_SECRET,
-      },
-    })
-
-    const results: Array<{
-      symbol: string
-      name: string
-      exchange: string
-      type: string
-      price?: number
-    }> = []
-
-    if (directRes.ok) {
-      const asset = await directRes.json()
-      if (asset.tradable && asset.status === "active") {
-        results.push({
-          symbol: asset.symbol,
-          name: asset.name,
-          exchange: asset.exchange,
-          type: inferAssetType(asset),
-        })
-      }
-    }
-
-    // Option 2: Fuzzy search via assets list (searches name & symbol)
-    // This fetches tradable assets that match. For production, cache this list.
-    const listRes = await fetch(
-      `${ALPACA_BASE_URL}/v2/assets?status=active&asset_class=us_equity`,
-      {
-        headers: {
-          "APCA-API-KEY-ID": ALPACA_KEY,
-          "APCA-API-SECRET-KEY": ALPACA_SECRET,
-        },
-      }
+    // Alpaca Broker API: GET /v1/assets with status=active
+    // We fetch a broad set and filter client-side for flexibility
+    const res = await fetch(
+      `${BROKER_BASE}/v1/assets?status=active&asset_class=us_equity`,
+      { headers: { Authorization: getAuthHeader() } }
     )
 
-    if (listRes.ok) {
-      const allAssets: Array<{
-        symbol: string
-        name: string
-        exchange: string
-        class: string
-        tradable: boolean
-        fractionable: boolean
-      }> = await listRes.json()
-
-      const query = q.toUpperCase()
-      const matches = allAssets
-        .filter(
-          (a) =>
-            a.tradable &&
-            (a.symbol.startsWith(query) || a.name.toUpperCase().includes(query))
-        )
-        // Prioritize exact symbol prefix matches
-        .sort((a, b) => {
-          const aExact = a.symbol === query ? 0 : a.symbol.startsWith(query) ? 1 : 2
-          const bExact = b.symbol === query ? 0 : b.symbol.startsWith(query) ? 1 : 2
-          return aExact - bExact
-        })
-        .slice(0, 10)
-
-      for (const asset of matches) {
-        if (!results.find((r) => r.symbol === asset.symbol)) {
-          results.push({
-            symbol: asset.symbol,
-            name: asset.name,
-            exchange: asset.exchange,
-            type: inferAssetType(asset),
+    if (!res.ok) {
+      // Fallback: try the query as an exact symbol lookup
+      const singleRes = await fetch(
+        `${BROKER_BASE}/v1/assets/${q}`,
+        { headers: { Authorization: getAuthHeader() } }
+      )
+      if (singleRes.ok) {
+        const asset = await singleRes.json()
+        if (asset.tradable) {
+          return NextResponse.json({
+            results: [
+              {
+                symbol: asset.symbol,
+                name: asset.name,
+                exchange: asset.exchange,
+                type: asset.class || "us_equity",
+              },
+            ],
           })
         }
       }
+      return NextResponse.json({ results: [] })
     }
 
-    // Optionally fetch latest prices for the top results
-    if (results.length > 0) {
-      try {
-        const symbols = results.slice(0, 5).map((r) => r.symbol).join(",")
-        const quoteRes = await fetch(
-          `https://data.alpaca.markets/v2/stocks/snapshots?symbols=${symbols}`,
-          {
-            headers: {
-              "APCA-API-KEY-ID": ALPACA_KEY,
-              "APCA-API-SECRET-KEY": ALPACA_SECRET,
-            },
-          }
-        )
-        if (quoteRes.ok) {
-          const snapshots = await quoteRes.json()
-          for (const r of results) {
-            const snap = snapshots[r.symbol]
-            if (snap?.latestTrade?.p) {
-              r.price = snap.latestTrade.p
-            }
-          }
-        }
-      } catch {
-        // Price fetch is optional, continue without
-      }
-    }
+    const assets: Array<{
+      symbol: string
+      name: string
+      exchange: string
+      class: string
+      tradable: boolean
+      status: string
+    }> = await res.json()
 
-    return NextResponse.json({ results: results.slice(0, 10) })
+    // Filter: symbol starts with query OR name contains query
+    const matches = assets
+      .filter(
+        (a) =>
+          a.tradable &&
+          (a.symbol.startsWith(q) ||
+            a.name.toUpperCase().includes(q))
+      )
+      .slice(0, 15)
+      .map((a) => ({
+        symbol: a.symbol,
+        name: a.name,
+        exchange: a.exchange,
+        type: a.class || "us_equity",
+      }))
+
+    // Sort: exact symbol match first, then symbols starting with query, then name matches
+    matches.sort((a, b) => {
+      if (a.symbol === q) return -1
+      if (b.symbol === q) return 1
+      const aStarts = a.symbol.startsWith(q) ? 0 : 1
+      const bStarts = b.symbol.startsWith(q) ? 0 : 1
+      if (aStarts !== bStarts) return aStarts - bStarts
+      return a.symbol.localeCompare(b.symbol)
+    })
+
+    return NextResponse.json({ results: matches.slice(0, 10) })
   } catch (err) {
     console.error("Ticker search error:", err)
     return NextResponse.json({ results: [] })

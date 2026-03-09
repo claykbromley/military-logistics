@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { PlaidApi, Configuration, PlaidEnvironments, ProcessorTokenCreateRequestProcessorEnum  } from "plaid"
+import {
+  PlaidApi,
+  Configuration,
+  PlaidEnvironments,
+  ProcessorTokenCreateRequestProcessorEnum,
+} from "plaid"
+import {
+  isConfigured,
+  brokerFetchGlobal,
+  getAlpacaAccountId,
+} from "@/lib/broker"
 
 // ─── Plaid client ───────────────────────────────────────────────────────────────
 
@@ -20,53 +30,24 @@ const plaidConfig = new Configuration({
 
 const plaidClient = new PlaidApi(plaidConfig)
 
-// ─── Alpaca API helper ──────────────────────────────────────────────────────────
-
-const ALPACA_BASE_URL =
-  process.env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets"
-
-async function alpacaRequest(path: string, options: RequestInit = {}) {
-  const res = await fetch(`${ALPACA_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "APCA-API-KEY-ID": process.env.ALPACA_API_KEY!,
-      "APCA-API-SECRET-KEY": process.env.ALPACA_SECRET_KEY!,
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  })
-
-  const text = await res.text()
-
-  if (!res.ok) {
-    throw new Error(`Alpaca ${res.status}: ${text}`)
-  }
-
-  return JSON.parse(text)
-}
-
 // ─── POST: Link a Plaid bank account to Alpaca via processor token ──────────────
 //
-// This is the one-time flow that connects a user's Plaid bank account to their
-// Alpaca brokerage account so ACH transfers can happen:
+//   1. Plaid processor token → Alpaca ACH relationship
+//   2. Store in ach_relationships table
 //
-//   1. We call Plaid's /processor/token/create with processor "alpaca"
-//      → Plaid returns a processor_token
-//   2. We send that token to Alpaca's POST /v2/account/ach_relationships
-//      → Alpaca creates an ACH relationship and returns a relationship_id
-//   3. We store the mapping in our `ach_relationships` table
-//
-// After this, execute-rule can initiate deposits using the relationship_id.
-//
-// Request body:
-//   { plaid_account_id: string }
-//
-// The plaid_account_id must correspond to a Plaid account the user has already
-// linked via the standard Plaid Link flow (stored in your plaid_accounts table).
+// IMPORTANT: This now uses the Broker API (/v1/accounts/{id}/...) with Basic
+// auth, NOT the Trading API (APCA-API-KEY-ID headers) which was the source of
+// auth errors.
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
+  if (!isConfigured()) {
+    return NextResponse.json(
+      { error: "Alpaca Broker API not configured" },
+      { status: 400 }
+    )
+  }
 
+  const supabase = await createClient()
   const {
     data: { user },
     error: authError,
@@ -78,10 +59,19 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const { plaid_account_id } = body
-  
+
   if (!plaid_account_id) {
     return NextResponse.json(
       { error: "plaid_account_id is required" },
+      { status: 400 }
+    )
+  }
+
+  // Get user's Alpaca account ID
+  const accountId = await getAlpacaAccountId()
+  if (!accountId) {
+    return NextResponse.json(
+      { error: "No Alpaca brokerage account found. Complete account setup first." },
       { status: 400 }
     )
   }
@@ -101,9 +91,8 @@ export async function POST(req: NextRequest) {
       message: "This bank account is already linked to Alpaca.",
     })
   }
-  
-  // ─── Look up the Plaid account to get the access_token ────────────
-  // We need the plaid_item's access_token and the plaid account_id
+
+  // ─── Look up the Plaid account ────────────────────────────────────
   const { data: plaidAccount, error: acctError } = await supabase
     .from("plaid_accounts")
     .select("id, account_id_plaid, plaid_item_id, name, mask")
@@ -118,7 +107,7 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Get the access_token from the plaid_items table
+  // Get the access_token from plaid_items
   const { data: plaidItem, error: itemError } = await supabase
     .from("plaid_items")
     .select("access_token, institution_name")
@@ -135,22 +124,19 @@ export async function POST(req: NextRequest) {
 
   try {
     // ─── Step 1: Create a Plaid processor token for Alpaca ──────────
-
-    const auth = await plaidClient.authGet({
-      access_token: plaidItem.access_token,
-    })
-
     const processorResponse = await plaidClient.processorTokenCreate({
       access_token: plaidItem.access_token,
       account_id: plaidAccount.account_id_plaid,
-      processor: ProcessorTokenCreateRequestProcessorEnum.Alpaca
+      processor: ProcessorTokenCreateRequestProcessorEnum.Alpaca,
     })
 
     const processorToken = processorResponse.data.processor_token
 
-    // ─── Step 2: Create ACH relationship in Alpaca ──────────────────
-    const achRelationship = await alpacaRequest(
-      "/v2/account/ach_relationships",
+    // ─── Step 2: Create ACH relationship via BROKER API ─────────────
+    // Key fix: Use brokerFetchGlobal with the Broker API path, not
+    // the Trading API /v2/account/ach_relationships endpoint.
+    const achRelationship = await brokerFetchGlobal(
+      `/v1/accounts/${accountId}/ach_relationships`,
       {
         method: "POST",
         body: JSON.stringify({
@@ -159,7 +145,7 @@ export async function POST(req: NextRequest) {
       }
     )
 
-    // ─── Step 3: Store the relationship in our database ─────────────
+    // ─── Step 3: Store the relationship ─────────────────────────────
     const relationshipRow = {
       user_id: user.id,
       plaid_account_id: plaid_account_id,
@@ -172,13 +158,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (existing) {
-      // Update the existing (possibly stale/failed) row
       await supabase
         .from("ach_relationships")
-        .update({
-          ...relationshipRow,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...relationshipRow, updated_at: new Date().toISOString() })
         .eq("id", existing.id)
     } else {
       await supabase.from("ach_relationships").insert(relationshipRow)
@@ -192,67 +174,94 @@ export async function POST(req: NextRequest) {
     })
   } catch (err: any) {
     console.error("Link bank error:", err)
-
-    // Parse common errors for better UX
     const message = err.message || "Failed to link bank account"
 
     if (message.includes("INVALID_INPUT")) {
       return NextResponse.json(
         {
           error:
-            "This account type cannot be linked for ACH transfers. Please use a checking or savings account.",
+            "This account type cannot be linked for ACH. Please use a checking or savings account.",
         },
         { status: 400 }
       )
     }
 
-    if (message.includes("already exists") || message.includes("DUPLICATE")) {
-      // Alpaca says the relationship already exists — fetch and store it
+    // Detect any flavor of "relationship already exists" from Alpaca
+    const isDuplicate =
+      message.includes("already exists") ||
+      message.includes("DUPLICATE") ||
+      message.includes("only one active") ||
+      message.includes("40910000")
+
+    if (isDuplicate) {
+      // Relationship already exists in Alpaca — fetch it and store in our DB
       try {
-        const relationships = await alpacaRequest(
-          "/v2/account/ach_relationships"
+        const relationships = await brokerFetchGlobal(
+          `/v1/accounts/${accountId}/ach_relationships`
         )
-        // Try to find the matching one
-        // (Alpaca doesn't give us a great way to match, so we store what we can)
-        if (relationships.length > 0) {
-          const latest = relationships[relationships.length - 1]
-          await supabase.from("ach_relationships").upsert(
-            {
-              user_id: user.id,
-              plaid_account_id: plaid_account_id,
-              plaid_item_id: plaidAccount.plaid_item_id,
-              alpaca_relationship_id: latest.id,
-              status: latest.status,
-              bank_name: plaidItem.institution_name,
-              account_name: plaidAccount.name,
-              account_mask: plaidAccount.mask,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "user_id,plaid_account_id" }
-          )
+
+        const active = Array.isArray(relationships)
+          ? relationships.find((r: any) => r.status === "APPROVED" || r.status === "QUEUED") || relationships[0]
+          : relationships
+
+        if (active?.id) {
+          // Store it — use insert with on-conflict or plain insert
+          const row = {
+            user_id: user.id,
+            plaid_account_id: plaid_account_id,
+            plaid_item_id: plaidAccount.plaid_item_id,
+            alpaca_relationship_id: active.id,
+            status: active.status || "APPROVED",
+            bank_name: plaidItem.institution_name,
+            account_name: plaidAccount.name,
+            account_mask: plaidAccount.mask,
+            updated_at: new Date().toISOString(),
+          }
+
+          if (existing) {
+            await supabase
+              .from("ach_relationships")
+              .update(row)
+              .eq("id", existing.id)
+          } else {
+            // Try upsert first, fall back to plain insert
+            const { error: upsertErr } = await supabase
+              .from("ach_relationships")
+              .upsert(row, { onConflict: "user_id,plaid_account_id" })
+
+            if (upsertErr) {
+              console.warn("Upsert failed, trying plain insert:", upsertErr.message)
+              await supabase.from("ach_relationships").insert(row)
+            }
+          }
 
           return NextResponse.json({
             success: true,
             already_linked: true,
-            relationship_id: latest.id,
-            status: latest.status,
+            relationship_id: active.id,
+            status: active.status,
             message: "Bank account was already linked to Alpaca.",
           })
         }
-      } catch {
-        // Fall through to generic error
+      } catch (recoveryErr: any) {
+        console.error("ACH recovery failed:", recoveryErr)
+        // Fall through to generic error with helpful message
       }
+
+      return NextResponse.json({
+        error: "An ACH relationship already exists on Alpaca but we couldn't sync it to your account. Try refreshing the page.",
+        detail: message,
+      }, { status: 409 })
     }
 
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
-// ─── GET: List all ACH relationships for the current user ───────────────────────
+// ─── GET: List ACH relationships ────────────────────────────────────────────────
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const supabase = await createClient()
-
   const {
     data: { user },
     error: authError,
@@ -262,18 +271,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const { data: relationships, error } = await supabase
+  const { data: relationships } = await supabase
     .from("ach_relationships")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-
-  if (error) {
-    return NextResponse.json(
-      { error: "Failed to fetch ACH relationships" },
-      { status: 500 }
-    )
-  }
 
   return NextResponse.json({ relationships: relationships || [] })
 }
@@ -281,8 +283,14 @@ export async function GET(req: NextRequest) {
 // ─── DELETE: Remove an ACH relationship ─────────────────────────────────────────
 
 export async function DELETE(req: NextRequest) {
-  const supabase = await createClient()
+  if (!isConfigured()) {
+    return NextResponse.json(
+      { error: "Alpaca not configured" },
+      { status: 400 }
+    )
+  }
 
+  const supabase = await createClient()
   const {
     data: { user },
     error: authError,
@@ -299,7 +307,6 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "id is required" }, { status: 400 })
   }
 
-  // Look up in our DB
   const { data: rel } = await supabase
     .from("ach_relationships")
     .select("alpaca_relationship_id")
@@ -308,33 +315,31 @@ export async function DELETE(req: NextRequest) {
     .single()
 
   if (!rel) {
-    return NextResponse.json(
-      { error: "Relationship not found" },
-      { status: 404 }
-    )
+    return NextResponse.json({ error: "Relationship not found" }, { status: 404 })
   }
 
+  const accountId = await getAlpacaAccountId()
+
   try {
-    // Delete from Alpaca
-    await alpacaRequest(
-      `/v2/account/ach_relationships/${rel.alpaca_relationship_id}`,
-      { method: "DELETE" }
-    )
+    if (accountId) {
+      await brokerFetchGlobal(
+        `/v1/accounts/${accountId}/ach_relationships/${rel.alpaca_relationship_id}`,
+        { method: "DELETE" }
+      )
+    }
   } catch (err: any) {
-    // If Alpaca says it's already gone, that's fine
     if (!err.message?.includes("404")) {
-      console.error("Alpaca delete failed:", err)
+      console.error("Alpaca delete ACH failed:", err)
     }
   }
 
-  // Delete from our DB
   await supabase
     .from("ach_relationships")
     .delete()
     .eq("id", relationshipId)
     .eq("user_id", user.id)
 
-  // Clear any rules that referenced this account
+  // Clear rules referencing this account
   await supabase
     .from("investment_rules")
     .update({ funding_account_id: null, auto_fund: false })

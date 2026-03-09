@@ -1,28 +1,19 @@
-import { NextRequest, NextResponse } from "next/server"
+import { NextResponse } from "next/server"
+import { isConfigured, brokerFetchGlobal } from "@/lib/broker"
 
-const ALPACA_BASE_URL = process.env.ALPACA_BASE_URL || "https://broker-api.sandbox.alpaca.markets"
-const ALPACA_KEY = process.env.ALPACA_API_KEY
-const ALPACA_SECRET = process.env.ALPACA_SECRET_KEY
-
-export async function GET(_req: NextRequest) {
-  if (!ALPACA_KEY || !ALPACA_SECRET) {
+/**
+ * GET /api/alpaca/clock
+ *
+ * Returns market open/close status. The Broker API exposes the clock at
+ * /v1/clock (NOT under /v1/trading/accounts/{id}).
+ */
+export async function GET() {
+  if (!isConfigured()) {
     return NextResponse.json({ error: "Alpaca not configured" }, { status: 500 })
   }
 
   try {
-    const credentials = Buffer.from(`${ALPACA_KEY}:${ALPACA_SECRET}`).toString("base64")
-
-    const res = await fetch(`${ALPACA_BASE_URL}/v1/clock`, {
-      headers: {
-        Authorization: `Basic ${credentials}`,
-      },
-    })
-
-    if (!res.ok) {
-      return NextResponse.json({ error: "Failed to fetch market clock" }, { status: res.status })
-    }
-
-    const data = await res.json()
+    const data = await brokerFetchGlobal("/v1/clock")
 
     return NextResponse.json({
       is_open: data.is_open,
@@ -32,6 +23,9 @@ export async function GET(_req: NextRequest) {
     })
   } catch (err) {
     console.error("Clock fetch error:", err)
-    return NextResponse.json({ error: "Failed to fetch market clock" }, { status: 500 })
+    return NextResponse.json(
+      { error: "Failed to fetch market clock" },
+      { status: 500 }
+    )
   }
 }

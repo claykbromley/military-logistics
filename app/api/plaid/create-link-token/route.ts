@@ -5,49 +5,43 @@ import {
   PlaidEnvironments,
   Products,
   CountryCode,
-  DepositoryAccountSubtype
+  DepositoryAccountSubtype,
 } from "plaid"
 import { createClient } from "@/lib/supabase/server"
 
 function getPlaidClient() {
-  const configuration = new Configuration({
-    basePath: PlaidEnvironments[process.env.PLAID_ENV || "sandbox"],
-    baseOptions: {
-      headers: {
-        "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID!,
-        "PLAID-SECRET": process.env.PLAID_SECRET!,
+  return new PlaidApi(
+    new Configuration({
+      basePath: PlaidEnvironments[process.env.PLAID_ENV || "sandbox"],
+      baseOptions: {
+        headers: {
+          "PLAID-CLIENT-ID": process.env.PLAID_CLIENT_ID!,
+          "PLAID-SECRET": process.env.PLAID_SECRET!,
+        },
       },
-    },
-  })
-
-  return new PlaidApi(configuration)
+    })
+  )
 }
 
 export async function POST() {
   if (!process.env.PLAID_CLIENT_ID || !process.env.PLAID_SECRET) {
-    return NextResponse.json(
-      { not_configured: true },
-      { status: 400 }
-    )
+    return NextResponse.json({ not_configured: true }, { status: 400 })
   }
 
   try {
     const supabase = await createClient()
-
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser()
 
     if (error || !user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const plaidClient = getPlaidClient()
 
+    // Request Auth product so we can create processor tokens later
     const response = await plaidClient.linkTokenCreate({
       user: { client_user_id: user.id },
       client_name: "Milify",
@@ -64,20 +58,11 @@ export async function POST() {
       },
     })
 
-    return NextResponse.json({
-      link_token: response.data.link_token,
-    })
+    return NextResponse.json({ link_token: response.data.link_token })
   } catch (error: unknown) {
     const message =
-      error instanceof Error
-        ? error.message
-        : "Failed to create link token"
-
+      error instanceof Error ? error.message : "Failed to create link token"
     console.error("Plaid create-link-token error:", message)
-
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

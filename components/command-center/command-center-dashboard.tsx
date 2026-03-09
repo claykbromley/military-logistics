@@ -5,8 +5,8 @@ import {
   DollarSign, FileText, Home, Users, Calendar, MessageSquare, NotebookText,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
-  Star, Phone, Sparkles, ExternalLink,
-  CreditCard, Wrench, Video, Car, Circle
+  Star, Phone, Sparkles, ExternalLink, Shield, Receipt, Zap, Target,
+  Wrench, Video, Car, Circle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
@@ -15,8 +15,144 @@ import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 import { useLegalChecklist } from "@/hooks/use-legal"
 import { usePets } from "@/hooks/use-pets"
+import { useAccounts, useBills, useInvestmentRules, useGoals } from "@/hooks/use-financial-manager"
+import useSWR from "swr"
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+type Frequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual"
+
+const MONTHLY_MULTIPLIER: Record<Frequency, number> = {
+  weekly: 52 / 12, biweekly: 26 / 12, monthly: 1,
+  quarterly: 1 / 3, semiannual: 1 / 6, annual: 1 / 12,
+}
+
+function toMonthly(amount: number, frequency: Frequency): number {
+  return amount * (MONTHLY_MULTIPLIER[frequency] ?? 1)
+}
+
+function formatCompact(value: number): string {
+  if (Math.abs(value) >= 10_000) {
+    return `$${(value / 1000).toFixed(1)}K`
+  }
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+}
 
 export function CommandCenterDashboard() {
+  const { data: accountsData, isLoading: loadingAccounts } = useAccounts()
+  const { data: bills } = useBills()
+  const { data: rules } = useInvestmentRules()
+  const { data: goals } = useGoals()
+
+  const { data: alpacaAccount } = useSWR<any>(
+    "/api/alpaca/account",
+    fetcher,
+    { onError: () => {}, revalidateOnFocus: false, refreshInterval: 60_000 }
+  )
+
+  const accounts = accountsData?.accounts || []
+  const billsList = bills || []
+  const rulesList = rules || []
+  const goalsList = goals || []
+
+  const alpacaConnected =
+    !!alpacaAccount &&
+    !("error" in alpacaAccount) &&
+    !("not_configured" in alpacaAccount)
+  const alpacaPortfolioValue = alpacaConnected
+    ? Number(alpacaAccount.portfolio_value || 0)
+    : 0
+  const totalBalance = accounts.reduce(
+    (sum, a) => sum + Number(a.balance_current || 0), 0
+  )
+  const creditBalance = accounts
+    .filter((a) => a.type === "credit")
+    .reduce((sum, a) => sum + Number(a.balance_current || 0), 0)
+
+  const netWorth = totalBalance + alpacaPortfolioValue - creditBalance
+  const hasAnyData = accounts.length > 0 || alpacaConnected
+
+  // Bills
+  const activeBills = billsList.filter((b) => !b.is_on_hold)
+  const heldBills = billsList.filter((b) => b.is_on_hold)
+  const totalMonthlyBills = billsList.reduce(
+    (sum, b) =>
+      sum + (b.is_on_hold ? 0 : toMonthly(Number(b.amount), b.frequency as Frequency)),
+    0
+  )
+  const onHoldSavings = billsList.reduce(
+    (sum, b) =>
+      sum + (b.is_on_hold ? toMonthly(Number(b.amount), b.frequency as Frequency) : 0),
+    0
+  )
+
+  // Bills due soon (next 7 days)
+  const billsDueSoon = useMemo(() => {
+    const now = new Date()
+    const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+    return activeBills.filter((b) => {
+      if (!b.next_date) return false
+      const due = new Date(b.next_date)
+      return due >= now && due <= weekFromNow
+    }).length
+  }, [activeBills])
+
+  // Investment rules
+  const activeRules = rulesList.filter((r) => r.is_active)
+  const monthlyInvestment = activeRules.reduce((sum, r) => {
+    const mult = { daily: 21, weekly: 4, biweekly: 2, monthly: 1 }[r.frequency] || 1
+    return r.type === "amount"
+      ? sum + Number(r.value) * mult
+      : sum + Number(r.value) * (Number((r as any).estimated_share_price) || 0) * mult
+  }, 0)
+
+  // Goals
+  const completedGoals = goalsList.filter((g) => g.is_completed).length
+  const totalGoalTarget = goalsList.reduce((sum, g) => sum + Number(g.target_amount), 0)
+  const totalGoalCurrent = goalsList.reduce(
+    (sum, g) => sum + Math.min(Number(g.current_amount), Number(g.target_amount)), 0
+  )
+  const goalProgress = totalGoalTarget > 0
+    ? Math.round((totalGoalCurrent / totalGoalTarget) * 100)
+    : 0
+
+  // Deployment readiness
+  const bankConnected = accounts.length > 0
+  const billsReviewed = billsList.length > 0
+  const investmentsSet = activeRules.length > 0
+  const goalsSet = goalsList.length > 0
+  const nonEssentialBills = billsList.filter((b) => !b.is_essential)
+  const billsOnHold = nonEssentialBills.filter((b) => b.is_on_hold).length
+  const holdProgress = nonEssentialBills.length > 0 ? billsOnHold / nonEssentialBills.length : 0
+  const steps = [bankConnected, billsReviewed, investmentsSet, goalsSet]
+  const completedSteps = steps.filter(Boolean).length
+  const deploymentReadiness = Math.round(
+    (completedSteps / steps.length) * 70 + holdProgress * 30
+  )
+
+  const financialNotifications = useMemo(() => {
+    let count = 0
+    if (billsDueSoon > 0) count++
+    if (nonEssentialBills.length > 0 && holdProgress < 1) count++
+    if (!investmentsSet && bankConnected) count++
+    if (!goalsSet && bankConnected) count++
+    return count
+  }, [billsDueSoon, nonEssentialBills.length, holdProgress, investmentsSet, goalsSet, bankConnected])
+
   const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
@@ -208,80 +344,202 @@ export function CommandCenterDashboard() {
           {/* Financial Command - Large, 2x height */}
           <div className="lg:col-span-5 lg:row-span-2">
             <div className="h-full bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/30 rounded-2xl p-6 border border-emerald-200/50 dark:border-emerald-800/50 shadow-lg hover:shadow-xl transition-all">
+              {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-xl bg-emerald-600 dark:bg-emerald-500 flex items-center justify-center shadow-lg">
                     <DollarSign className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">Financial Management</h3>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                      Financial Management
+                    </h3>
                     <p className="text-xs text-slate-600 dark:text-slate-400">Real-time overview</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
-                  <Bell className="w-3.5 h-3.5" />
-                  2
-                </div>
-              </div>
-
-              {/* Large Savings Display */}
-              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-6 mb-4 border border-emerald-200/30 dark:border-emerald-700/30">
-                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  Deployment Savings
-                </div>
-                <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2">$2,450</div>
-                <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                  <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
-                    <div className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full w-2/3"></div>
+                {financialNotifications > 0 && (
+                  <div className="flex items-center gap-1.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm">
+                    <Bell className="w-3.5 h-3.5" />
+                    {financialNotifications}
                   </div>
-                  <span className="font-semibold">67% of goal</span>
-                </div>
+                )}
               </div>
 
-              {/* Financial Stats Grid */}
+              {/* Large Primary Display — Net Worth or Deployment Savings */}
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-6 mb-4 border border-emerald-200/30 dark:border-emerald-700/30">
+                {hasAnyData ? (
+                  <>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      Net Worth
+                    </div>
+                    <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2 tabular-nums">
+                      {formatCompact(netWorth)}
+                    </div>
+                    {onHoldSavings > 0 ? (
+                      <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                        <span className="font-semibold">
+                          Saving {formatCurrency(onHoldSavings)}/mo
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          from {heldBills.length} paused bill{heldBills.length !== 1 ? "s" : ""}
+                        </span>
+                      </div>
+                    ) : goalsList.length > 0 ? (
+                      <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                        <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full transition-all"
+                            style={{ width: `${goalProgress}%` }}
+                          />
+                        </div>
+                        <span className="font-semibold">{goalProgress}% of goals</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-emerald-700/70 dark:text-emerald-400/70">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        <span>
+                          {accounts.length} account{accounts.length !== 1 ? "s" : ""} connected
+                          {alpacaConnected ? " + Alpaca" : ""}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      Deployment Readiness
+                    </div>
+                    <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2">
+                      {deploymentReadiness}%
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                      <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full transition-all"
+                          style={{ width: `${deploymentReadiness}%` }}
+                        />
+                      </div>
+                      <span className="font-semibold">{completedSteps}/{steps.length} steps</span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Stats Grid */}
               <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* Bills Due Soon */}
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Bills Due Soon</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      Bills Due Soon
+                    </span>
                     <Clock className="w-4 h-4 text-amber-500" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">3</div>
-                  <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">Next 7 days</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                    {billsDueSoon}
+                  </div>
+                  <div className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-1">
+                    {billsDueSoon > 0 ? "Next 7 days" : "None upcoming"}
+                  </div>
                 </div>
 
+                {/* Active Bills */}
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Autopay Active</span>
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      Monthly Bills
+                    </span>
+                    <Receipt className="w-4 h-4 text-blue-500" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">12<span className="text-lg text-slate-500 dark:text-slate-400">/15</span></div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">accounts</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                    {activeBills.length}
+                    {heldBills.length > 0 && (
+                      <span className="text-lg text-slate-500 dark:text-slate-400">
+                        /{billsList.length}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs font-medium mt-1">
+                    {totalMonthlyBills > 0 ? (
+                      <span className="text-slate-600 dark:text-slate-400">
+                        {formatCurrency(totalMonthlyBills)}/mo
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 dark:text-slate-400">No bills tracked</span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Auto-Invest */}
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Accounts</span>
-                    <CreditCard className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      Auto-Invest
+                    </span>
+                    <Zap className="w-4 h-4 text-purple-500 dark:text-purple-400" />
                   </div>
-                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">8</div>
-                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">All monitored</div>
+                  <div className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                    {activeRules.length}
+                  </div>
+                  <div className="text-xs font-medium mt-1">
+                    {monthlyInvestment > 0 ? (
+                      <span className="text-emerald-600 dark:text-emerald-400">
+                        {formatCurrency(monthlyInvestment)}/mo
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {activeRules.length > 0 ? "rules active" : "No rules set"}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
+                {/* Goals */}
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Net Worth</span>
-                    <Sparkles className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                      Goals
+                    </span>
+                    <Target className="w-4 h-4 text-emerald-500" />
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">$48.2K</div>
-                  <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1 flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    +$2.4K
-                  </div>
+                  {goalsList.length > 0 ? (
+                    <>
+                      <div className="flex items-baseline justify-between mb-2">
+                        <span className="text-3xl font-bold text-slate-900 dark:text-slate-100 tabular-nums">
+                          {goalProgress}%
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                          {formatCompact(totalGoalCurrent)} / {formatCompact(totalGoalTarget)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-emerald-500 dark:bg-emerald-400 h-full rounded-full transition-all"
+                          style={{ width: `${goalProgress}%` }}
+                        />
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
+                        {completedGoals} of {goalsList.length} goal{goalsList.length !== 1 ? "s" : ""} complete
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-3xl font-bold text-slate-900 dark:text-slate-100">—</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                        No goals set
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 dark:shadow-emerald-900/50" asChild>
+              {/* CTA Button */}
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 dark:shadow-emerald-900/50 cursor-pointer"
+                asChild
+              >
                 <Link href="/services/command-center/financial">
                   Manage Finances
                   <ArrowRight className="w-4 h-4 ml-2" />
@@ -421,7 +679,7 @@ export function CommandCenterDashboard() {
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-3">
-                  <div className={"w-11 h-11 rounded-xl flex items-center justify-center shadow-lg bg-orange-200 dark:bg-orange-900"}>
+                  <div className={"w-11 h-11 rounded-xl flex items-center justify-center shadow-lg bg-orange-400 dark:bg-orange-900"}>
                     <ShieldCheck className="w-6 h-6 text-white" />
                   </div>
                   <div>

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isConfigured, marketDataFetch } from "@/lib/broker"
 
-const ALPACA_KEY = process.env.ALPACA_API_KEY
-const ALPACA_SECRET = process.env.ALPACA_SECRET_KEY
-
+/**
+ * GET /api/alpaca/quote/AAPL
+ *
+ * Returns the latest trade price and daily change for a symbol.
+ * The useStockPrice hook in the frontend polls this.
+ */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ symbol: string }> }
@@ -13,48 +17,38 @@ export async function GET(
     return NextResponse.json({ error: "Symbol required" }, { status: 400 })
   }
 
-  if (!ALPACA_KEY || !ALPACA_SECRET) {
+  if (!isConfigured()) {
     return NextResponse.json({ error: "Alpaca not configured" }, { status: 500 })
   }
 
   try {
-    const res = await fetch(
-      `https://data.alpaca.markets/v2/stocks/${symbol.toUpperCase()}/snapshot`,
-      {
-        headers: {
-          "APCA-API-KEY-ID": ALPACA_KEY,
-          "APCA-API-SECRET-KEY": ALPACA_SECRET,
-        },
-      }
+    // Get latest trade
+    const tradeData = await marketDataFetch(
+      `/v2/stocks/${symbol.toUpperCase()}/trades/latest`
     )
+    const price = tradeData.trade?.p ?? 0
 
-    if (!res.ok) {
-      return NextResponse.json({ error: "Quote not found" }, { status: 404 })
+    // Try to get previous close for change calculation
+    let change = 0
+    let changePercent = 0
+
+    try {
+      const snapshotData = await marketDataFetch(
+        `/v2/stocks/${symbol.toUpperCase()}/snapshot`
+      )
+      const prevClose = snapshotData.prevDailyBar?.c ?? price
+      change = price - prevClose
+      changePercent = prevClose > 0 ? (change / prevClose) * 100 : 0
+    } catch {
+      // Snapshot not available for all symbols; just return price
     }
 
-    const data = await res.json()
-
-    const latestPrice = data.latestTrade?.p ?? data.minuteBar?.c ?? null
-    const prevClose = data.prevDailyBar?.c ?? null
-
-    let change = null
-    let changePercent = null
-
-    if (latestPrice != null && prevClose != null && prevClose > 0) {
-      change = latestPrice - prevClose
-      changePercent = (change / prevClose) * 100
-    }
-
-    return NextResponse.json({
-      price: latestPrice,
-      change,
-      changePercent,
-      high: data.dailyBar?.h ?? null,
-      low: data.dailyBar?.l ?? null,
-      volume: data.dailyBar?.v ?? null,
-    })
+    return NextResponse.json({ price, change, changePercent })
   } catch (err) {
-    console.error("Quote fetch error:", err)
-    return NextResponse.json({ error: "Failed to fetch quote" }, { status: 500 })
+    console.error(`Quote error for ${symbol}:`, err)
+    return NextResponse.json(
+      { error: `Failed to fetch quote for ${symbol}` },
+      { status: 500 }
+    )
   }
 }

@@ -1,77 +1,64 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import {
+  isConfigured,
+  notConfiguredResponse,
+  brokerTradingFetch,
+  getAlpacaAccountId,
+} from "@/lib/broker"
 
-const BROKER_BASE = process.env.ALPACA_BASE_URL || "https://broker-api.sandbox.alpaca.markets"
-const BROKER_KEY = process.env.ALPACA_API_KEY || ""
-const BROKER_SECRET = process.env.ALPACA_SECRET_KEY || ""
+/**
+ * GET /api/alpaca/orders
+ * Returns recent orders.
+ *
+ * POST /api/alpaca/orders
+ * Places a new order.  Body: { symbol, type, value, side?, time_in_force?, limit_price? }
+ */
 
-function isConfigured() {
-  return BROKER_KEY.length > 0 && BROKER_SECRET.length > 0
-}
-
-function getAuthHeader() {
-  return `Basic ${Buffer.from(`${BROKER_KEY}:${BROKER_SECRET}`).toString("base64")}`
-}
-
-async function getAlpacaAccountId() {
-  const supabase = await createClient()
-  const { data } = await supabase
-    .from("alpaca_accounts")
-    .select("alpaca_account_id")
-    .single()
-  return data?.alpaca_account_id
-}
-
-async function brokerFetch(accountId: string, path: string, options: RequestInit = {}) {
-  const res = await fetch(`${BROKER_BASE}/v1/trading/accounts/${accountId}${path}`, {
-    ...options,
-    headers: {
-      Authorization: getAuthHeader(),
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  })
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`Alpaca API error (${res.status}): ${text}`)
-  }
-  return res.json()
-}
-
-// GET recent orders
 export async function GET() {
-  if (!isConfigured()) {
-    return NextResponse.json({ not_configured: true })
-  }
+  if (!isConfigured()) return notConfiguredResponse()
 
   try {
     const accountId = await getAlpacaAccountId()
-    if (!accountId) {
-      return NextResponse.json({ no_account: true })
-    }
+    if (!accountId) return NextResponse.json({ not_configured: true })
 
-    const orders = await brokerFetch(accountId, "/orders?status=all&limit=20&direction=desc")
+    const orders = await brokerTradingFetch(
+      accountId,
+      "/orders?status=all&limit=20&direction=desc"
+    )
     return NextResponse.json(orders)
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to fetch orders"
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch orders"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
-// POST a new order
 export async function POST(request: Request) {
   if (!isConfigured()) {
-    return NextResponse.json({ error: "Alpaca Broker API not configured" }, { status: 400 })
+    return NextResponse.json(
+      { error: "Alpaca Broker API not configured" },
+      { status: 400 }
+    )
   }
 
   try {
     const accountId = await getAlpacaAccountId()
     if (!accountId) {
-      return NextResponse.json({ error: "No Alpaca account found" }, { status: 400 })
+      return NextResponse.json(
+        { error: "No Alpaca account found" },
+        { status: 400 }
+      )
     }
 
     const body = await request.json()
-    const { symbol, type, value, side = "buy", time_in_force = "day", limit_price } = body
+    const {
+      symbol,
+      type,
+      value,
+      side = "buy",
+      time_in_force = "day",
+      limit_price,
+    } = body
 
     const orderPayload: Record<string, unknown> = {
       symbol,
@@ -80,25 +67,33 @@ export async function POST(request: Request) {
       time_in_force,
     }
 
-    if (limit_price) {
-      orderPayload.limit_price = limit_price
-    }
+    if (limit_price) orderPayload.limit_price = limit_price
 
-    // "amount" type = notional (dollar amount), "shares" type = qty
+    // "amount" type → notional (dollar amount), "shares" type → qty
     if (type === "amount") {
       orderPayload.notional = value
     } else {
       orderPayload.qty = value
     }
 
-    const order = await brokerFetch(accountId, "/orders", {
+    const order = await brokerTradingFetch(accountId, "/orders", {
       method: "POST",
       body: JSON.stringify(orderPayload),
     })
 
     return NextResponse.json(order)
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Failed to place order"
+    const message =
+      error instanceof Error ? error.message : "Failed to place order"
+
+    // Surface insufficient-buying-power errors cleanly
+    if (message.includes("insufficient")) {
+      return NextResponse.json(
+        { error: message, insufficient_funds: true },
+        { status: 422 }
+      )
+    }
+
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

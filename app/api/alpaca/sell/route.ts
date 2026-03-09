@@ -1,81 +1,73 @@
-// app/api/alpaca/sell/route.ts
-// API route to sell shares via Alpaca Markets
+import { NextResponse } from "next/server"
+import {
+  isConfigured,
+  brokerTradingFetch,
+  getAlpacaAccountId,
+} from "@/lib/broker"
 
-import { NextRequest, NextResponse } from "next/server"
+/**
+ * POST /api/alpaca/sell
+ *
+ * Places a sell order. Body: { symbol, qty, order_type?, limit_price? }
+ *
+ * The frontend SellSharesModal calls this endpoint.
+ */
+export async function POST(request: Request) {
+  if (!isConfigured()) {
+    return NextResponse.json(
+      { error: "Alpaca Broker API not configured" },
+      { status: 400 }
+    )
+  }
 
-// Replace with your actual Alpaca credential retrieval
-const ALPACA_API_KEY = process.env.ALPACA_API_KEY
-const ALPACA_SECRET_KEY = process.env.ALPACA_SECRET_KEY
-const ALPACA_BASE_URL = process.env.ALPACA_BASE_URL || "https://paper-api.alpaca.markets" // paper by default
-
-export async function POST(req: NextRequest) {
   try {
-    const body = await req.json()
-    const { symbol, qty, order_type, limit_price } = body
-
-    if (!symbol || !qty) {
+    const accountId = await getAlpacaAccountId()
+    if (!accountId) {
       return NextResponse.json(
-        { error: "Missing required fields: symbol and qty" },
+        { error: "No Alpaca account found" },
         { status: 400 }
       )
     }
 
-    if (!ALPACA_API_KEY || !ALPACA_SECRET_KEY) {
+    const body = await request.json()
+    const { symbol, qty, order_type = "market", limit_price } = body
+
+    if (!symbol || !qty || qty <= 0) {
       return NextResponse.json(
-        { error: "Alpaca API credentials not configured" },
-        { status: 500 }
+        { error: "symbol and qty are required" },
+        { status: 400 }
       )
     }
 
-    // Build the order payload
-    const orderPayload: Record<string, any> = {
-      symbol: symbol.toUpperCase(),
-      qty: String(qty),
+    const orderPayload: Record<string, unknown> = {
+      symbol,
       side: "sell",
       type: order_type === "limit" ? "limit" : "market",
-      time_in_force: order_type === "limit" ? "gtc" : "day", // GTC for limit, day for market
+      time_in_force: "day",
+      qty: String(qty),
     }
 
-    // Add limit price if limit order
     if (order_type === "limit" && limit_price) {
       orderPayload.limit_price = String(limit_price)
     }
 
-    const response = await fetch(`${ALPACA_BASE_URL}/v2/orders`, {
+    const order = await brokerTradingFetch(accountId, "/orders", {
       method: "POST",
-      headers: {
-        "APCA-API-KEY-ID": ALPACA_API_KEY,
-        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(orderPayload),
     })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: data.message || "Failed to place sell order" },
-        { status: response.status }
-      )
-    }
-
     return NextResponse.json({
       success: true,
-      order_id: data.id,
-      symbol: data.symbol,
-      qty: data.qty,
-      side: data.side,
-      type: data.type,
-      status: data.status,
-      limit_price: data.limit_price,
-      filled_at: data.filled_at,
+      order_id: order.id,
+      status: order.status,
+      symbol: order.symbol,
+      qty: order.qty,
+      side: order.side,
     })
-  } catch (error: any) {
-    console.error("Sell order error:", error)
-    return NextResponse.json(
-      { error: error.message || "Internal server error" },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to place sell order"
+    console.error("POST /api/alpaca/sell error:", message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

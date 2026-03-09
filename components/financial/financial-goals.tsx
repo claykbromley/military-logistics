@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { Target, Plus, Trash2, Edit2, Check } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { Target, Plus, Trash2, Pencil, Check } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,14 +9,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
+import { createClient } from "@/lib/supabase/client"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useGoals } from "@/hooks/use-financial-manager"
 
@@ -33,10 +27,11 @@ const GOAL_CATEGORIES = [
 ]
 
 export function FinancialGoals() {
-  const { data: goals, isLoading, addGoal, updateGoal: updateGoalInDb, deleteGoal: deleteGoalFromDb } = useGoals()
+  const { data: goals, isLoading, mutate, addGoal, updateGoal: updateGoalInDb, deleteGoal: deleteGoalFromDb } = useGoals()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingGoal, setEditingGoal] = useState<string | null>(null)
   const [editAmount, setEditAmount] = useState("")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [newGoal, setNewGoal] = useState({
     name: "",
     target_amount: "",
@@ -44,8 +39,32 @@ export function FinancialGoals() {
     category: "custom",
     target_date: "",
   })
-
   const goalsList = goals || []
+
+  const supabase = useMemo(() => createClient(), [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsLoggedIn(!!session)
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (event) => {
+        if (event === "SIGNED_IN") {
+          setIsLoggedIn(true)
+          await Promise.all([mutate()])
+        }
+
+        if (event === "SIGNED_OUT") {
+          setIsLoggedIn(false)
+          mutate([], false)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [supabase, mutate])
 
   const handleAddGoal = async () => {
     if (!newGoal.name || !newGoal.target_amount) return
@@ -53,9 +72,16 @@ export function FinancialGoals() {
       await addGoal({
         name: newGoal.name,
         target_amount: parseFloat(newGoal.target_amount),
-        current_amount: newGoal.current_amount ? parseFloat(newGoal.current_amount) : 0,
+        current_amount: newGoal.current_amount
+          ? (parseFloat(newGoal.current_amount) >= parseFloat(newGoal.target_amount)
+            ? parseFloat(newGoal.target_amount)
+            : parseFloat(newGoal.current_amount))
+          : 0,
         category: newGoal.category,
         target_date: newGoal.target_date || null,
+        is_completed: newGoal.current_amount
+          ? parseFloat(newGoal.current_amount) >= parseFloat(newGoal.target_amount)
+          : false,
       })
       setNewGoal({ name: "", target_amount: "", current_amount: "", category: "custom", target_date: "" })
       setIsDialogOpen(false)
@@ -66,8 +92,18 @@ export function FinancialGoals() {
 
   const updateGoalProgress = async (id: string) => {
     if (!editAmount) return
+    const goal = goalsList.find((g) => g.id === id)
+    if (!goal) return
+
+    const target = Number(goal.target_amount)
+    const entered = parseFloat(editAmount)
+    const clamped = Math.min(entered, target)
+
     try {
-      await updateGoalInDb(id, { current_amount: parseFloat(editAmount) })
+      await updateGoalInDb(id, {
+        current_amount: clamped,
+        is_completed: clamped >= target,
+      })
       setEditingGoal(null)
       setEditAmount("")
     } catch (err) {
@@ -135,21 +171,22 @@ export function FinancialGoals() {
                 (Number(goal.current_amount) / Number(goal.target_amount)) * 100,
                 100
               )
+              const isCompleted = goal.is_completed || Number(goal.current_amount) >= Number(goal.target_amount)
               const isEditing = editingGoal === goal.id
 
               return (
                 <div
                   key={goal.id}
                   className={`p-4 rounded-lg border transition-all ${
-                    goal.is_completed
-                      ? "border-accent/50 bg-accent/5"
-                      : "border-border bg-secondary/30"
+                    isCompleted
+                      ? "border-accent/50 bg-accent/5 opacity-75"
+                      : "border-border bg-primary/20"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold text-foreground">{goal.name}</h4>
-                      {goal.is_completed && (
+                      {isCompleted && (
                         <Badge className="bg-accent text-accent-foreground text-[10px]">
                           <Check className="w-3 h-3 mr-0.5" />
                           Complete
@@ -157,7 +194,7 @@ export function FinancialGoals() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      {!goal.is_completed && (
+                      {!isCompleted && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -165,16 +202,16 @@ export function FinancialGoals() {
                             setEditingGoal(isEditing ? null : goal.id)
                             setEditAmount(String(goal.current_amount))
                           }}
-                          className="text-muted-foreground hover:text-foreground h-8 w-8"
+                          className="text-muted-foreground hover:text-white h-8 w-8 cursor-pointer"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Pencil className="w-3.5 h-3.5" />
                         </Button>
                       )}
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => deleteGoal(goal.id)}
-                        className="text-muted-foreground hover:text-destructive h-8 w-8"
+                        className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -187,7 +224,7 @@ export function FinancialGoals() {
                     </Badge>
                     {goal.target_date && (
                       <span className="text-xs text-muted-foreground">
-                        Target: {new Date(goal.target_date).toLocaleDateString()}
+                        Target: {new Date(goal.target_date + "T00:00:00").toLocaleDateString()}
                       </span>
                     )}
                   </div>
@@ -228,7 +265,7 @@ export function FinancialGoals() {
             })}
           </div>
         ) : (
-          <div className="text-center py-8 border-2 border-dashed border-border rounded-lg mb-4">
+          <div className="text-center py-8 border-2 border-dashed border-border dark:border-slate-500 rounded-lg mb-4">
             <Target className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
             <p className="text-muted-foreground">No financial goals set</p>
             <p className="text-sm text-muted-foreground">Set goals to track your progress</p>
@@ -237,9 +274,9 @@ export function FinancialGoals() {
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full bg-primary text-primary-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer">
+            <Button className="w-full bg-primary text-primary-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer" disabled={!isLoggedIn}>
               <Plus className="w-4 h-4 mr-2" />
-              Add Financial Goal
+              {!isLoggedIn && "Log In to "}Add Financial Goal
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-md">

@@ -2,24 +2,13 @@
 
 import { useState } from "react"
 import { Loader2, Shield, User, MapPin, FileText } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogHeader } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { STATES } from "@/lib/types"
 
 interface KYCData {
   given_name: string
@@ -41,33 +30,14 @@ interface KYCDialogProps {
   onComplete: (data: KYCData) => Promise<void>
 }
 
-const US_STATES = [
-  { value: "AL", label: "Alabama" }, { value: "AK", label: "Alaska" },
-  { value: "AZ", label: "Arizona" }, { value: "AR", label: "Arkansas" },
-  { value: "CA", label: "California" }, { value: "CO", label: "Colorado" },
-  { value: "CT", label: "Connecticut" }, { value: "DE", label: "Delaware" },
-  { value: "FL", label: "Florida" }, { value: "GA", label: "Georgia" },
-  { value: "HI", label: "Hawaii" }, { value: "ID", label: "Idaho" },
-  { value: "IL", label: "Illinois" }, { value: "IN", label: "Indiana" },
-  { value: "IA", label: "Iowa" }, { value: "KS", label: "Kansas" },
-  { value: "KY", label: "Kentucky" }, { value: "LA", label: "Louisiana" },
-  { value: "ME", label: "Maine" }, { value: "MD", label: "Maryland" },
-  { value: "MA", label: "Massachusetts" }, { value: "MI", label: "Michigan" },
-  { value: "MN", label: "Minnesota" }, { value: "MS", label: "Mississippi" },
-  { value: "MO", label: "Missouri" }, { value: "MT", label: "Montana" },
-  { value: "NE", label: "Nebraska" }, { value: "NV", label: "Nevada" },
-  { value: "NH", label: "New Hampshire" }, { value: "NJ", label: "New Jersey" },
-  { value: "NM", label: "New Mexico" }, { value: "NY", label: "New York" },
-  { value: "NC", label: "North Carolina" }, { value: "ND", label: "North Dakota" },
-  { value: "OH", label: "Ohio" }, { value: "OK", label: "Oklahoma" },
-  { value: "OR", label: "Oregon" }, { value: "PA", label: "Pennsylvania" },
-  { value: "RI", label: "Rhode Island" }, { value: "SC", label: "South Carolina" },
-  { value: "SD", label: "South Dakota" }, { value: "TN", label: "Tennessee" },
-  { value: "TX", label: "Texas" }, { value: "UT", label: "Utah" },
-  { value: "VT", label: "Vermont" }, { value: "VA", label: "Virginia" },
-  { value: "WA", label: "Washington" }, { value: "WV", label: "West Virginia" },
-  { value: "WI", label: "Wisconsin" }, { value: "WY", label: "Wyoming" },
-]
+function isInvalidSSN(value: string) {
+  const digits = value.replace(/\D/g, "")
+  if (digits.length !== 9) return true
+  if (/^(\d)\1{8}$/.test(digits)) {return true}
+  if (digits === "123456789") {return true}
+  if (digits === "987654321") {return true}
+  return false
+}
 
 export function KYCDialog({ open, onOpenChange, onComplete }: KYCDialogProps) {
   const [step, setStep] = useState(1)
@@ -243,9 +213,9 @@ export function KYCDialog({ open, onOpenChange, onComplete }: KYCDialogProps) {
                     <SelectValue placeholder="Select state" />
                   </SelectTrigger>
                   <SelectContent>
-                    {US_STATES.map((state) => (
-                      <SelectItem key={state.value} value={state.value}>
-                        {state.label}
+                    {STATES.map((state) => (
+                      <SelectItem key={state.abbr} value={state.abbr}>
+                        {state.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -328,7 +298,10 @@ export function KYCDialog({ open, onOpenChange, onComplete }: KYCDialogProps) {
               </Button>
               <Button
                 className="flex-1 bg-primary text-primary-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                onClick={handleSubmit}
+                onClick={() => {
+                  if (isInvalidSSN(formData.tax_id)) {alert("Please enter a valid SSN")}
+                  else {handleSubmit()}}
+                }
                 disabled={!isStep3Valid || isSubmitting}
               >
                 {isSubmitting ? (

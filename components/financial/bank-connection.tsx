@@ -26,6 +26,7 @@ export function BankConnection() {
   const [plaidReady, setPlaidReady] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showKYCDialog, setShowKYCDialog] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [pendingPlaidData, setPendingPlaidData] = useState<{
     public_token: string
     institution: { institution_id?: string; name?: string } | undefined
@@ -47,11 +48,12 @@ export function BankConnection() {
     } = supabase.auth.onAuthStateChange(
       async (event) => {
         if (event === "SIGNED_IN") {
-          mutate({ accounts: [], items: [] }, false)
+          setIsLoggedIn(true)
           await Promise.all([mutate()])
         }
 
         if (event === "SIGNED_OUT") {
+          setIsLoggedIn(false)
           mutate({ accounts: [], items: [] }, false)
         }
       }
@@ -88,20 +90,58 @@ export function BankConnection() {
   }) => {
     if (!pendingPlaidData) return
 
+    // ── Step 1: Create Alpaca account ─────────────────────────────
+    let alpacaResult: any
     try {
-      // Step 1: Create Alpaca account with KYC data
       const alpacaRes = await fetch("/api/alpaca/create-account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(kycData),
       })
-      const alpacaResult = await alpacaRes.json()
-      if (alpacaResult.error) {
-        throw new Error(alpacaResult.error)
+
+      // Handle non-JSON responses (e.g. Next.js error pages, 502s)
+      const contentType = alpacaRes.headers.get("content-type") || ""
+      if (!contentType.includes("application/json")) {
+        const text = await alpacaRes.text()
+        console.error("create-account returned non-JSON:", alpacaRes.status, text.slice(0, 500))
+        alert(
+          `Account creation failed (${alpacaRes.status}). ` +
+          `The server returned an unexpected response. Check the browser console and server logs for details.`
+        )
+        return
       }
 
-      // Step 2: Exchange Plaid token
-      await fetch("/api/plaid/exchange-token", {
+      alpacaResult = await alpacaRes.json()
+
+      // Log the full response for debugging
+      if (!alpacaRes.ok || alpacaResult.error) {
+        console.error("create-account error response:", JSON.stringify(alpacaResult, null, 2))
+        
+        // Show a helpful error message
+        const errorMsg = alpacaResult.error || `HTTP ${alpacaRes.status}`
+        const debugInfo = alpacaResult.debug
+          ? `\n\nDebug info:\n${JSON.stringify(alpacaResult.debug, null, 2)}`
+          : ""
+        const alpacaError = alpacaResult.alpaca_error
+          ? `\n\nAlpaca error:\n${typeof alpacaResult.alpaca_error === "string" ? alpacaResult.alpaca_error : JSON.stringify(alpacaResult.alpaca_error, null, 2)}`
+          : ""
+        
+        alert(`Account creation failed: ${errorMsg}${alpacaError}${debugInfo}`)
+        return
+      }
+    } catch (err) {
+      console.error("create-account network/parse error:", err)
+      alert(
+        `Could not reach the account creation API. ` +
+        `Error: ${err instanceof Error ? err.message : "Unknown error"}. ` +
+        `Check that your server is running and the API route exists.`
+      )
+      return
+    }
+
+    // ── Step 2: Exchange Plaid token ──────────────────────────────
+    try {
+      const exchangeRes = await fetch("/api/plaid/exchange-token", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -110,15 +150,22 @@ export function BankConnection() {
         }),
       })
 
-      // Refresh both accounts and Alpaca status
-      mutate()
-      mutateAlpaca()
-      setShowKYCDialog(false)
-      setPendingPlaidData(null)
+      if (!exchangeRes.ok) {
+        const exchangeData = await exchangeRes.json().catch(() => ({}))
+        console.error("exchange-token failed:", exchangeRes.status, exchangeData)
+        // Don't block — the Alpaca account was already created successfully
+        // The user can re-link the bank later
+      }
     } catch (err) {
-      console.error("Account setup failed:", err)
-      alert(`Account setup failed: ${err instanceof Error ? err.message : "Unknown error"}`)
+      console.error("exchange-token error:", err)
+      // Non-fatal — Alpaca account exists, bank can be linked later
     }
+
+    // ── Done ─────────────────────────────────────────────────────
+    mutate()
+    mutateAlpaca()
+    setShowKYCDialog(false)
+    setPendingPlaidData(null)
   }, [pendingPlaidData, mutate, mutateAlpaca])
 
   const handleConnect = useCallback(async () => {
@@ -147,7 +194,7 @@ export function BankConnection() {
         onSuccess: async (public_token: string, metadata: { institution?: { institution_id?: string; name?: string } }) => {
           // Check if user already has Alpaca account
           if (alpacaStatus?.has_account) {
-            // Already have Alpaca account - just exchange token
+            // Already have Alpaca account — just exchange token
             try {
               await fetch("/api/plaid/exchange-token", {
                 method: "POST",
@@ -163,7 +210,7 @@ export function BankConnection() {
             }
             setIsConnecting(false)
           } else {
-            // No Alpaca account - show KYC dialog first
+            // No Alpaca account — show KYC dialog first
             setPendingPlaidData({ public_token, institution: metadata.institution })
             setShowKYCDialog(true)
             setIsConnecting(false)
@@ -244,7 +291,7 @@ export function BankConnection() {
         </div>
       </CardHeader>
       <CardContent>
-        {error && (
+        {error && !accounts.length && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
             Failed to load accounts. Check your connection and try again.
           </div>
@@ -261,7 +308,7 @@ export function BankConnection() {
               </p>
             </div>
 
-            <div className="space-y-2 mb-4 max-h-70 overflow-y-auto">
+            <div className="space-y-2 mb-4 max-h-100 overflow-y-auto">
               {accounts.map((account) => {
                 const institution = items.find((i) => i.id === account.plaid_item_id)
                 return (
@@ -298,11 +345,28 @@ export function BankConnection() {
             <div className="flex gap-2">
               <Button
                 variant="outline"
+                disabled={refreshing}
                 className="flex-1 bg-transparent cursor-pointer dark:border-slate-500"
-                onClick={() => mutate()}
+                onClick={async () => {
+                  setRefreshing(true)
+
+                  try {
+                    await fetch("/api/plaid/refresh-balances", { method: "POST" })
+                    await mutate()
+                  } catch (e) {
+                    console.error(e)
+                  } finally {
+                    setRefreshing(false)
+                  }
+                }}
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Balances
+                <RefreshCw
+                  className={`w-4 h-4 mr-2 ${
+                    refreshing ? "animate-spin" : ""
+                  }`}
+                />
+
+                {refreshing ? "Refreshing..." : "Refresh Balances"}
               </Button>
               <Button
                 className="flex-1 bg-primary text-primary-foreground hover:bg-accent cursor-pointer"
