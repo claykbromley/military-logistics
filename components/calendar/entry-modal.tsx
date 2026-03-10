@@ -284,6 +284,51 @@ export function EntryModal({
     }
   }, [formData.start_date])
 
+  // Human-readable recurrence summary
+  const recurrenceSummary = useMemo(() => {
+    if (!formData.is_recurring) return ""
+
+    const interval = formData.recurrence_interval
+    const freq = formData.recurrence_freq
+
+    let freqStr = ""
+    if (interval === 1) {
+      const map: Record<string, string> = { daily: "day", weekly: "week", monthly: "month", yearly: "year" }
+      freqStr = `Every ${map[freq] || freq}`
+    } else {
+      const map: Record<string, string> = { daily: "days", weekly: "weeks", monthly: "months", yearly: "years" }
+      freqStr = `Every ${interval} ${map[freq] || freq}`
+    }
+
+    let detailStr = ""
+    if (freq === "weekly" && formData.recurrence_days.length > 0) {
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+      const selected = [...formData.recurrence_days].sort((a, b) => a - b).map((i) => dayNames[i])
+      detailStr = ` on ${selected.join(", ")}`
+    } else if (freq === "monthly") {
+      if (formData.recurrence_monthly_mode === "day_of_week") {
+        detailStr = ` on the ${monthlyDowLabel}`
+      } else {
+        detailStr = ` on day ${monthlyDayNumber}`
+      }
+    }
+
+    let endStr = ""
+    if (formData.recurrence_end_mode === "on_date" && formData.recurrence_end) {
+      try {
+        const d = new Date(formData.recurrence_end + "T12:00:00")
+        endStr = `, until ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
+      } catch {
+        endStr = ""
+      }
+    } else if (formData.recurrence_end_mode === "after_count") {
+      const c = formData.recurrence_count
+      endStr = `, ${c} time${c !== 1 ? "s" : ""}`
+    }
+
+    return `${freqStr}${detailStr}${endStr}`
+  }, [formData.is_recurring, formData.recurrence_interval, formData.recurrence_freq, formData.recurrence_days, formData.recurrence_monthly_mode, formData.recurrence_end_mode, formData.recurrence_end, formData.recurrence_count, monthlyDowLabel, monthlyDayNumber])
+
   // Timezone label for display
   const currentTzLabel = useMemo(() => {
     const match = COMMON_TIMEZONES.find((tz) => tz.value === formData.timezone)
@@ -915,6 +960,12 @@ export function EntryModal({
                       )}
                     </label>
                   </div>
+                </div>
+
+                {/* Recurrence summary */}
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 border border-primary/15">
+                  <Repeat className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-primary font-medium">{recurrenceSummary}</span>
                 </div>
               </div>
             )}
