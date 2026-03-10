@@ -44,7 +44,7 @@ export function WeekView({
           return (
             <div
               key={i}
-              className={`border-r border-border/30 last:border-r-0 px-1.5 pt-2 pb-1.5 min-h-[56px] ${
+              className={`border-r border-border/30 last:border-r-0 px-1.5 pt-2 pb-1.5 min-h-[56px] overflow-hidden min-w-0 ${
                 today ? "bg-primary/[0.03]" : ""
               }`}
             >
@@ -73,7 +73,7 @@ export function WeekView({
 
               {/* All-day chips */}
               {allDay.length > 0 && (
-                <div className="space-y-0.5">
+                <div className="space-y-0.5 max-h-[72px] overflow-y-auto overflow-x-hidden">
                   {allDay.map((e, j) => (
                     <AllDayChip
                       key={`${e.id}-${j}`}
