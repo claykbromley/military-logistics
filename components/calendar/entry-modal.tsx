@@ -85,10 +85,12 @@ function TimePicker({
   value,
   onChange,
   label,
+  dropdownAlign = "left",
 }: {
   value: string
   onChange: (val: string) => void
   label?: string
+  dropdownAlign?: "left" | "right"
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState("")
@@ -149,7 +151,7 @@ function TimePicker({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-xl w-48 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className={`absolute z-50 top-full mt-1 bg-card border border-border rounded-lg shadow-xl w-48 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 ${dropdownAlign === "right" ? "right-0" : "left-0"}`}>
           {/* Search / manual input */}
           <div className="p-2 border-b border-border">
             <input
@@ -555,6 +557,7 @@ export function EntryModal({
                       <TimePicker
                         value={formData.end_time}
                         onChange={(val) => update({ end_time: val })}
+                        dropdownAlign="right"
                       />
                     )}
                   </>
