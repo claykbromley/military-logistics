@@ -1,41 +1,82 @@
-import { createClient } from "@/lib/supabase/client"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+const ALPACA_API_BASE = process.env.ALPACA_BASE_URL ?? "https://broker-api.alpaca.markets"
+const ALPACA_API_KEY = process.env.ALPACA_API_KEY!
+const ALPACA_API_SECRET = process.env.ALPACA_SECRET_KEY!
+
+async function getAlpacaPortfolioValue(accountId: string): Promise<number> {
+  const res = await fetch(
+    `${ALPACA_API_BASE}/v1/trading/accounts/${accountId}/account`,
+    {
+      headers: {
+        Authorization:
+          "Basic " + btoa(`${ALPACA_API_KEY}:${ALPACA_API_SECRET}`),
+      },
+    }
+  )
+  if (!res.ok) return 0
+  const data = await res.json()
+  return Number(data.portfolio_value ?? data.equity ?? 0)
+}
 
 export async function POST(req: Request) {
-  // Verify cron secret
   const authHeader = req.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return Response.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const supabase = createClient()
   const today = new Date().toISOString().slice(0, 10)
 
-  // Get distinct user IDs with accounts
-  const { data: rows } = await supabase
-    .from("accounts")
-    .select("user_id, balance_current, type")
+  // Fetch bank accounts and alpaca account mappings in parallel
+  const [{ data: bankRows }, { data: alpacaRows }] = await Promise.all([
+    supabase
+      .from("plaid_accounts")
+      .select("user_id, balance_current"),
+    supabase
+      .from("alpaca_accounts")
+      .select("user_id, alpaca_account_id"),
+  ])
 
-  if (!rows || rows.length === 0) {
+  if ((!bankRows || bankRows.length === 0) && (!alpacaRows || alpacaRows.length === 0)) {
     return Response.json({ message: "No accounts found" })
   }
 
-  // Group by user
-  const byUser = new Map<string, typeof rows>()
-  for (const row of rows) {
-    const existing = byUser.get(row.user_id) ?? []
-    existing.push(row)
-    byUser.set(row.user_id, existing)
+  // Collect all unique user IDs
+  const userIds = new Set<string>()
+  bankRows?.forEach((r) => userIds.add(r.user_id))
+  alpacaRows?.forEach((r) => userIds.add(r.user_id))
+
+  // Bank balances by user
+  const bankByUser = new Map<string, number>()
+  for (const row of bankRows ?? []) {
+    const prev = bankByUser.get(row.user_id) ?? 0
+    bankByUser.set(row.user_id, prev + Number(row.balance_current || 0))
   }
 
-  const snapshots = Array.from(byUser.entries()).map(([userId, accounts]) => {
-    const bankBalance = accounts.reduce(
-      (sum, a) => sum + Number(a.balance_current || 0),
-      0
+  // Alpaca portfolio values by user (fetched in parallel)
+  const investmentByUser = new Map<string, number>()
+  if (alpacaRows && alpacaRows.length > 0) {
+    const results = await Promise.all(
+      alpacaRows.map(async (row) => ({
+        userId: row.user_id,
+        value: await getAlpacaPortfolioValue(row.alpaca_account_id),
+      }))
     )
-    const investmentBalance = accounts
-      .filter((a) => a.type === "investment")
-      .reduce((sum, a) => sum + Number(a.balance_current || 0), 0)
+    for (const { userId, value } of results) {
+      const prev = investmentByUser.get(userId) ?? 0
+      investmentByUser.set(userId, prev + value)
+    }
+  }
 
+  // Build snapshots
+  const snapshots = Array.from(userIds).map((userId) => {
+    const bankBalance = bankByUser.get(userId) ?? 0
+    const investmentBalance = investmentByUser.get(userId) ?? 0
     return {
       user_id: userId,
       date: today,
