@@ -101,15 +101,36 @@ export function useProperties() {
       .select("*")
       .eq("id", user.id)
       .single()
-    if (error) { console.error("Failed to load emergency contacts:", error); return [] }
-    return (data || []).map((c: any) => ({
-      id: c.id, name: c.name, relationship: c.relationship || undefined,
-      role: c.role || undefined, phone: c.phone || undefined,
-      phoneSecondary: c.phone_secondary || undefined, email: c.email || undefined,
-      address: c.address || undefined, isPrimary: c.is_primary || false,
-      hasPoa: c.has_poa || false, poaType: c.poa_type || undefined,
-      canAccessAccounts: c.can_access_accounts || false, priority: c.priority || 0,
-      notes: c.notes || undefined, createdAt: c.created_at, updatedAt: c.updated_at,
+
+    if (error) {
+      console.error("Failed to load emergency contacts:", error)
+      return []
+    }
+
+    data.unshift({
+      id: 0,
+      name: "Myself",
+      phone: myData.phone,
+      email: myData.email
+    })
+
+    return (data || []).map((c: Record<string, any>) => ({
+      id: c.id,
+      name: c.name,
+      relationship: c.relationship || undefined,
+      role: c.role || undefined,
+      phone: c.phone || undefined,
+      phoneSecondary: c.phone_secondary || undefined,
+      email: c.email || undefined,
+      address: c.address || undefined,
+      isPrimary: c.is_primary || false,
+      hasPoa: c.has_poa || false,
+      poaType: c.poa_type || undefined,
+      canAccessAccounts: c.can_access_accounts || false,
+      priority: c.priority || 0,
+      notes: c.notes || undefined,
+      createdAt: c.created_at,
+      updatedAt: c.updated_at,
     }))
   }, [])
 

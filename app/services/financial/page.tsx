@@ -7,7 +7,7 @@ import {
   DollarSign, PiggyBank, CreditCard, Home, TrendingUp,
   Shield, ChevronRight, BriefcaseBusiness, ArrowUpRight,
   ArrowDownRight, ExternalLink, Clock, Newspaper,
-  Sparkles, type LucideIcon,
+  Sparkles, Receipt
 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import axios from "axios"
@@ -18,22 +18,14 @@ const API_KEY = process.env.NEXT_PUBLIC_FINNHUB_API_KEY
 const FIXED_STOCKS = ["QQQ", "SPY", "DIA"]
 const CYCLING_STOCKS = ["AAPL", "MSFT", "GOOGL", "TSLA", "AMZN", "NVDA", "META"]
 
-type ServiceCategory = {
-  name: string
-  icon: LucideIcon
-  description: string
-  accent: string
-  accentBg: string
-  hoverBorder: string
-}
-
-const serviceCategories: ServiceCategory[] = [
-  { name: "Investments", icon: TrendingUp, description: "Learn about investment options to grow your capital", accent: "text-blue-700", accentBg: "bg-blue-50", hoverBorder: "hover:border-blue-400" },
-  { name: "Taxes and Income", icon: PiggyBank, description: "Analyze your income and file your taxes", accent: "text-violet-700", accentBg: "bg-violet-50", hoverBorder: "hover:border-violet-400" },
-  { name: "Loans", icon: Home, description: "Secure loans for important life changes", accent: "text-rose-700", accentBg: "bg-rose-50", hoverBorder: "hover:border-rose-400" },
-  { name: "Retirement", icon: Shield, description: "Prepare for a life after the military", accent: "text-amber-700", accentBg: "bg-amber-50", hoverBorder: "hover:border-amber-400" },
-  { name: "Start a Business", icon: BriefcaseBusiness, description: "Manage a side business while active duty", accent: "text-orange-700", accentBg: "bg-orange-50", hoverBorder: "hover:border-orange-400" },
-  { name: "Credit", icon: CreditCard, description: "Grow your credit and explore card options", accent: "text-cyan-700", accentBg: "bg-cyan-50", hoverBorder: "hover:border-cyan-400" },
+const serviceCategories = [
+  { name: "Investments", icon: TrendingUp},
+  { name: "Taxes and Income", icon: PiggyBank},
+  { name: "Loans", icon: Home},
+  { name: "Retirement", icon: Shield},
+  { name: "Start a Business", icon: BriefcaseBusiness},
+  { name: "Credit", icon: CreditCard},
+  { name: "Bills", icon: Receipt}
 ]
 
 /* ─── Types ─── */
@@ -199,10 +191,10 @@ export default function FinancialPage() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] overflow-hidden">
+      <div className="flex flex-col lg:flex-row items-stretch">
         {/* Left Sidebar */}
-        <aside className="w-full lg:w-80 bg-sidebar border-r overflow-y-auto">
-          <div className="top-20 p-6">
+        <aside className="w-full lg:w-80 bg-sidebar border-r">
+          <div className="p-6">
             <a href="/services/financial">
               <h2 className="text-2xl font-bold text-sidebar-foreground mb-6 pb-3 border-b-2 border-muted-foreground text-center">
                 Financial Services
@@ -254,7 +246,7 @@ export default function FinancialPage() {
         </aside>
 
         {/* ── Main Content ── */}
-        <main className="flex-1 overflow-y-auto px-5 py-7 lg:px-10">
+        <main className="flex-1 lg:sticky lg:top-0 lg:h-screen overflow-y-auto px-5 py-7 lg:px-10">
           <div className="mx-auto max-w-[960px]">
 
             {/* Hero */}

@@ -417,3 +417,155 @@ export interface SharedContact {
   localRelationship?: string
   addedToContacts?: boolean
 }
+
+// Financial Manager
+
+export interface PlaidItem {
+  id: string;
+  user_id: string;
+  access_token: string;
+  item_id: string;
+  institution_id: string | null;
+  institution_name: string | null;
+  cursor: string | null;
+  created_at: string;
+}
+
+export interface Account {
+  id: string;
+  plaid_item_id: string;
+  account_id_plaid: string;
+  name: string;
+  official_name: string | null;
+  type: string;
+  subtype: string | null;
+  balance_current: number;
+  balance_available: number | null;
+  mask: string | null;
+  updated_at: string;
+}
+
+export interface Bill {
+  id: string;
+  user_id: string;
+  account_id: string | null;
+  name: string;
+  merchant_name: string | null;
+  category: string;
+  amount: number;
+  frequency: string;
+  last_date: string | null;
+  next_date: string | null;
+  is_on_hold: boolean;
+  is_essential: boolean;
+  stream_id: string | null;
+  created_at: string;
+}
+
+export interface InvestmentRule {
+  id: string
+  funding_account_id: string
+  user_id: string
+  type: "amount" | "shares"
+  symbol: string
+  value: number
+  frequency: "daily" | "weekly" | "biweekly" | "monthly"
+  min_price: number | null
+  max_price: number | null
+  is_active: boolean
+  last_executed_at: string | null
+  created_at: string
+  strategy: "dca" | "smart_dip" | "threshold"
+  strategy_params: Record<string, any> | null
+  estimated_share_price: number | null
+}
+
+export interface FinancialGoal {
+  id: string;
+  user_id: string;
+  name: string;
+  target_amount: number;
+  current_amount: number;
+  category: string;
+  target_date: string | null;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface Advisor {
+  id: string
+  name: string
+  credentials: string
+  firm: string
+  bio: string
+  specialties: string[]
+  rating: number
+  review_count: number
+  location: string
+  state: string
+  phone: string | null
+  email: string | null
+  website: string | null
+  military_experience: boolean
+  branch: string | null
+  accepts_tricare: boolean
+  fee_structure: "Fee-Only" | "Fee-Based" | "Free / Non-Profit"
+  virtual_available: boolean
+  languages: string[]
+  minimum_assets: string | null
+  photo_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdvisorFilters {
+  search?: string
+  specialty?: string
+  state?: string
+  branch?: string
+  feeType?: string
+  militaryOnly?: boolean
+  virtualOnly?: boolean
+  tricareOnly?: boolean
+  sortBy?: "rating" | "reviews" | "name"
+  limit?: number
+  offset?: number
+}
+
+export interface AlpacaOrder {
+  id: string;
+  client_order_id: string;
+  symbol: string;
+  qty?: string;
+  notional?: string;
+  side: string;
+  type: string;
+  time_in_force: string;
+  status: string;
+  submitted_at: string;
+  filled_at?: string;
+  filled_avg_price?: string;
+  filled_qty?: string;
+}
+
+export interface AlpacaPosition {
+  asset_id: string;
+  symbol: string;
+  qty: string;
+  avg_entry_price: string;
+  market_value: string;
+  unrealized_pl: string;
+  unrealized_plpc: string;
+  current_price: string;
+}
+
+export interface AlpacaAccount {
+  id: string;
+  account_number: string;
+  status: string;
+  currency: string;
+  cash: string;
+  portfolio_value: string;
+  buying_power: string;
+  equity: string;
+}

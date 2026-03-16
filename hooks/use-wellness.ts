@@ -4,16 +4,19 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 
 export type Mood = "great" | "good" | "neutral" | "struggling" | "difficult"
+export type EntryType = "checkin" | "journal"
 
 export interface JournalEntry {
   id: string
   user_id?: string
   entryDate: string
+  entryType: EntryType
   title?: string
   content: string
   mood?: Mood
   moodScore?: number
   energyLevel?: number
+  stress?: number
   sleepHours?: number
   exerciseMinutes?: number
   gratitude?: string
@@ -42,6 +45,28 @@ const scoreToMood = (score: number): Mood => {
   return "difficult"
 }
 
+function mapDbToLocal(e: Record<string, any>): JournalEntry {
+  return {
+    id: e.id,
+    user_id: e.user_id,
+    entryDate: e.entry_date,
+    entryType: e.entry_type || "checkin",
+    title: e.entry_title || "",
+    content: e.journal_entry || "",
+    mood: e.mood_score ? scoreToMood(e.mood_score) : undefined,
+    moodScore: e.mood_score || undefined,
+    energyLevel: e.energy_level || undefined,
+    stress: e.stress_level || undefined,
+    sleepHours: e.sleep_hours || undefined,
+    exerciseMinutes: e.exercise_minutes || undefined,
+    gratitude: e.gratitude || undefined,
+    goals: e.goals || undefined,
+    isPrivate: e.is_private ?? true,
+    createdAt: e.created_at,
+    updatedAt: e.updated_at,
+  }
+}
+
 export function useWellness() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
@@ -50,52 +75,26 @@ export function useWellness() {
   const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadData = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    const supabase = createClient()
 
-      setIsAuthenticated(!!user)
+    const loadEntries = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("wellness_entries")
+          .select("*")
+          .order("entry_date", { ascending: false })
 
-      if (user) {
-        try {
-          const { data, error } = await supabase
-            .from("wellness_entries")
-            .select("*")
-            .order("entry_date", { ascending: false })
+        if (error) throw error
 
-          if (error) throw error
+        const localEntries = (data || []).map(mapDbToLocal)
+        setEntries(localEntries)
 
-          const localEntries: JournalEntry[] = (data || []).map((e) => ({
-            id: e.id,
-            user_id: e.user_id,
-            entryDate: e.entry_date,
-            content: e.journal_entry || "",
-            mood: e.mood ? scoreToMood(e.mood) : undefined,
-            moodScore: e.mood || undefined,
-            energyLevel: e.energy_level || undefined,
-            sleepHours: e.sleep_hours || undefined,
-            exerciseMinutes: e.exercise_minutes || undefined,
-            gratitude: e.gratitude || undefined,
-            goals: e.goals || undefined,
-            isPrivate: e.is_private ?? true,
-            createdAt: e.created_at,
-            updatedAt: e.updated_at,
-          }))
-
-          setEntries(localEntries)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
-        } catch (error) {
-          console.error("Error loading wellness entries from Supabase:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to load")
-          loadFromLocalStorage()
-        }
-      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
+      } catch (error) {
+        console.error("Error loading wellness entries:", error)
+        setSyncError(error instanceof Error ? error.message : "Failed to load")
         loadFromLocalStorage()
       }
-
-      setIsLoaded(true)
     }
 
     const loadFromLocalStorage = () => {
@@ -109,14 +108,41 @@ export function useWellness() {
       }
     }
 
-    loadData()
+    const clearUserData = () => {
+      setEntries([])
+      setIsAuthenticated(false)
+      localStorage.removeItem(STORAGE_KEY)
+    }
 
-    const supabase = createClient()
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user)
+    // Initial session check (handles page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
+
+      if (user) {
+        setIsAuthenticated(true)
+        loadEntries(user.id)
+      } else {
+        loadFromLocalStorage()
+      }
+
+      setIsLoaded(true)
     })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        const user = session?.user
+
+        if (event === "SIGNED_IN" && user) {
+          setIsAuthenticated(true)
+          loadEntries(user.id)
+        }
+
+        if (event === "SIGNED_OUT") {
+          clearUserData()
+        }
+      }
+    )
 
     return () => subscription.unsubscribe()
   }, [])
@@ -129,10 +155,12 @@ export function useWellness() {
 
   const addEntry = useCallback(
     async (entry: Omit<JournalEntry, "id" | "createdAt" | "updatedAt">) => {
+      console.log(entry)
       const now = new Date().toISOString()
       const newEntry: JournalEntry = {
         ...entry,
         id: crypto.randomUUID(),
+        entryType: entry.entryType || "checkin",
         entryDate: entry.entryDate || now.split("T")[0],
         createdAt: now,
         updatedAt: now,
@@ -152,10 +180,13 @@ export function useWellness() {
               .insert({
                 user_id: user.id,
                 entry_date: newEntry.entryDate,
-                mood: entry.mood ? moodToScore[entry.mood] : null,
+                entry_type: newEntry.entryType,
+                mood_score: entry.mood ? moodToScore[entry.mood] : null,
                 energy_level: entry.energyLevel || null,
+                stress_level: entry.stress || null,
                 sleep_hours: entry.sleepHours || null,
                 exercise_minutes: entry.exerciseMinutes || null,
+                entry_title: entry.title || null,
                 journal_entry: entry.content || null,
                 gratitude: entry.gratitude || null,
                 goals: entry.goals || null,
@@ -166,23 +197,7 @@ export function useWellness() {
 
             if (error) throw error
 
-            const createdEntry: JournalEntry = {
-              id: data.id,
-              user_id: data.user_id,
-              entryDate: data.entry_date,
-              content: data.journal_entry || "",
-              mood: data.mood ? scoreToMood(data.mood) : undefined,
-              moodScore: data.mood || undefined,
-              energyLevel: data.energy_level || undefined,
-              sleepHours: data.sleep_hours || undefined,
-              exerciseMinutes: data.exercise_minutes || undefined,
-              gratitude: data.gratitude || undefined,
-              goals: data.goals || undefined,
-              isPrivate: data.is_private ?? true,
-              createdAt: data.created_at,
-              updatedAt: data.updated_at,
-            }
-
+            const createdEntry = mapDbToLocal(data)
             setEntries((prev) => [createdEntry, ...prev])
             setSyncError(null)
             return createdEntry
@@ -206,7 +221,9 @@ export function useWellness() {
   const updateEntry = useCallback(
     async (id: string, updates: Partial<JournalEntry>) => {
       setEntries((prev) =>
-        prev.map((e) => (e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e))
+        prev.map((e) =>
+          e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
+        )
       )
 
       if (isAuthenticated) {
@@ -216,12 +233,16 @@ export function useWellness() {
 
           const dbUpdates: Record<string, unknown> = {}
           if (updates.entryDate !== undefined) dbUpdates.entry_date = updates.entryDate
-          if (updates.mood !== undefined) dbUpdates.mood = updates.mood ? moodToScore[updates.mood] : null
+          if (updates.entryType !== undefined) dbUpdates.entry_type = updates.entryType
+          if (updates.mood !== undefined)
+            dbUpdates.mood_score = updates.mood ? moodToScore[updates.mood] : null
           if (updates.energyLevel !== undefined) dbUpdates.energy_level = updates.energyLevel || null
+          if (updates.stress !== undefined) dbUpdates.stress_level = updates.stress || null
           if (updates.sleepHours !== undefined) dbUpdates.sleep_hours = updates.sleepHours || null
           if (updates.exerciseMinutes !== undefined)
             dbUpdates.exercise_minutes = updates.exerciseMinutes || null
           if (updates.content !== undefined) dbUpdates.journal_entry = updates.content || null
+          if (updates.title !== undefined) dbUpdates.entry_title = updates.title || null
           if (updates.gratitude !== undefined) dbUpdates.gratitude = updates.gratitude || null
           if (updates.goals !== undefined) dbUpdates.goals = updates.goals || null
           if (updates.isPrivate !== undefined) dbUpdates.is_private = updates.isPrivate
@@ -264,6 +285,16 @@ export function useWellness() {
     [isAuthenticated]
   )
 
+  // ── Filtered accessors ──
+
+  /** Only check-in entries */
+  const checkinEntries = entries.filter((e) => e.entryType === "checkin")
+
+  /** Only journal entries (with content) */
+  const journalEntries = entries.filter(
+    (e) => e.entryType === "journal" && e.content && e.content.trim().length > 0
+  )
+
   const getEntriesByMood = useCallback(
     (mood: Mood) => entries.filter((e) => e.mood === mood),
     [entries]
@@ -274,7 +305,10 @@ export function useWellness() {
   const getMoodStats = useCallback(() => {
     const last30Days = new Date()
     last30Days.setDate(last30Days.getDate() - 30)
-    const recentEntries = entries.filter((e) => new Date(e.createdAt) >= last30Days && e.mood)
+    // Use check-in moods for stats (the daily snapshot)
+    const recentEntries = checkinEntries.filter(
+      (e) => new Date(e.createdAt) >= last30Days && e.mood
+    )
     const moodCounts: Record<Mood, number> = {
       great: 0,
       good: 0,
@@ -289,33 +323,44 @@ export function useWellness() {
       total: recentEntries.length,
       counts: moodCounts,
     }
-  }, [entries])
+  }, [checkinEntries])
 
   const getStreak = useCallback(() => {
     if (entries.length === 0) return 0
-    let streak = 0
+
+    const entryDays = new Set(
+      entries.map((e) => {
+        const raw = e.entryDate || e.createdAt
+        const parts = raw.split("T")[0].split("-")
+        const d = new Date(+parts[0], +parts[1] - 1, +parts[2])
+        d.setHours(0, 0, 0, 0)
+        return d.getTime()
+      })
+    )
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today)
-      checkDate.setDate(checkDate.getDate() - i)
-      const hasEntry = entries.some((e) => {
-        const entryDate = new Date(e.entryDate || e.createdAt)
-        entryDate.setHours(0, 0, 0, 0)
-        return entryDate.getTime() === checkDate.getTime()
-      })
-      if (hasEntry) {
-        streak++
-      } else if (i > 0) {
-        break
-      }
+    let streak = 0
+    let checkDate = new Date(today)
+
+    // If there is no entry today, start counting from yesterday
+    if (!entryDays.has(checkDate.getTime())) {
+      checkDate.setDate(checkDate.getDate() - 1)
     }
+
+    while (entryDays.has(checkDate.getTime())) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+
     return streak
   }, [entries])
 
   return {
     entries,
+    checkinEntries,
+    journalEntries,
     isLoaded,
     isAuthenticated,
     isSyncing,

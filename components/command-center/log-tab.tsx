@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { Plus, Phone, Video, Mail, MessageSquare, FileText, Check, Trash2, ChevronsUpDown, Edit, Calendar, Clock, Filter, History, MoreVertical, AlertCircle } from "lucide-react"
+import { Plus, Phone, Video, Mail, MessageSquare, FileText, Check, Trash2, ChevronsUpDown, Edit, Calendar, Clock, Filter, NotebookText, MoreVertical, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -124,7 +124,7 @@ export function AddCommunicationDialog({
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <History className="w-5 h-5 text-indigo-500" />
+            <NotebookText className="w-5 h-5 text-indigo-500" />
             {editingLog ? "Edit Communication Log" : "Log Communication"}
           </DialogTitle>
           <DialogDescription>Record a past communication for your records</DialogDescription>
@@ -376,6 +376,8 @@ export function LogTab() {
   // View states
   const [logFilter, setLogFilter] = useState<string>("all")
   const [logTypeFilter, setLogTypeFilter] = useState<string>("all")
+  const [openContacts, setOpenContacts] = useState(false)
+  const [search, setSearch] = useState("")
 
   // Derived data
   const contactOptions = contacts.map((c) => ({
@@ -417,6 +419,19 @@ export function LogTab() {
     }
   }
 
+  const filteredContacts = useMemo(() => {
+    const q = search.toLowerCase()
+    return contactOptions.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.email?.toLowerCase().includes(q)
+    ).slice(0,5)
+  }, [contactOptions, search])
+
+  const selectedContact = contactOptions.find(
+    (c) => c.id === logFilter
+  )
+
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -437,39 +452,87 @@ export function LogTab() {
             <Filter className="w-4 h-4 text-muted-foreground" />
             <h3 className="font-medium">Filters</h3>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Contact</Label>
-              <Select value={logFilter} onValueChange={setLogFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Contacts</SelectItem>
-                  {contactOptions.map((contact) => (
-                    <SelectItem key={contact.id} value={contact.id}>
-                      {contact.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <div className="flex justify-between items-end">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact</Label>
+                <Popover open={openContacts} onOpenChange={setOpenContacts}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      role="combobox"
+                      aria-expanded={openContacts}
+                      className="w-full justify-between border border-border dark:border-slate-500 cursor-pointer"
+                    >
+                      {selectedContact
+                        ? `${selectedContact.name} (${selectedContact.email})`
+                        : "Search contacts..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+
+                  <PopoverContent className="w-full p-0">
+                    <Command shouldFilter={false}>
+                      <CommandInput
+                        placeholder="Type name or email..."
+                        value={search}
+                        onValueChange={setSearch}
+                      />
+
+                      <CommandEmpty>No contacts found.</CommandEmpty>
+
+                      <CommandGroup className="max-h-60 overflow-auto">
+                        {filteredContacts.map((contact) => (
+                          <CommandItem
+                            key={contact.id}
+                            value={contact.id}
+                            onSelect={() => {
+                              setLogFilter(contact.id)
+                              setOpenContacts(false)
+                              setSearch("")
+                            }}
+                          >
+                            {contact.name} ({contact.email})
+
+                            <Check
+                              className={cn(
+                                "ml-auto h-4 w-4",
+                                logFilter === contact.id
+                                  ? "opacity-100"
+                                  : "opacity-0"
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={logTypeFilter} onValueChange={setLogTypeFilter}>
+                  <SelectTrigger className="dark:border-slate-500 cursor-pointer">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="call">Phone Call</SelectItem>
+                    <SelectItem value="video">Video Call</SelectItem>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="message">Text/Message</SelectItem>
+                    <SelectItem value="letter">Letter</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={logTypeFilter} onValueChange={setLogTypeFilter}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="call">Phone Call</SelectItem>
-                  <SelectItem value="video">Video Call</SelectItem>
-                  <SelectItem value="email">Email</SelectItem>
-                  <SelectItem value="message">Text/Message</SelectItem>
-                  <SelectItem value="letter">Letter</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Button
+              className="cursor-pointer"
+              onClick={() => setIsLogDialogOpen(true)}
+            >
+              <NotebookText className="w-4 h-4 mr-2" />
+              Log Communication
+            </Button>
           </div>
         </div>
 
@@ -510,7 +573,7 @@ export function LogTab() {
         ) : (
           <div className="text-center py-16 bg-card border rounded-2xl">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-              <History className="w-8 h-8 text-slate-500" />
+              <NotebookText className="w-8 h-8 text-slate-500" />
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">
               {communicationLog.length === 0

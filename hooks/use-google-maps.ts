@@ -8,7 +8,7 @@ import {
   setCachedResults,
   clearCache as clearCacheUtil,
   getCacheStats,
-} from "@/lib/cache-utils"
+} from "@/lib/calender/cache-utils"
 import { createClient } from "@/lib/supabase/client"
 
 declare global {
