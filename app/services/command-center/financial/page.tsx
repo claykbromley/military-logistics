@@ -14,7 +14,7 @@ import { FinanceSummary } from "@/components/financial/finance-summary"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, PiggyBank, LayoutDashboard, TrendingUp, HandHelping, Receipt, Shield, Download, Building2, DollarSign, Target } from "lucide-react"
+import { ArrowLeft, PiggyBank, LayoutDashboard, TrendingUp, HandHelping, Receipt, Shield, Download, Building2, DollarSign, Target, ExternalLink } from "lucide-react"
 import { useAccounts, useBills, useInvestmentRules, useGoals } from "@/hooks/use-financial-manager"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -149,11 +149,11 @@ export default function FinanceDashboard() {
                 </p>
               </div>
             </div>
-            <Button className="bg-white text-primary dark:text-secondary hover:bg-white/90 cursor-pointer">
-              <div className="flex items-center gap-2">
-                <Download className="w-4 h-4 mr-2" />
-                Export PDF
-              </div>
+            <Button asChild className="bg-white text-primary dark:bg-primary dark:text-primary-foreground hover:bg-white/80 dark:hover:bg-primary/80 cursor-pointer">
+              <Link href="/services/financial" className="flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Milify Financial Services
+              </Link>
             </Button>
           </div>
 

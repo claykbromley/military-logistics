@@ -1,11 +1,11 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useEffect } from "react"
 import { 
   DollarSign, FileText, Home, Users, Calendar, MessageSquare, NotebookText,
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
-  Star, Phone, Sparkles, ExternalLink, Shield, Receipt, Zap, Target,
+  Star, Phone, Sparkles, ExternalLink, Flame, Receipt, Zap, Target,
   Wrench, Video, Car, Circle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,55 +14,150 @@ import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
 import { useLegalChecklist } from "@/hooks/use-legal"
+import { useWellness, type Mood } from "@/hooks/use-wellness"
 import { usePets } from "@/hooks/use-pets"
 import { useAccounts, useBills, useInvestmentRules, useGoals } from "@/hooks/use-financial-manager"
 import useSWR from "swr"
+import { createClient } from "@/lib/supabase/client"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
-type Frequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual"
-
-const MONTHLY_MULTIPLIER: Record<Frequency, number> = {
-  weekly: 52 / 12, biweekly: 26 / 12, monthly: 1,
-  quarterly: 1 / 3, semiannual: 1 / 6, annual: 1 / 12,
-}
-
-function toMonthly(amount: number, frequency: Frequency): number {
-  return amount * (MONTHLY_MULTIPLIER[frequency] ?? 1)
-}
-
-function formatCompact(value: number): string {
-  if (Math.abs(value) >= 10_000) {
-    return `$${(value / 1000).toFixed(1)}K`
-  }
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })
-}
-
-function formatCurrency(value: number): string {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  })
-}
-
 export function CommandCenterDashboard() {
-  const { data: accountsData, isLoading: loadingAccounts } = useAccounts()
-  const { data: bills } = useBills()
-  const { data: rules } = useInvestmentRules()
-  const { data: goals } = useGoals()
+
+  // ____________________________ General _________________________________________________
+
+    function formatPhone(input: string | number): string | null {
+    if (input === null || input === undefined) return null;
+    let digits = String(input).replace(/\D/g, "");
+    if (digits.length < 10) return null;
+
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits.startsWith("1")) {
+      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    const countryCodeLength = digits.length - 10;
+    const countryCode = digits.slice(0, countryCodeLength);
+    const rest = digits.slice(countryCodeLength);
+
+    return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+  }
+
+  const formatDate = (dateStr?: string, year?: boolean) => {
+    if (!dateStr) return '—'
+    if (year) {
+      return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric'
+      })
+    }
+    return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: '2-digit',
+    })
+  }
+
+  const daysUntil = (dateStr?: string) => {
+    if (!dateStr) return null
+    const today = new Date()
+    const target = new Date(`${dateStr}T00:00:00`)
+    today.setHours(0, 0, 0, 0)
+    const diffMs = target.getTime() - today.getTime()
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+  }
+
+  function getSoonestByDate<T>(
+    items: T[],
+    getDate: (item: T) => string | null | undefined
+  ): T | null {
+    return items.reduce<T | null>((earliest, item) => {
+      const currentDate = getDate(item)
+      if (!currentDate) return earliest
+
+      if (!earliest) return item
+
+      const earliestDate = getDate(earliest)
+      if (!earliestDate) return item
+
+      return new Date(currentDate) < new Date(earliestDate)
+        ? item
+        : earliest
+    }, null)
+  }
+
+  // ____________________________ Financial _________________________________________________
+
+  const { data: accountsData, mutate: mutateAccounts } = useAccounts()
+  const { data: bills, mutate: mutateBills } = useBills()
+  const { data: rules, mutate: mutateRules } = useInvestmentRules()
+  const { data: goals, mutate: mutateGoals } = useGoals()
+
+  const supabase = useMemo(() => createClient(), [])
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      async (event) => {
+        if (event === "SIGNED_IN") {
+          await Promise.all([
+            mutateAccounts(),
+            mutateBills(),
+            mutateRules(),
+            mutateGoals(),
+          ])
+        }
+
+        if (event === "SIGNED_OUT") {
+          mutateAccounts(undefined, false)
+          mutateBills([], false)
+          mutateRules([], false)
+          mutateGoals([], false)
+        }
+      }
+    )
+
+    return () => subscription.unsubscribe()
+  }, [supabase, mutateAccounts, mutateBills, mutateRules, mutateGoals])
 
   const { data: alpacaAccount } = useSWR<any>(
     "/api/alpaca/account",
     fetcher,
     { onError: () => {}, revalidateOnFocus: false, refreshInterval: 60_000 }
   )
+
+  type Frequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual"
+
+  const MONTHLY_MULTIPLIER: Record<Frequency, number> = {
+    weekly: 52 / 12, biweekly: 26 / 12, monthly: 1,
+    quarterly: 1 / 3, semiannual: 1 / 6, annual: 1 / 12,
+  }
+
+  function toMonthly(amount: number, frequency: Frequency): number {
+    return amount * (MONTHLY_MULTIPLIER[frequency] ?? 1)
+  }
+
+  function formatCompact(value: number): string {
+    if (Math.abs(value) >= 10_000) {
+      return `$${(value / 1000).toFixed(1)}K`
+    }
+    return value.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+  }
+
+  function formatCurrency(value: number): string {
+    return value.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+  }
 
   const accounts = accountsData?.accounts || []
   const billsList = bills || []
@@ -132,17 +227,11 @@ export function CommandCenterDashboard() {
 
   // Deployment readiness
   const bankConnected = accounts.length > 0
-  const billsReviewed = billsList.length > 0
   const investmentsSet = activeRules.length > 0
   const goalsSet = goalsList.length > 0
   const nonEssentialBills = billsList.filter((b) => !b.is_essential)
   const billsOnHold = nonEssentialBills.filter((b) => b.is_on_hold).length
   const holdProgress = nonEssentialBills.length > 0 ? billsOnHold / nonEssentialBills.length : 0
-  const steps = [bankConnected, billsReviewed, investmentsSet, goalsSet]
-  const completedSteps = steps.filter(Boolean).length
-  const deploymentReadiness = Math.round(
-    (completedSteps / steps.length) * 70 + holdProgress * 30
-  )
 
   const financialNotifications = useMemo(() => {
     let count = 0
@@ -153,110 +242,12 @@ export function CommandCenterDashboard() {
     return count
   }, [billsDueSoon, nonEssentialBills.length, holdProgress, investmentsSet, goalsSet, bankConnected])
 
+  // ____________________________ Communications/Contacts _________________________________________________
+
   const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
-
-  const { getPropertiesByType, getUpcomingMaintenance, getExpiringItems } = useProperties()
-  const homes = getPropertiesByType('home').length + getPropertiesByType('rental').length
-  const vehicles = getPropertiesByType('vehicle')
-  const maintenance = getUpcomingMaintenance()
-  const expiringItems = getExpiringItems()
-
-  const { documents, getExpiringDocuments } = useDocuments()
-  const expiringDocuments = getExpiringDocuments()
-  const totalSize = documents.reduce((accumulator, currentItem) => {
-    return accumulator + (currentItem.fileSize || 0);
-  }, 0)
-
-  function formatPhone(input: string | number): string | null {
-    if (input === null || input === undefined) return null;
-    let digits = String(input).replace(/\D/g, "");
-    if (digits.length < 10) return null;
-
-    if (digits.length === 10) {
-      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-    }
-    if (digits.length === 11 && digits.startsWith("1")) {
-      return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    }
-    const countryCodeLength = digits.length - 10;
-    const countryCode = digits.slice(0, countryCodeLength);
-    const rest = digits.slice(countryCodeLength);
-
-    return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
-  }
-
-  const formatDate = (dateStr?: string, year?: boolean) => {
-    if (!dateStr) return '—'
-    if (year) {
-      return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
-        month: 'short',
-        day: '2-digit',
-        year: 'numeric'
-      })
-    }
-    return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
-      month: 'short',
-      day: '2-digit',
-    })
-  }
-
-  const daysUntil = (dateStr?: string) => {
-    if (!dateStr) return null
-    const today = new Date()
-    const target = new Date(`${dateStr}T00:00:00`)
-    today.setHours(0, 0, 0, 0)
-    const diffMs = target.getTime() - today.getTime()
-    return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-  }
-
-  function getSoonestByDate<T>(
-    items: T[],
-    getDate: (item: T) => string | null | undefined
-  ): T | null {
-    return items.reduce<T | null>((earliest, item) => {
-      const currentDate = getDate(item)
-      if (!currentDate) return earliest
-
-      if (!earliest) return item
-
-      const earliestDate = getDate(earliest)
-      if (!earliestDate) return item
-
-      return new Date(currentDate) < new Date(earliestDate)
-        ? item
-        : earliest
-    }, null)
-  }
-
-  function formatFileSize(bytes?: number): string {
-    if (!bytes) return `0 KB`
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-  }
-
-  const { pets, getUpcomingVetVisits } = usePets()
-  const uncoveredPets = pets.filter(pet => !pet.caregiverName)
-  const vetVisit = getSoonestByDate(getUpcomingVetVisits(60), (visit) => visit.record.nextDue)
-  const petEmoji = (petType: String) => {
-    if (petType === 'dog') {return "🐕"}
-    if (petType === 'cat') {return "🐈"}
-    if (petType === 'bird') {return "🐦"}
-    if (petType === 'fish') {return "🐟"}
-    if (petType === 'reptile') {return "🦎"}
-    if (petType === 'small_mammal') {return "🐹"}
-    return "🐾"
-  }
-
-  const soonestMaintenance = getSoonestByDate(maintenance, item => item.nextDue)
-  const soonestMaintenanceType = vehicles.some(item => item['id'] === soonestMaintenance?.propertyId) ? "vehicle" : "other"
-  const soonestExpItem = getSoonestByDate(expiringItems, item => item.date)
-  const soonestExpItemStatus = daysUntil(soonestExpItem?.date)
-  const soonestExpDoc = getSoonestByDate(expiringDocuments, item => item.expirationDate)
-  const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
 
   const upcomingCalls = useMemo(() => {
     const now = Date.now()
@@ -295,6 +286,8 @@ export function CommandCenterDashboard() {
       timeZoneName: "short",
     }).format(date)
   }
+
+  // ____________________________ Legal _________________________________________________
 
   interface ChecklistDef {
     id: string
@@ -335,6 +328,101 @@ export function CommandCenterDashboard() {
   const criticalRemaining = criticalItems.length - criticalDone
   const incompleteCritical = criticalItems.filter((i) => !completionMap[i.id]?.completed).slice(0, 3)
 
+  // ____________________________ Documents _________________________________________________
+
+  const { documents, getExpiringDocuments } = useDocuments()
+  const expiringDocuments = getExpiringDocuments()
+  const totalSize = documents.reduce((accumulator, currentItem) => {
+    return accumulator + (currentItem.fileSize || 0);
+  }, 0)
+
+  function formatFileSize(bytes?: number): string {
+    if (!bytes) return `0 KB`
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const soonestExpDoc = getSoonestByDate(expiringDocuments, item => item.expirationDate)
+  const soonestExpDocStatus = daysUntil(soonestExpDoc?.expirationDate?.split('T')[0])
+
+  // ____________________________ Properties _________________________________________________
+
+  const { getPropertiesByType, getUpcomingMaintenance, getExpiringItems } = useProperties()
+  const homes = getPropertiesByType('home').length + getPropertiesByType('rental').length
+  const vehicles = getPropertiesByType('vehicle')
+  const maintenance = getUpcomingMaintenance()
+  const expiringItems = getExpiringItems()
+
+  const soonestMaintenance = getSoonestByDate(maintenance, item => item.nextDue)
+  const soonestMaintenanceType = vehicles.some(item => item['id'] === soonestMaintenance?.propertyId) ? "vehicle" : "other"
+  const soonestExpItem = getSoonestByDate(expiringItems, item => item.date)
+  const soonestExpItemStatus = daysUntil(soonestExpItem?.date)
+
+  // ____________________________ Pets _________________________________________________
+
+  const { pets, getUpcomingVetVisits } = usePets()
+  const uncoveredPets = pets.filter(pet => !pet.caregiverName)
+  const vetVisit = getSoonestByDate(getUpcomingVetVisits(60), (visit) => visit.record.nextDue)
+  const petEmoji = (petType: String) => {
+    if (petType === 'dog') {return "🐕"}
+    if (petType === 'cat') {return "🐈"}
+    if (petType === 'bird') {return "🐦"}
+    if (petType === 'fish') {return "🐟"}
+    if (petType === 'reptile') {return "🦎"}
+    if (petType === 'small_mammal') {return "🐹"}
+    return "🐾"
+  }
+
+  // ____________________________ Wellness _________________________________________________
+
+  const moodScores: Record<Mood, number> = {
+    great: 5,
+    good: 4,
+    neutral: 3,
+    struggling: 2,
+    difficult: 1,
+  }
+
+  const moodEmojis: string[] = ["💪", "😊", "😐", "😔", "😞"]
+  const moodBgColors: string[] = ["bg-success/40", "bg-chart-4/40", "bg-chart-3/40", "bg-chart-2/40", "bg-destructive/40"]
+
+  const moodColors: Record<Mood, string> = {
+    great: "text-emerald-500",
+    good: "text-sky-500",
+    neutral: "text-amber-500",
+    struggling: "text-orange-500",
+    difficult: "text-red-500",
+  }
+
+  const { entries, checkinEntries, journalEntries, isLoaded, getMoodStats, getStreak } = useWellness()
+  const streak = isLoaded ? getStreak() : 0
+  const totalEntries = entries.length
+
+  // Last 7 check-ins with mood scores for the mini bar chart
+  const last7 = (() => {
+    const days: { score: number }[] = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const ds = d.toLocaleDateString("en-CA")
+      const entry = checkinEntries.find((e) => e.entryDate === ds)
+      days.push({ score: entry?.mood ? moodScores[entry.mood] : 0 })
+    }
+    return days
+  })()
+
+  // Average mood from last 7 days (only days with data)
+  const scored = last7.filter((d) => d.score > 0)
+  const avgMood = scored.length ? (scored.reduce((a, d) => a + d.score, 0) / scored.length) : null
+  const lastEntry = entries.length > 0 ? formatDate(entries[0].createdAt.split("T")[0]) : null
+  
+  // Latest mood
+  const latestMoodEntry = checkinEntries.find((e) => e.mood)
+  const latestMood = latestMoodEntry?.mood
+
+  // ____________________________ Return _________________________________________________
+
   return (
     <section className="py-6 md:py-10 bg-background">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
@@ -367,63 +455,40 @@ export function CommandCenterDashboard() {
 
               {/* Large Primary Display — Net Worth or Deployment Savings */}
               <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-2xl p-6 mb-4 border border-emerald-200/30 dark:border-emerald-700/30">
-                {hasAnyData ? (
-                  <>
-                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      Net Worth
+                <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                  Net Worth
+                </div>
+                <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2 tabular-nums">
+                  {formatCompact(netWorth)}
+                </div>
+                {onHoldSavings > 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                    <span className="font-semibold">
+                      Saving {formatCurrency(onHoldSavings)}/mo
+                    </span>
+                    <span className="text-slate-500 dark:text-slate-400">
+                      from {heldBills.length} paused bill{heldBills.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                ) : goalsList.length > 0 ? (
+                  <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+                    <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full transition-all"
+                        style={{ width: `${goalProgress}%` }}
+                      />
                     </div>
-                    <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2 tabular-nums">
-                      {formatCompact(netWorth)}
-                    </div>
-                    {onHoldSavings > 0 ? (
-                      <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                        <span className="font-semibold">
-                          Saving {formatCurrency(onHoldSavings)}/mo
-                        </span>
-                        <span className="text-slate-500 dark:text-slate-400">
-                          from {heldBills.length} paused bill{heldBills.length !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                    ) : goalsList.length > 0 ? (
-                      <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                        <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full transition-all"
-                            style={{ width: `${goalProgress}%` }}
-                          />
-                        </div>
-                        <span className="font-semibold">{goalProgress}% of goals</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-emerald-700/70 dark:text-emerald-400/70">
-                        <TrendingUp className="w-3.5 h-3.5" />
-                        <span>
-                          {accounts.length} account{accounts.length !== 1 ? "s" : ""} connected
-                          {alpacaConnected ? " + Alpaca" : ""}
-                        </span>
-                      </div>
-                    )}
-                  </>
+                    <span className="font-semibold">{goalProgress}% of goals</span>
+                  </div>
                 ) : (
-                  <>
-                    <div className="text-sm text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      Deployment Readiness
-                    </div>
-                    <div className="text-5xl font-bold text-emerald-700 dark:text-emerald-400 mb-2">
-                      {deploymentReadiness}%
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
-                      <div className="flex-1 bg-emerald-200 dark:bg-emerald-900 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-emerald-600 dark:bg-emerald-500 h-full rounded-full transition-all"
-                          style={{ width: `${deploymentReadiness}%` }}
-                        />
-                      </div>
-                      <span className="font-semibold">{completedSteps}/{steps.length} steps</span>
-                    </div>
-                  </>
+                  <div className="flex items-center gap-2 text-sm text-emerald-700/70 dark:text-emerald-400/70">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>
+                      {accounts.length} account{accounts.length !== 1 ? "s" : ""} connected
+                      {alpacaConnected ? " + Alpaca" : ""}
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -1030,44 +1095,50 @@ export function CommandCenterDashboard() {
                   <Heart className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Wellness Journal</h3>
-                  <span className="text-xs text-slate-600 dark:text-slate-400">34 entries</span>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Wellness Hub</h3>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">
+                    {totalEntries} {totalEntries === 1 ? "entry" : "entries"}
+                  </span>
                 </div>
               </div>
-              
+
               <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-3 mb-3 border border-rose-200/30 dark:border-rose-700/30">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">Current Mood</span>
-                  <div className="flex gap-0.5">
-                    {[1, 2, 3, 4].map(i => (
-                      <Star key={i} className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    ))}
-                    <Star className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600" />
-                  </div>
+                  <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">7-Day Mood</span>
+                  {latestMood && (
+                    <span className={`text-xs font-semibold capitalize ${moodColors[latestMood]}`}>
+                      {latestMood}
+                    </span>
+                  )}
                 </div>
-                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">7.2 / 10 average</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1.5">
+                  {avgMood ? `${avgMood.toFixed(1)} / 5 average` : "No data yet"}
+                </div>
                 <div className="flex gap-1.5">
-                  {[8, 7, 9, 6, 8, 7, 7].map((val, i) => (
-                    <div 
-                      key={i} 
-                      className="flex-1 bg-rose-200 dark:bg-rose-900 rounded-sm overflow-hidden"
-                      style={{ height: '24px' }}
+                  {last7.map((d, i) => (
+                    <div
+                      key={i}
+                      className={`flex-1 ${d.score ? moodBgColors[5 - d.score] : "bg-rose-200/40"} rounded-sm text-center`}
+                      style={{ height: "24px" }}
                     >
-                      <div 
-                        className="bg-rose-500 dark:bg-rose-400 w-full rounded-sm"
-                        style={{ height: `${val * 10}%` }}
-                      ></div>
+                      {moodEmojis[5 - d.score]}
                     </div>
                   ))}
                 </div>
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
-                  <Sparkles className="w-3 h-3" />
-                  7-day streak
+                {streak > 0 ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold">
+                    <Flame className="w-3 h-3" />
+                    {streak}-day streak
+                  </span>
+                ) : (
+                  <span className="text-slate-500 dark:text-slate-400">No streak yet</span>
+                )}
+                <span className="text-slate-600 dark:text-slate-400">
+                  {lastEntry ? `Last: ${lastEntry}` : "Start tracking"}
                 </span>
-                <span className="text-slate-600 dark:text-slate-400">Last: Today</span>
               </div>
             </div>
           </Link>

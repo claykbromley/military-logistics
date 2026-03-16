@@ -569,16 +569,28 @@ function LegalReadinessContent() {
                 </p>
               </div>
             </div>
-            {/* Emergency line - desktop */}
-            <a
-              href="tel:18003429647"
-              className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white/90 hover:bg-white/15 transition-colors text-sm font-semibold"
-              aria-label="Call Military OneSource: 1-800-342-9647"
-            >
-              <PhoneCall className="w-4 h-4" aria-hidden="true" />
-              <span>1-800-342-9647</span>
-              <span className="text-white/50 text-xs font-normal ml-1">24/7</span>
-            </a>
+            <div className="flex gap-4 items-center">
+              <Button asChild className="bg-white text-primary dark:bg-primary dark:text-primary-foreground hover:bg-white/80 dark:hover:bg-primary/80 cursor-pointer">
+                <Link href="/services/legal" className="flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Milify Legal Services
+                </Link>
+              </Button>
+
+              {/* Emergency line - desktop */}
+              <a
+                href="tel:18003429647"
+                className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm font-semibold"
+                aria-label="Call Military OneSource: 1-800-342-9647"
+              >
+                <PhoneCall className="w-4 h-4" aria-hidden="true" />
+                <div>
+                  <div className="font-semibold text-sm">OneSource Legal Help</div>
+                  <div className="text-xs">1-800-342-9647</div>
+                </div>
+                <span className="text-white/50 text-xs font-normal ml-1">24/7</span>
+              </a>
+            </div>
           </div>
 
           {/* Quick Stats */}

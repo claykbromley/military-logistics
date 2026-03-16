@@ -75,36 +75,26 @@ export function useWellness() {
   const [syncError, setSyncError] = useState<string | null>(null)
 
   useEffect(() => {
-    const loadData = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    const supabase = createClient()
 
-      setIsAuthenticated(!!user)
+    const loadEntries = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from("wellness_entries")
+          .select("*")
+          .order("entry_date", { ascending: false })
 
-      if (user) {
-        try {
-          const { data, error } = await supabase
-            .from("wellness_entries")
-            .select("*")
-            .order("entry_date", { ascending: false })
+        if (error) throw error
 
-          if (error) throw error
+        const localEntries = (data || []).map(mapDbToLocal)
+        setEntries(localEntries)
 
-          const localEntries = (data || []).map(mapDbToLocal)
-          setEntries(localEntries)
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
-        } catch (error) {
-          console.error("Error loading wellness entries from Supabase:", error)
-          setSyncError(error instanceof Error ? error.message : "Failed to load")
-          loadFromLocalStorage()
-        }
-      } else {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
+      } catch (error) {
+        console.error("Error loading wellness entries:", error)
+        setSyncError(error instanceof Error ? error.message : "Failed to load")
         loadFromLocalStorage()
       }
-
-      setIsLoaded(true)
     }
 
     const loadFromLocalStorage = () => {
@@ -118,14 +108,41 @@ export function useWellness() {
       }
     }
 
-    loadData()
+    const clearUserData = () => {
+      setEntries([])
+      setIsAuthenticated(false)
+      localStorage.removeItem(STORAGE_KEY)
+    }
 
-    const supabase = createClient()
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsAuthenticated(!!session?.user)
+    // Initial session check (handles page refresh)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user
+
+      if (user) {
+        setIsAuthenticated(true)
+        loadEntries(user.id)
+      } else {
+        loadFromLocalStorage()
+      }
+
+      setIsLoaded(true)
     })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        const user = session?.user
+
+        if (event === "SIGNED_IN" && user) {
+          setIsAuthenticated(true)
+          loadEntries(user.id)
+        }
+
+        if (event === "SIGNED_OUT") {
+          clearUserData()
+        }
+      }
+    )
 
     return () => subscription.unsubscribe()
   }, [])
@@ -138,6 +155,7 @@ export function useWellness() {
 
   const addEntry = useCallback(
     async (entry: Omit<JournalEntry, "id" | "createdAt" | "updatedAt">) => {
+      console.log(entry)
       const now = new Date().toISOString()
       const newEntry: JournalEntry = {
         ...entry,
@@ -308,26 +326,34 @@ export function useWellness() {
   }, [checkinEntries])
 
   const getStreak = useCallback(() => {
-    // Streak counts days that have at least one entry of any type
     if (entries.length === 0) return 0
-    let streak = 0
+
+    const entryDays = new Set(
+      entries.map((e) => {
+        const raw = e.entryDate || e.createdAt
+        const parts = raw.split("T")[0].split("-")
+        const d = new Date(+parts[0], +parts[1] - 1, +parts[2])
+        d.setHours(0, 0, 0, 0)
+        return d.getTime()
+      })
+    )
+
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    for (let i = 0; i < 365; i++) {
-      const checkDate = new Date(today)
-      checkDate.setDate(checkDate.getDate() - i)
-      const hasEntry = entries.some((e) => {
-        const entryDate = new Date(e.entryDate || e.createdAt)
-        entryDate.setHours(0, 0, 0, 0)
-        return entryDate.getTime() === checkDate.getTime()
-      })
-      if (hasEntry) {
-        streak++
-      } else if (i > 0) {
-        break
-      }
+    let streak = 0
+    let checkDate = new Date(today)
+
+    // If there is no entry today, start counting from yesterday
+    if (!entryDays.has(checkDate.getTime())) {
+      checkDate.setDate(checkDate.getDate() - 1)
     }
+
+    while (entryDays.has(checkDate.getTime())) {
+      streak++
+      checkDate.setDate(checkDate.getDate() - 1)
+    }
+
     return streak
   }, [entries])
 

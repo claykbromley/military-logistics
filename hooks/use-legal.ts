@@ -220,8 +220,8 @@ export function useLegalNotes() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+    let cancelled = false;
+    (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()

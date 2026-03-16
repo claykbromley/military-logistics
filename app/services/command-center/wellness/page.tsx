@@ -6,7 +6,7 @@ import { Footer } from "@/components/footer"
 import Link from "next/link"
 import { ArrowLeft, Plus, BookOpen, Smile, Meh, Frown, ChevronDown, Trash2, Edit, Flame, PhoneCall,
   Lock, Unlock, Phone, ExternalLink, Moon, Zap, Dumbbell, Heart, Target, TrendingUp, BarChart3, Activity,
-  Wind, Eye, Hand, Ear, Flower2, Cookie, Loader2, Check } from "lucide-react"
+  Wind, Eye, Hand, Ear, Flower2, Cookie, Loader2, Check, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -46,8 +46,8 @@ const moods: {
     label: "Okay",
     icon: <Meh className="w-4 h-4" />,
     emoji: "😐",
-    cssColor: "var(--holiday)",
-    cssBg: "color-mix(in oklch, var(--holiday) 14%, transparent)",
+    cssColor: "var(--chart-3)",
+    cssBg: "color-mix(in oklch, var(--chart-3) 14%, transparent)",
   },
   {
     value: "struggling",
@@ -250,7 +250,6 @@ function CheckInTab({
 }) {
   const td = todayStr()
   const todayEntry = checkinEntries.find((e) => e.entryDate === td)
-  console.log(checkinEntries, td)
 
   const [mood, setMood] = useState<Mood | undefined>(todayEntry?.mood)
   const [sleep, setSleep] = useState(todayEntry?.sleepHours ?? 7)
@@ -291,7 +290,7 @@ function CheckInTab({
       const d = new Date()
       d.setDate(d.getDate() - i)
       const ds = d.toLocaleDateString("en-CA")
-      // Prefer the check-in entry for mood display, fall back to any entry
+      // Prefer the check-in entry a mood display, fall back to any entry
       const checkin = checkinEntries.find((e) => e.entryDate === ds)
       const any = allEntries.find((e) => e.entryDate === ds)
       days.push({
@@ -824,8 +823,8 @@ function TrendsTab({
       : null
   }, [checkinEntries])
 
-  const totalExercise = useMemo(
-    () => checkinEntries.reduce((a, e) => a + (e.exerciseMinutes || 0), 0),
+  const avgExercise = useMemo(
+    () => Math.round((checkinEntries.reduce((a, e) => a + (e.exerciseMinutes || 0), 0) / checkinEntries.length)),
     [checkinEntries]
   )
 
@@ -839,7 +838,7 @@ function TrendsTab({
           { label: "Check-Ins", value: String(checkinEntries.length), icon: BookOpen, color: "var(--accent)" },
           { label: "Avg Sleep", value: avgSleep ? `${avgSleep}h` : "—", icon: Moon, color: "var(--primary)" },
           { label: "Avg Energy", value: avgEnergy ?? "—", icon: Zap, color: "var(--holiday)" },
-          { label: "Exercise", value: `${totalExercise}m`, icon: Dumbbell, color: "var(--success)" },
+          { label: "Avg Exercise", value: avgExercise ? `${avgExercise}m` : "—", icon: Dumbbell, color: "var(--success)" },
         ].map((s) => (
           <div key={s.label} className="bg-card border rounded-xl p-4 text-center">
             <s.icon className="w-5 h-5 mx-auto mb-1" style={{ color: s.color }} />
@@ -1148,15 +1147,23 @@ export default function WellnessPage() {
     checkinEntries,
     journalEntries,
     isLoaded,
+    isAuthenticated,
     addEntry,
     updateEntry,
     deleteEntry,
     getMoodStats,
     getStreak,
   } = useWellness()
-  const [tab, setTab] = useState<TabId>("checkin")
+  const todayEntry = checkinEntries.find((e) => e.entryDate === todayStr())
+  const [tab, setTab] = useState<TabId>(todayEntry?"trends":"checkin")
   const moodStats = getMoodStats()
   const streak = getStreak()
+
+  useEffect(() => {
+    if (todayEntry) {
+      setTab("trends")
+    }
+  }, [todayEntry])
 
   if (!isLoaded) {
     return (
@@ -1191,6 +1198,14 @@ export default function WellnessPage() {
                 </p>
               </div>
             </div>
+            <div className="flex gap-4 items-center">
+              <Button asChild className="bg-white text-primary dark:bg-primary dark:text-primary-foreground hover:bg-white/80 dark:hover:bg-primary/80 cursor-pointer">
+                <Link href="/services/medical" className="flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Milify Medical Services
+                </Link>
+              </Button>
+
               {/* Emergency line - desktop */}
               <a
                 href="tel:988"
@@ -1204,6 +1219,7 @@ export default function WellnessPage() {
                 </div>
                 <span className="text-white/50 text-xs font-normal ml-1">24/7</span>
               </a>
+            </div>
           </div>
 
           {/* Tabs*/}
@@ -1250,13 +1266,32 @@ export default function WellnessPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20 space-y-5">
+        {/* Auth warning */}
+        {!isAuthenticated && (
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                  Sign in to sync your wellness entries
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300/80 mt-0.5 leading-relaxed">
+                  Your daily check-ins and journal entries are currently stored locally. Sign in to sync them across devices.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {tab === "checkin" && (
           <CheckInTab
             checkinEntries={checkinEntries}
             allEntries={entries}
-            addEntry={addEntry}
-            updateEntry={updateEntry}
+            addEntry={(data) => {addEntry(data); setTab("trends")}}
+            updateEntry={(id, updates) => {updateEntry(id, updates); setTab("trends")}}
             streak={streak}
           />
         )}

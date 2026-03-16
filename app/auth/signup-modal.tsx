@@ -81,7 +81,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
           }}
         />
         {success? 
-        <div className="flex flex-col items-center pt-4 pb-4 border-b-2 border-slate-500">
+        <div className="flex flex-col items-center pt-4 pb-4">
           <div className="text-sm text-muted-foreground">
             <h3 className="text-2xl text-center font-bold">Check Your Email</h3>
             <p className="p-2">We&apos;ve sent you a confirmation link</p>
