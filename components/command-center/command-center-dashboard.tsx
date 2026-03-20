@@ -146,6 +146,17 @@ export function CommandCenterDashboard() {
     fetchUpcomingEntries()
   }, [fetchUpcomingEntries])
 
+  // Re-fetch when auth state changes (sign in / sign out)
+  useEffect(() => {
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED") {
+        fetchUpcomingEntries()
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [fetchUpcomingEntries])
+
   // Realtime subscription for meeting count changes
   useEffect(() => {
     const supabase = createClient()
