@@ -1,4 +1,4 @@
-import type { Business } from "./known-chains"
+import type { Business } from "../known-chains"
 
 export interface CachedLocation {
   lat: number

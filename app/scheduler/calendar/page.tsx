@@ -14,7 +14,7 @@ import {
   expandRecurring,
   defaultFormData,
 } from "./utils"
-import { getFederalHolidays } from "@/lib/federal-holidays"
+import { getFederalHolidays } from "@/lib/calender/federal-holidays"
 
 import { EntryModalProvider, useEntryModal } from "@/components/calendar/use-entry-modal"
 import { ConnectedEntryModal } from "@/components/calendar/entry-modal"

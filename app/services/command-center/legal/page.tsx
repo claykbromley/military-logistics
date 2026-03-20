@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
 import { useDocuments, type Document } from "@/hooks/use-documents"
-import { CommunicationHubProvider } from "@/hooks/use-communication-hub"
+import { CommunicationHubProvider, useCommunicationHub } from "@/hooks/use-communication-hub"
 import {
   useLegalChecklist, useLegalNotes, type NoteRow,
 } from "@/hooks/use-legal"
@@ -134,6 +134,24 @@ const EMERGENCY_HOTLINES = [
 /* ═══════════════════════════════════════════════════════════════
    SUB-COMPONENTS
    ═══════════════════════════════════════════════════════════════ */
+
+function formatPhone(input: string | number): string | null {
+  if (input === null || input === undefined) return null;
+  let digits = String(input).replace(/\D/g, "");
+  if (digits.length < 10) return null;
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const countryCodeLength = digits.length - 10;
+  const countryCode = digits.slice(0, countryCodeLength);
+  const rest = digits.slice(countryCodeLength);
+
+  return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+}
 
 function ReadinessRing({ percentage, size = 136 }: { percentage: number; size?: number }) {
   const radius = (size / 2) - 10
@@ -317,7 +335,7 @@ function LegalResourceCard({ resource }: { resource: LegalResourceLink }) {
           <p className="text-xs text-muted-foreground leading-relaxed">{resource.description}</p>
           {resource.phone && (
             <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent">
-              <Phone className="w-3 h-3" aria-hidden="true" />{resource.phone}
+              <Phone className="w-3 h-3" aria-hidden="true" />{formatPhone(resource.phone)}
             </span>
           )}
         </div>
@@ -444,6 +462,7 @@ function LegalReadinessContent() {
   const { documents, isLoaded: docsLoaded } = useDocuments()
   const { completionMap, loading: checklistLoading, toggle, resetAll, isAuthenticated } = useLegalChecklist()
   const { notes, loading: notesLoading, add: addNote, update: updateNote, remove: removeNote } = useLegalNotes()
+  const { getEmergencyContacts, getPoaHolders, isLoaded: contactsLoaded } = useCommunicationHub()
 
   /* ── Local UI state ── */
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -456,6 +475,8 @@ function LegalReadinessContent() {
   const [shouldScrollToNotes, setShouldScrollToNotes] = useState(false)
 
   const isLoaded = docsLoaded && !checklistLoading && !notesLoading
+  const emergencyContactsList = contactsLoaded ? getEmergencyContacts() : []
+  const poaHolders = contactsLoaded ? getPoaHolders() : []
 
   /* ── Derived stats ── */
   const totalItems = LEGAL_CHECKLIST_ITEMS.length
@@ -525,12 +546,7 @@ function LegalReadinessContent() {
       <Header />
 
       {/* ═══ HERO ═══ */}
-      <div className="relative overflow-hidden border-b bg-primary">
-        {/* Subtle geometric pattern overlay */}
-        <div className="absolute inset-0 opacity-[0.04]" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-        }} aria-hidden="true" />
-
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 relative">
           {/* Top row */}
           <div className="flex items-start sm:items-center justify-between gap-4">
@@ -553,16 +569,28 @@ function LegalReadinessContent() {
                 </p>
               </div>
             </div>
-            {/* Emergency line - desktop */}
-            <a
-              href="tel:18003429647"
-              className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white/90 hover:bg-white/15 transition-colors text-sm font-semibold"
-              aria-label="Call Military OneSource: 1-800-342-9647"
-            >
-              <PhoneCall className="w-4 h-4" aria-hidden="true" />
-              <span>1-800-342-9647</span>
-              <span className="text-white/50 text-xs font-normal ml-1">24/7</span>
-            </a>
+            <div className="flex gap-4 items-center">
+              <Button asChild className="bg-white text-primary dark:bg-primary dark:text-primary-foreground hover:bg-white/80 dark:hover:bg-primary/80 cursor-pointer">
+                <Link href="/services/legal" className="flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Milify Legal Services
+                </Link>
+              </Button>
+
+              {/* Emergency line - desktop */}
+              <a
+                href="tel:18003429647"
+                className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors text-sm font-semibold"
+                aria-label="Call Military OneSource: 1-800-342-9647"
+              >
+                <PhoneCall className="w-4 h-4" aria-hidden="true" />
+                <div>
+                  <div className="font-semibold text-sm">OneSource Legal Help</div>
+                  <div className="text-xs">1-800-342-9647</div>
+                </div>
+                <span className="text-white/50 text-xs font-normal ml-1">24/7</span>
+              </a>
+            </div>
           </div>
 
           {/* Quick Stats */}
@@ -781,6 +809,77 @@ function LegalReadinessContent() {
                 </div>
               </div>
             </div>
+
+            {isLoaded && (emergencyContactsList.length > 0 || poaHolders.length > 0) && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8 shadow-sm">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg text-foreground">Your Quick Reference Card</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Your designated emergency contacts for quick access
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {emergencyContactsList.length > 0 && (
+                    <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <h4 className="text-sm font-semibold text-red-600">Primary Emergency Contact</h4>
+                      </div>
+                      <p className="font-bold text-foreground text-lg">{emergencyContactsList[0].contactName}</p>
+                      {emergencyContactsList[0].relationship && (
+                        <p className="text-sm text-muted-foreground">{emergencyContactsList[0].relationship}</p>
+                      )}
+                      {emergencyContactsList[0].phonePrimary && (
+                        <a
+                          href={`tel:${emergencyContactsList[0].phonePrimary.replace(/[^0-9]/g, "")}`}
+                          className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
+                        >
+                          <Phone className="w-4 h-4" />
+                          {formatPhone(emergencyContactsList[0].phonePrimary)}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  
+                  {poaHolders.length > 0 && (
+                    <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Shield className="w-4 h-4 text-indigo-600" />
+                        <h4 className="text-sm font-semibold text-indigo-600">Power of Attorney</h4>
+                      </div>
+                      <p className="font-bold text-foreground text-lg">{poaHolders[0].contactName}</p>
+                      {poaHolders[0].relationship && (
+                        <p className="text-sm text-muted-foreground">{poaHolders[0].relationship}</p>
+                      )}
+                      {poaHolders[0].phonePrimary && (
+                        <a
+                          href={`tel:${poaHolders[0].phonePrimary.replace(/[^0-9]/g, "")}`}
+                          className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
+                        >
+                          <Phone className="w-4 h-4" />
+                          {formatPhone(poaHolders[0].phonePrimary)}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="mt-4 pt-4 border-t border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Manage all contacts in your{" "}
+                    <a href="/services/command-center/contacts" className="text-blue-600 dark:text-blue-400 hover:underline font-medium">
+                      Emergency Contact Network
+                    </a>
+                  </p>
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {/* ═══════════════════════════════════════════
@@ -842,7 +941,7 @@ function LegalReadinessContent() {
                   <div className="flex items-center gap-3 mt-2.5">
                     {h.phone ? (
                       <a href={`tel:${h.phone}`} className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline" aria-label={`Call ${h.label}: ${h.phone}`}>
-                        <Phone className="w-3.5 h-3.5" aria-hidden="true" />{h.phone}
+                        <Phone className="w-3.5 h-3.5" aria-hidden="true" />{formatPhone(h.phone)}
                       </a>
                     ) : (
                       <a href={h.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline">
@@ -1079,9 +1178,9 @@ function LegalReadinessContent() {
                         <a
                           href={`tel:${contact.phone.replace(/[^0-9]/g, "")}`}
                           className="inline-flex items-center gap-1.5 text-sm font-bold text-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded"
-                          aria-label={`Call ${contact.name}: ${contact.phone}`}
+                          aria-label={`Call ${contact.name}: ${formatPhone(contact.phone)}`}
                         >
-                          <Phone className="w-3.5 h-3.5" aria-hidden="true" />{contact.phone}
+                          <Phone className="w-3.5 h-3.5" aria-hidden="true" />{formatPhone(contact.phone)}
                         </a>
                       )}
                       <a

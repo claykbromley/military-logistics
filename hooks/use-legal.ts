@@ -43,32 +43,58 @@ export function useLegalChecklist() {
   const [rows, setRows] = useState<ChecklistRow[]>([])
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-
   const supabase = useMemo(() => createClient(), [])
 
-  // Auth + initial fetch
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (cancelled) return
-      if (!user) {
-        setLoading(false)
-        return
-      }
-      setUserId(user.id)
+
+    const fetchChecklist = async (userId: string) => {
+      setLoading(true)
 
       const { data } = await supabase
         .from("legal_checklist_items")
         .select("*")
-        .eq("user_id", user.id)
-      if (!cancelled && data) setRows(data)
+        .eq("user_id", userId)
+
+      if (!cancelled && data) {
+        setRows(data)
+      }
+
       setLoading(false)
-    })()
+    }
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (cancelled) return
+
+      if (user) {
+        setUserId(user.id)
+        fetchChecklist(user.id)
+      } else {
+        setUserId(null)
+        setRows([])
+        setLoading(false)
+      }
+    })
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return
+
+      const user = session?.user
+
+      if (user) {
+        setUserId(user.id)
+        fetchChecklist(user.id)
+      } else {
+        setUserId(null)
+        setRows([])
+      }
+    })
+
     return () => {
       cancelled = true
+      subscription.unsubscribe()
     }
   }, [supabase])
 
@@ -194,8 +220,8 @@ export function useLegalNotes() {
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
-    let cancelled = false
-    ;(async () => {
+    let cancelled = false;
+    (async () => {
       const {
         data: { user },
       } = await supabase.auth.getUser()

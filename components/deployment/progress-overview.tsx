@@ -14,11 +14,11 @@ export function ProgressOverview({ categories }: ProgressOverviewProps) {
   if (!isLoaded) {
     return (
       <div className="bg-card border border-border rounded-lg p-6 animate-pulse">
-        <div className="h-6 w-48 bg-muted rounded mb-4" />
-        <div className="h-4 w-full bg-muted rounded mb-6" />
+        <div className="h-6 w-48 bg-muted dark:bg-background rounded mb-4" />
+        <div className="h-4 w-full bg-muted dark:bg-background rounded mb-6" />
         <div className="grid grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-16 bg-muted rounded" />
+            <div key={i} className="h-16 bg-muted dark:bg-background rounded" />
           ))}
         </div>
       </div>
@@ -62,7 +62,7 @@ export function ProgressOverview({ categories }: ProgressOverviewProps) {
           <span className="text-muted-foreground">Completion</span>
           <span className="font-medium text-foreground">{overall.percentage}%</span>
         </div>
-        <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
+        <div className="w-full h-3 bg-muted dark:bg-background rounded-full overflow-hidden">
           <div
             className="h-full bg-accent transition-all duration-500"
             style={{ width: `${overall.percentage}%` }}
@@ -77,7 +77,7 @@ export function ProgressOverview({ categories }: ProgressOverviewProps) {
           return (
             <div
               key={category}
-              className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg"
+              className="flex items-center gap-2 p-3 bg-muted/50 dark:bg-background/50 rounded-lg"
             >
               {isComplete ? (
                 <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />

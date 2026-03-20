@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { ArrowLeft, Calendar, CalendarPlus, MessageCircle, History, AlertCircle, Users } from "lucide-react"
+import { ArrowLeft, Calendar, CalendarPlus, MessageCircle, NotebookText, AlertCircle, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -227,7 +227,7 @@ function CommunicationHubPageInner({
       <Header />
 
       {/* Hero Header */}
-      <div className="relative overflow-hidden border-b bg-primary">
+      <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
@@ -259,11 +259,11 @@ function CommunicationHubPageInner({
                 className="bg-white/10 hover:bg-white/20 text-white border-white/20 cursor-pointer"
                 onClick={() => setIsLogDialogOpen(true)}
               >
-                <History className="w-4 h-4 mr-2" />
+                <NotebookText className="w-4 h-4 mr-2" />
                 Log Communication
               </Button>
               <Button
-                className="bg-white text-primary hover:bg-white/90 cursor-pointer"
+                className="bg-white text-primary dark:text-secondary hover:bg-white/70 cursor-pointer"
                 onClick={() => openEntryModal()}
               >
                 <CalendarPlus className="w-4 h-4 mr-2" />
@@ -303,7 +303,7 @@ function CommunicationHubPageInner({
             <div className="bg-white/10 backdrop-blur rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                  <History className="w-5 h-5 text-white" />
+                  <NotebookText className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-white">{totalLogs}</p>
@@ -318,7 +318,7 @@ function CommunicationHubPageInner({
       {/* Mobile Actions */}
       <div className="sm:hidden flex gap-2 p-4 border-b bg-background">
         <Button variant="outline" className="flex-1" onClick={() => setIsLogDialogOpen(true)}>
-          <History className="w-4 h-4 mr-2" />
+          <NotebookText className="w-4 h-4 mr-2" />
           Log
         </Button>
         <Button className="flex-1" onClick={() => openEntryModal()}>
@@ -345,7 +345,7 @@ function CommunicationHubPageInner({
               )}
             </TabsTrigger>
             <TabsTrigger value="logs" className="gap-2">
-              <History className="w-4 h-4" />
+              <NotebookText className="w-4 h-4" />
               Logs
             </TabsTrigger>
           </TabsList>

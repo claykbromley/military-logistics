@@ -42,6 +42,24 @@ const emergencyContacts = [
   },
 ]
 
+function formatPhone(input: string | number): string | null {
+  if (input === null || input === undefined) return null;
+  let digits = String(input).replace(/\D/g, "");
+  if (digits.length < 10) return null;
+
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const countryCodeLength = digits.length - 10;
+  const countryCode = digits.slice(0, countryCodeLength);
+  const rest = digits.slice(countryCodeLength);
+
+  return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
+}
+
 export function EmergencyContacts() {
   const { getEmergencyContacts, getPoaHolders, isLoaded } = useCommunicationHub()
   
@@ -92,7 +110,7 @@ export function EmergencyContacts() {
                       className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
                     >
                       <Phone className="w-4 h-4" />
-                      {emergencyContactsList[0].phonePrimary}
+                      {formatPhone(emergencyContactsList[0].phonePrimary)}
                     </a>
                   )}
                 </div>
@@ -114,7 +132,7 @@ export function EmergencyContacts() {
                       className="inline-flex items-center gap-1.5 text-blue-600 dark:text-blue-400 font-medium mt-2 hover:underline"
                     >
                       <Phone className="w-4 h-4" />
-                      {poaHolders[0].phonePrimary}
+                      {formatPhone(poaHolders[0].phonePrimary)}
                     </a>
                   )}
                 </div>

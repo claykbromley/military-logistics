@@ -14,8 +14,8 @@ import {
   subMonths,
 } from "date-fns"
 import { ChevronLeft, ChevronRight } from "lucide-react"
-import type { CalendarEvent } from "@/lib/calendar-types"
-import { GOLD_DOT, HOLIDAY_STYLE } from "@/lib/event-colors"
+import type { CalendarEvent } from "@/lib/calender/calendar-types"
+import { GOLD_DOT, HOLIDAY_STYLE } from "@/lib/calender/event-colors"
 import { cn } from "@/lib/utils"
 
 interface MiniMonthCalendarProps {

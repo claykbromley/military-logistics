@@ -618,9 +618,6 @@ export function Header() {
                         rel="noopener noreferrer"
                         className="cursor-pointer"
                       >
-                        <span className="font-mono text-xs text-muted-foreground w-10">
-                          {branch.abbr}
-                        </span>
                         {branch.name}
                       </a>
                     </DropdownMenuItem>
@@ -770,7 +767,7 @@ export function Header() {
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
-                        className="cursor-pointer text-red-600 focus:text-red-600"
+                        className="cursor-pointer text-red-600 focus:text-white"
                         onClick={handleSignOut}
                       >
                         <LogOut className="mr-2 h-4 w-4" />
