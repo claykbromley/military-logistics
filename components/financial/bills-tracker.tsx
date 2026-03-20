@@ -299,6 +299,116 @@ function BillForm({
   )
 }
 
+/* ───────────────────── Bill → Calendar sync ────────────────────── */
+
+function billFrequencyToRecurrence(freq: Frequency): {
+  recurrence_freq: string; recurrence_interval: number
+} {
+  switch (freq) {
+    case "weekly":     return { recurrence_freq: "weekly",  recurrence_interval: 1 }
+    case "biweekly":   return { recurrence_freq: "weekly",  recurrence_interval: 2 }
+    case "monthly":    return { recurrence_freq: "monthly", recurrence_interval: 1 }
+    case "quarterly":  return { recurrence_freq: "monthly", recurrence_interval: 3 }
+    case "semiannual": return { recurrence_freq: "monthly", recurrence_interval: 6 }
+    case "annual":     return { recurrence_freq: "yearly",  recurrence_interval: 1 }
+    default:           return { recurrence_freq: "monthly", recurrence_interval: 1 }
+  }
+}
+
+function getDefaultBillDate(frequency: Frequency): string {
+  const now = new Date()
+  if (frequency === "weekly" || frequency === "biweekly") {
+    // Default to the current day of the week (i.e. today)
+    const y = now.getFullYear()
+    const m = String(now.getMonth() + 1).padStart(2, "0")
+    const d = String(now.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+  }
+  // Monthly or longer: default to the 1st of next month
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+  const y = next.getFullYear()
+  const m = String(next.getMonth() + 1).padStart(2, "0")
+  return `${y}-${m}-01`
+}
+
+async function syncBillCalendarEvent(
+  billId: string,
+  billName: string,
+  amount: number,
+  frequency: Frequency,
+  nextDate: string | undefined | null,
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const tag = `[bill:${billId}]`
+  const dueDate = nextDate || getDefaultBillDate(frequency)
+  const { recurrence_freq, recurrence_interval } = billFrequencyToRecurrence(frequency)
+
+  const startTime = new Date(`${dueDate}T00:00:00`).toISOString()
+  const endTime = new Date(`${dueDate}T23:59:59`).toISOString()
+  const title = `${billName} — $${amount.toFixed(2)} due`
+  const description = `${frequencyLabel(frequency)} bill: ${billName} ($${amount.toFixed(2)})`
+  const eventColor = "#ef4444" // red for bills
+
+  // Check for existing calendar entry
+  const { data: existing } = await supabase
+    .from("calendar_entries")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("source", "bill")
+    .eq("linked_entity_tag", tag)
+    .maybeSingle()
+
+  const payload = {
+    title,
+    description,
+    color: eventColor,
+    start_time: startTime,
+    end_time: endTime,
+    all_day: true,
+    is_recurring: true,
+    recurrence_freq,
+    recurrence_interval,
+    linked_entity_tag: tag,
+  }
+
+  if (existing) {
+    await supabase.from("calendar_entries")
+      .update(payload)
+      .eq("id", existing.id)
+  } else {
+    await supabase.from("calendar_entries")
+      .insert({
+        user_id: user.id,
+        type: "event" as const,
+        source: "bill",
+        ...payload,
+      })
+  }
+}
+
+async function deleteBillCalendarEvent(billId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const tag = `[bill:${billId}]`
+  const { data: entries } = await supabase
+    .from("calendar_entries")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("source", "bill")
+    .eq("linked_entity_tag", tag)
+
+  if (entries && entries.length > 0) {
+    await supabase.from("calendar_entries")
+      .delete()
+      .in("id", entries.map((e: any) => e.id))
+  }
+}
+
 /* ───────────────────────── Main Component ───────────────────────── */
 
 export function BillsTracker() {
@@ -364,7 +474,10 @@ export function BillsTracker() {
   /* ── Delete ── */
   const deleteBill = async (id: string) => {
     setDeletingId(id)
-    try { await deleteBillFromDb(id) }
+    try {
+      await deleteBillFromDb(id)
+      await deleteBillCalendarEvent(id)
+    }
     catch (err) { console.error("Delete failed:", err) }
     setDeletingId(null)
   }
@@ -383,6 +496,31 @@ export function BillsTracker() {
         is_essential: newBill.is_essential,
         next_date: newBill.next_date || undefined,
       })
+
+      // Find the just-created bill to get its ID for calendar sync
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: match } = await supabase
+          .from("bills")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("name", newBill.name)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (match) {
+          await syncBillCalendarEvent(
+            match.id,
+            newBill.merchant_name || newBill.name,
+            parseFloat(newBill.amount),
+            newBill.frequency,
+            newBill.next_date || undefined,
+          )
+        }
+      }
+
       setNewBill({ ...EMPTY_FORM })
       setIsAddDialogOpen(false)
     } catch (err) { console.error("Add bill failed:", err) }
@@ -417,6 +555,16 @@ export function BillsTracker() {
         account_id: editForm.account_id || null,
         next_date: editForm.next_date || null,
       })
+
+      // Sync calendar event with updated bill data
+      await syncBillCalendarEvent(
+        editingBill.id,
+        editForm.merchant_name || editForm.name,
+        parseFloat(editForm.amount),
+        editForm.frequency,
+        editForm.next_date || undefined,
+      )
+
       setIsEditDialogOpen(false)
       setEditingBill(null)
     } catch (err) { console.error("Edit bill failed:", err) }
