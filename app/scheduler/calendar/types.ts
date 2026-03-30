@@ -29,6 +29,9 @@ export interface CalendarEntry {
   timezone: string | null
   meeting_link: string | null
   linked_entity_tag: string | null
+  task_list_id: string | null
+  task_priority: string
+  task_sort_order: number
   created_at: string
   updated_at: string
 }
