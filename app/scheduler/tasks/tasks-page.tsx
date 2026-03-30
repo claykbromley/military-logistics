@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
+import { Header } from "@/components/header"
 
 /* ═══════════════════════ Types ═══════════════════════ */
 
@@ -321,6 +322,8 @@ export function MilitaryTasksPage() {
   )
 
   return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <Header />
     <div className="flex h-[calc(100vh-140px)] gap-0 bg-background rounded-2xl border border-border overflow-hidden shadow-sm">
       {/* ─── Sidebar ─── */}
       <aside className="w-64 flex-shrink-0 border-r border-border bg-muted/20 flex flex-col">
@@ -560,6 +563,7 @@ export function MilitaryTasksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   )
 }
