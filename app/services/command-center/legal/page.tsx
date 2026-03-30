@@ -647,25 +647,25 @@ function LegalReadinessContent() {
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="w-full justify-start overflow-x-auto bg-muted/50 p-1 rounded-xl h-auto flex-wrap" aria-label="Legal readiness sections">
-            <TabsTrigger value="dashboard" className="rounded-lg gap-1.5 text-xs sm:text-sm data-[state=active]:shadow-sm">
-              <LayoutDashboard className="w-3.5 h-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">Dashboard</span><span className="sm:hidden">Home</span>
-            </TabsTrigger>
-            <TabsTrigger value="checklist" className="rounded-lg gap-1.5 text-xs sm:text-sm data-[state=active]:shadow-sm">
-              <ClipboardCheck className="w-3.5 h-3.5" aria-hidden="true" />Checklist
-            </TabsTrigger>
-            <TabsTrigger value="resources" className="rounded-lg gap-1.5 text-xs sm:text-sm data-[state=active]:shadow-sm">
-              <Library className="w-3.5 h-3.5" aria-hidden="true" />Resources
-            </TabsTrigger>
-            <TabsTrigger value="scra-guide" className="rounded-lg gap-1.5 text-xs sm:text-sm data-[state=active]:shadow-sm">
-              <Gavel className="w-3.5 h-3.5" aria-hidden="true" />SCRA Guide
-            </TabsTrigger>
-            <TabsTrigger value="get-help" className="rounded-lg gap-1.5 text-xs sm:text-sm data-[state=active]:shadow-sm">
-              <HandHelping className="w-3.5 h-3.5" aria-hidden="true" />Get Help
-            </TabsTrigger>
+          <TabsList className="w-full h-auto flex gap-3 overflow-x-auto rounded-2xl bg-muted/60 p-1.5 backdrop-blur-sm border border-border shadow-sm">
+            {[
+              { value: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
+              { value: "checklist", icon: ClipboardCheck, label: "Checklist" },
+              { value: "resources", icon: Library, label: "Resources" },
+              { value: "scra-guide", icon: Gavel, label: "SCRA Guide" },
+              { value: "get-help", icon: HandHelping, label: "Get Help" },
+            ].map(({ value, icon: Icon, label }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-2 rounded-xl text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-accent/10 data-[state=active]:!bg-primary/30 data-[state=active]:!text-foreground cursor-pointer"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">{label}</span>
+              </TabsTrigger>
+            ))}
           </TabsList>
-
+          
           {/* ═══════════════════════════════════════════
               TAB: DASHBOARD
               ═══════════════════════════════════════════ */}

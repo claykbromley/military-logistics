@@ -6,10 +6,13 @@ import {
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink, Flame, Receipt, Zap, Target,
-  Wrench, Video, Car, Circle
+  Wrench, Video, Car, Circle, Search, MapPin
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import Link from "next/link"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { useProperties } from "@/hooks/use-properties"
 import { useDocuments } from "@/hooks/use-documents"
@@ -21,8 +24,151 @@ import useSWR from "swr"
 import { createClient } from "@/lib/supabase/client"
 import type { CalendarEntry } from "@/app/scheduler/calendar/types"
 import { getNextOccurrence } from "@/app/scheduler/calendar/utils"
+import { useCareer, ENLISTED_RANKS, WARRANT_RANKS, OFFICER_RANKS, } from "@/hooks/use-career"
+import { PAYGRADES } from "@/lib/types"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
+
+/* ─────────────────────────────────────────────
+   Full-page loading screen
+   ───────────────────────────────────────────── */
+
+function DashboardLoadingScreen() {
+  const [dots, setDots] = useState("")
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."))
+    }, 500)
+    return () => clearInterval(interval)
+  }, [])
+
+  const shimmerCards = [
+    { gradient: "from-emerald-100/60 to-teal-100/60 dark:from-emerald-900/20 dark:to-teal-900/20", span: "lg:col-span-5 lg:row-span-2" },
+    { gradient: "from-purple-100/60 to-pink-100/60 dark:from-purple-900/20 dark:to-pink-900/20", span: "lg:col-span-7" },
+    { gradient: "from-cyan-100/60 to-blue-100/60 dark:from-cyan-900/20 dark:to-blue-900/20", span: "lg:col-span-4" },
+    { gradient: "from-orange-100/60 to-red-100/60 dark:from-orange-900/20 dark:to-red-900/20", span: "lg:col-span-3" },
+  ]
+
+  const secondaryCards = [
+    "from-blue-100/60 to-indigo-100/60 dark:from-blue-900/20 dark:to-indigo-900/20",
+    "from-amber-100/60 to-orange-100/60 dark:from-amber-900/20 dark:to-orange-900/20",
+    "from-red-100/60 to-rose-100/60 dark:from-red-900/20 dark:to-rose-900/20",
+    "from-pink-100/60 to-fuchsia-100/60 dark:from-pink-900/20 dark:to-fuchsia-900/20",
+    "from-rose-100/60 to-pink-100/60 dark:from-rose-900/20 dark:to-pink-900/20",
+    "from-violet-100/60 to-purple-100/60 dark:from-violet-900/20 dark:to-purple-900/20",
+  ]
+
+  return (
+    <section className="py-6 md:py-10 bg-background">
+      <style jsx>{`
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes pulse-soft {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 0.8; }
+        }
+      `}</style>
+
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
+        {/* Loading header */}
+        <div className="flex items-center justify-center gap-3 mb-8">
+          <div className="relative flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-slate-200 dark:bg-slate-700 animate-pulse" />
+            <div className="absolute inset-0 rounded-xl border-2 border-slate-300 dark:border-slate-600 animate-ping opacity-20" />
+          </div>
+          <div>
+            <div className="text-lg font-semibold text-slate-500 dark:text-slate-400">
+              Loading Command Center{dots}
+            </div>
+            <div className="text-xs text-slate-400 dark:text-slate-500">Syncing your data</div>
+          </div>
+        </div>
+
+        {/* Primary grid skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
+          {shimmerCards.map((card, i) => (
+            <div key={i} className={card.span}>
+              <div
+                className={`bg-gradient-to-br ${card.gradient} rounded-2xl border border-slate-200/30 dark:border-slate-700/30 shadow-sm overflow-hidden h-full`}
+                style={{ minHeight: card.span.includes("row-span-2") ? "420px" : "200px", animation: "pulse-soft 2s ease-in-out infinite", animationDelay: `${i * 200}ms` }}
+              >
+                <div className="p-6">
+                  {/* Header shimmer */}
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-11 h-11 rounded-xl bg-slate-300/50 dark:bg-slate-600/50" />
+                    <div className="flex-1">
+                      <div className="relative overflow-hidden h-5 w-36 rounded bg-slate-300/40 dark:bg-slate-600/40 mb-1.5">
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/30 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 150}ms` }} />
+                      </div>
+                      <div className="relative overflow-hidden h-3 w-24 rounded bg-slate-300/30 dark:bg-slate-600/30">
+                        <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/30 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 150 + 100}ms` }} />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Content shimmer blocks */}
+                  <div className="space-y-3">
+                    <div className="relative overflow-hidden h-20 rounded-xl bg-slate-300/25 dark:bg-slate-600/25">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 150 + 200}ms` }} />
+                    </div>
+                    {card.span.includes("row-span-2") && (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          {[0, 1, 2, 3].map((j) => (
+                            <div key={j} className="relative overflow-hidden h-24 rounded-xl bg-slate-300/20 dark:bg-slate-600/20">
+                              <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent" style={{ animationDelay: `${j * 100 + 300}ms` }} />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="relative overflow-hidden h-10 rounded-lg bg-slate-300/30 dark:bg-slate-600/30">
+                          <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Secondary grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {secondaryCards.map((gradient, i) => (
+            <div
+              key={i}
+              className={`bg-gradient-to-br ${gradient} rounded-xl border border-slate-200/30 dark:border-slate-700/30 shadow-sm overflow-hidden`}
+              style={{ minHeight: "180px", animation: "pulse-soft 2s ease-in-out infinite", animationDelay: `${(i + 4) * 200}ms` }}
+            >
+              <div className="p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl bg-slate-300/50 dark:bg-slate-600/50" />
+                  <div>
+                    <div className="relative overflow-hidden h-4 w-28 rounded bg-slate-300/40 dark:bg-slate-600/40 mb-1.5">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/30 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 120}ms` }} />
+                    </div>
+                    <div className="relative overflow-hidden h-3 w-20 rounded bg-slate-300/30 dark:bg-slate-600/30">
+                      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/30 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 120 + 80}ms` }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="relative overflow-hidden h-16 rounded-lg bg-slate-300/25 dark:bg-slate-600/25">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent" style={{ animationDelay: `${i * 120 + 160}ms` }} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ─────────────────────────────────────────────
+   Main Component
+   ───────────────────────────────────────────── */
 
 export function CommandCenterDashboard() {
 
@@ -91,10 +237,17 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Financial _________________________________________________
 
-  const { data: accountsData, mutate: mutateAccounts } = useAccounts()
-  const { data: bills, mutate: mutateBills } = useBills()
-  const { data: rules, mutate: mutateRules } = useInvestmentRules()
-  const { data: goals, mutate: mutateGoals } = useGoals()
+  const { data: accountsData, mutate: mutateAccounts, isLoading: isAccountsLoading } = useAccounts()
+  const { data: bills, mutate: mutateBills, isLoading: isBillsLoading } = useBills()
+  const { data: rules, mutate: mutateRules, isLoading: isRulesLoading } = useInvestmentRules()
+  const { data: goals, mutate: mutateGoals, isLoading: isGoalsLoading } = useGoals()
+  const { data: alpacaAccount, mutate: mutateAlpaca, isLoading: isAlpacaLoading } = useSWR<any>(
+    "/api/alpaca/account",
+    fetcher,
+    { onError: () => {}, revalidateOnFocus: false, refreshInterval: 60_000 }
+  )
+
+  const financialLoaded = !isAccountsLoading && !isBillsLoading && !isRulesLoading && !isGoalsLoading && !isAlpacaLoading
 
   const supabase = useMemo(() => createClient(), [])
   useEffect(() => {
@@ -108,6 +261,7 @@ export function CommandCenterDashboard() {
             mutateBills(),
             mutateRules(),
             mutateGoals(),
+            mutateAlpaca()
           ])
         }
 
@@ -116,6 +270,7 @@ export function CommandCenterDashboard() {
           mutateBills([], false)
           mutateRules([], false)
           mutateGoals([], false)
+          mutateAlpaca(undefined, false)
         }
       }
     )
@@ -123,11 +278,7 @@ export function CommandCenterDashboard() {
     return () => subscription.unsubscribe()
   }, [supabase, mutateAccounts, mutateBills, mutateRules, mutateGoals])
 
-  const { data: alpacaAccount } = useSWR<any>(
-    "/api/alpaca/account",
-    fetcher,
-    { onError: () => {}, revalidateOnFocus: false, refreshInterval: 60_000 }
-  )
+  
 
   type Frequency = "weekly" | "biweekly" | "monthly" | "quarterly" | "semiannual" | "annual"
 
@@ -246,7 +397,7 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Communications/Contacts _________________________________________________
 
-  const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog } = useCommunicationHub()
+  const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog, isLoaded: commLoaded } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
@@ -295,11 +446,15 @@ export function CommandCenterDashboard() {
   const [meetingCount, setMeetingCount] = useState(0)
   const [upcomingEvents, setUpcomingEvents] = useState<(CalendarEntry & { _nextOccurrence: Date })[]>([])
   const [eventCount, setEventCount] = useState(0)
+  const [calendarLoaded, setCalendarLoaded] = useState(false)
 
   const fetchUpcomingEntries = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setCalendarLoaded(true)
+      return
+    }
 
     const { data, error } = await supabase
       .from("calendar_entries")
@@ -313,6 +468,7 @@ export function CommandCenterDashboard() {
       setMeetingCount(0)
       setUpcomingEvents([])
       setEventCount(0)
+      setCalendarLoaded(true)
       return
     }
 
@@ -339,6 +495,7 @@ export function CommandCenterDashboard() {
     // All events for calendar card
     setEventCount(allResolved.length)
     setUpcomingEvents(allResolved)
+    setCalendarLoaded(true)
   }, [])
 
   useEffect(() => {
@@ -402,7 +559,7 @@ export function CommandCenterDashboard() {
     { id: "mail-forwarding", label: "Mail Forwarding", priority: "optional" },
   ]
 
-  const { completionMap } = useLegalChecklist()
+  const { completionMap, loading: legalLoading } = useLegalChecklist()
 
   const total = LEGALCHECKLIST.length
   const done = LEGALCHECKLIST.filter((i) => completionMap[i.id]?.completed).length
@@ -414,7 +571,7 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Documents _________________________________________________
 
-  const { documents, getExpiringDocuments } = useDocuments()
+  const { documents, getExpiringDocuments, isLoaded: docsLoaded } = useDocuments()
   const expiringDocuments = getExpiringDocuments()
   const totalSize = documents.reduce((accumulator, currentItem) => {
     return accumulator + (currentItem.fileSize || 0);
@@ -432,7 +589,7 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Properties _________________________________________________
 
-  const { getPropertiesByType, getUpcomingMaintenance, getExpiringItems } = useProperties()
+  const { getPropertiesByType, getUpcomingMaintenance, getExpiringItems, isLoaded: propsLoaded } = useProperties()
   const homes = getPropertiesByType('home').length + getPropertiesByType('rental').length
   const vehicles = getPropertiesByType('vehicle')
   const maintenance = getUpcomingMaintenance()
@@ -445,7 +602,7 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Pets _________________________________________________
 
-  const { pets, getUpcomingVetVisits } = usePets()
+  const { pets, getUpcomingVetVisits, isLoaded: petsLoaded } = usePets()
   const uncoveredPets = pets.filter(pet => !pet.caregiverName)
   const vetVisit = getSoonestByDate(getUpcomingVetVisits(60), (visit) => visit.record.nextDue)
   const petEmoji = (petType: String) => {
@@ -479,8 +636,8 @@ export function CommandCenterDashboard() {
     difficult: "text-red-500",
   }
 
-  const { entries, checkinEntries, journalEntries, isLoaded, getMoodStats, getStreak } = useWellness()
-  const streak = isLoaded ? getStreak() : 0
+  const { entries, checkinEntries, isLoaded: wellnessLoaded, getStreak } = useWellness()
+  const streak = wellnessLoaded ? getStreak() : 0
   const totalEntries = entries.length
 
   // Last 7 check-ins with mood scores for the mini bar chart
@@ -505,10 +662,58 @@ export function CommandCenterDashboard() {
   const latestMoodEntry = checkinEntries.find((e) => e.mood)
   const latestMood = latestMoodEntry?.mood
 
+  // ____________________________ Career _________________________________________________
+
+  const { profile, zipInput, updateProfile, lookupBAH, getBasePay, getBAH, getBAS, setZipInput } = useCareer()
+  const [monthlyBonus, setMonthlyBonus] = useState("")
+
+  useEffect(() => {
+    if (profile?.zipCode) {
+      setZipInput(profile.zipCode)
+    }
+  }, [profile?.zipCode])
+
+  const handleZipLookup = () => {
+    if (zipInput.length >= 5) {
+      lookupBAH(zipInput)
+    }
+  }
+
+  const currentRank = PAYGRADES.find(p => p.label === (profile.rank)) || { value: "e5", label: "E-5", next: "E-6", note: "Promotion board, ~4-6 YOS typical" }
+  const yos = profile.yearsOfService
+  const basePay = getBasePay(currentRank.label, yos)
+  const bas = getBAS(currentRank.label)
+  const hasDependents = profile.dependentStatus
+  const bah = getBAH(currentRank.value, hasDependents)
+  const totalMonthlyComp = basePay + bas + bah + Number(monthlyBonus)
+  
+  // ____________________________ All-loaded gate _________________________________________________
+  console.log(financialLoaded, commLoaded, calendarLoaded, legalLoading, docsLoaded, propsLoaded, petsLoaded, wellnessLoaded)
+  const allLoaded = financialLoaded
+    && (commLoaded ?? true)
+    && calendarLoaded
+    && (!legalLoading)
+    && (docsLoaded ?? true)
+    && (propsLoaded ?? true)
+    && (petsLoaded ?? true)
+    && wellnessLoaded
+
+  // Show the loading screen until everything is ready
+  if (!allLoaded) {
+    return <DashboardLoadingScreen />
+  }
+
   // ____________________________ Return _________________________________________________
 
   return (
-    <section className="py-6 md:py-10 bg-background">
+    <section className="py-6 md:py-10 bg-background animate-[fadeIn_0.5s_ease-out]">
+      <style jsx>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6">
         {/* Main Grid Layout - Asymmetric */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
@@ -1209,7 +1414,7 @@ export function CommandCenterDashboard() {
                   )}
                 </div>
                 <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1.5">
-                  {avgMood ? `${avgMood.toFixed(1)} / 5 average` : "No data yet"}
+                  {avgMood ? `${avgMood.toFixed(1)} / 5 average` : "No data in last 7 days"}
                 </div>
                 <div className="flex gap-1.5">
                   {last7.map((d, i) => (
@@ -1241,47 +1446,132 @@ export function CommandCenterDashboard() {
           </Link>
 
           {/* Career & Benefits */}
-          <Link href="/services/command-center/career" className="group">
-            <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/40 dark:to-purple-950/30 rounded-xl p-5 border border-violet-200/50 dark:border-violet-800/50 shadow-sm hover:shadow-lg hover:border-violet-300 dark:hover:border-violet-600 transition-all h-full">
-              <div className="flex items-center gap-3 mb-4">
+          <div className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/40 dark:to-purple-950/30 rounded-xl p-5 border border-violet-200/50 dark:border-violet-800/50 shadow-sm hover:shadow-lg hover:border-violet-300 dark:hover:border-violet-600 transition-all h-full">
+            <Link href="/services/command-center/career" className="group block mb-4">
+              <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-xl bg-violet-600 dark:bg-violet-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                   <Briefcase className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900 dark:text-slate-100">Career & Benefits</h3>
-                  <span className="text-xs text-slate-600 dark:text-slate-400">Active duty</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-400">Pay calculator & benefits tracker</span>
                 </div>
               </div>
-              
-              <div className="space-y-2 mb-3">
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30 dark:border-violet-700/30">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">TSP Contribution</span>
-                    <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                  </div>
-                  <div className="text-lg font-bold text-violet-700 dark:text-violet-400">15%</div>
-                  <div className="flex-1 bg-violet-200 dark:bg-violet-900 rounded-full h-1.5 overflow-hidden mt-1">
-                    <div className="bg-violet-600 dark:bg-violet-500 h-full rounded-full w-3/4"></div>
+            </Link>
+
+            {/* Interactive inputs — NOT inside a Link */}
+            <div className="space-y-2.5 mb-3">
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5 block">Rank</label>
+                  <Select value={profile.rank} onValueChange={(v) => updateProfile({ rank: v })}>
+                    <SelectTrigger className="h-8 text-xs bg-white/60 dark:bg-white/5 border-violet-200/30 dark:border-violet-700/30 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem disabled value="__enlisted">── Enlisted ──</SelectItem>
+                      {ENLISTED_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      <SelectItem disabled value="__warrant">── Warrant ──</SelectItem>
+                      {WARRANT_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                      <SelectItem disabled value="__officer">── Officer ──</SelectItem>
+                      {OFFICER_RANKS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5 block">YOS</label>
+                  <Select value={String(profile.yearsOfService)} onValueChange={(v) => updateProfile({ yearsOfService: parseInt(v) })}>
+                    <SelectTrigger className="h-8 text-xs bg-white/60 dark:bg-white/5 border-violet-200/30 dark:border-violet-700/30 cursor-pointer">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 41 }, (_, i) => (
+                        <SelectItem key={i} value={String(i)}>{i} {i === 1 ? "yr" : "yrs"}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5 block">ZIP Code</label>
+                  <div className="flex gap-1">
+                    <Input
+                      value={zipInput}
+                      onChange={(e) => setZipInput(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                      placeholder="Zip"
+                      maxLength={5}
+                      onKeyDown={(e) => e.key === "Enter" && handleZipLookup()}
+                      className="h-9 text-xs bg-white/60 dark:bg-white/5 border-violet-200/30 dark:border-violet-700/30"
+                    />
                   </div>
                 </div>
+                <div>
+                  <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5 block">Bonus/mo</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">$</span>
+                    <Input
+                      value={monthlyBonus}
+                      inputMode="numeric"
+                      placeholder="0"
+                      onChange={(e) => setMonthlyBonus(e.target.value.replace(/[^\d]/g, ""))}
+                      className="h-9 text-xs pl-5 bg-white/60 dark:bg-white/5 border-violet-200/30 dark:border-violet-700/30"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30 dark:border-violet-700/30">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400 font-medium mb-0.5">Leave Balance</div>
-                      <div className="text-lg font-bold text-slate-900 dark:text-slate-100">28.5 <span className="text-sm text-slate-600 dark:text-slate-400">days</span></div>
+              {/* Row 3: Dependents */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                  <label className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Dependents
+                  </label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                    {profile.dependentStatus ? "Yes" : "No"}
+                  </span>
+                  <Switch
+                    checked={profile.dependentStatus}
+                    onCheckedChange={(checked) => updateProfile({ dependentStatus: checked })}
+                    className="scale-75 origin-right cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Pay Breakdown */}
+              <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-lg p-2.5 border border-violet-200/30 dark:border-violet-700/30 space-y-1.5">
+                <div className="flex justify-between items-center text-xs">
+                  {[
+                    { label: "Base Pay", value: basePay },
+                    { label: `BAH${profile.mha ? "" : bah === 0 ? " (enter ZIP)" : ""}`, value: bah },
+                    { label: "BAS", value: bas },
+                    ...(Number(monthlyBonus) > 0 ? [{ label: "Bonuses", value: Number(monthlyBonus) }] : []),
+                  ].map((item) => (
+                    <div key={item.label} className="flex gap-1">
+                      <span className="text-slate-500 dark:text-slate-400">{item.label}:</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300 tabular-nums">
+                        {item.value > 0 ? `$${Math.round(item.value).toLocaleString()}` : "—"}
+                      </span>
                     </div>
-                    <Calendar className="w-8 h-8 text-violet-300 dark:text-violet-700" />
-                  </div>
+                  ))}
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-600 dark:text-slate-400">GI Bill: 100%</span>
-                <span className="text-violet-600 dark:text-violet-400 font-semibold">View benefits →</span>
+                <div className="border-t border-violet-200/30 dark:border-violet-700/30 pt-1.5 flex justify-between items-center">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Monthly Total</span>
+                  <span className="text-base font-bold text-violet-700 dark:text-violet-400 tabular-nums">
+                    {totalMonthlyComp > 0 ? `$${Math.round(totalMonthlyComp).toLocaleString()}` : "—"}
+                  </span>
+                </div>
               </div>
             </div>
-          </Link>
+
+            {/* Clickable footer */}
+            <Link href="/services/command-center/career" className="flex items-center justify-end text-xs group/footer">
+              <span className="text-violet-600 dark:text-violet-400 font-semibold group-hover/footer:underline">
+                Full details →
+              </span>
+            </Link>
+          </div>
         </div>
 
         {/* Bottom CTA */}

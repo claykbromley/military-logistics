@@ -243,11 +243,7 @@ export default function FinanceDashboard() {
                 { value: "dashboard", icon: LayoutDashboard, label: "Dashboard" },
                 { value: "banks", icon: Building2, label: "Banks" },
                 { value: "bills", icon: Receipt, label: "Bills" },
-                {
-                  value: "investments",
-                  icon: TrendingUp,
-                  label: "Investments",
-                },
+                { value: "investments", icon: TrendingUp, label: "Investments" },
                 { value: "goals", icon: PiggyBank, label: "Goals" },
                 { value: "advisors", icon: HandHelping, label: "Advisors" },
               ].map(({ value, icon: Icon, label }) => (

@@ -229,7 +229,7 @@ function CommunicationHubPageInner({
       {/* Hero Header */}
       <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild className="text-white/80 hover:text-white hover:bg-white/10">
@@ -328,26 +328,28 @@ function CommunicationHubPageInner({
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-muted/50 p-1">
-            <TabsTrigger value="schedule" className="gap-2">
-              <Calendar className="w-4 h-4" />
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="gap-2">
-              <MessageCircle className="w-4 h-4" />
-              Messages
-              {unreadThreadCount > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-[20px]">
-                  {unreadThreadCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="gap-2">
-              <NotebookText className="w-4 h-4" />
-              Logs
-            </TabsTrigger>
+          <TabsList className="w-full h-auto flex gap-3 overflow-x-auto rounded-2xl bg-muted/60 p-1.5 backdrop-blur-sm border border-border shadow-sm">
+            {[
+              { value: "schedule", icon: Calendar, label: "Schedule" },
+              { value: "messages", icon: MessageCircle, label: "Messages" },
+              { value: "logs", icon: NotebookText, label: "Logs" },
+            ].map(({ value, icon: Icon, label }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-2 rounded-xl text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-accent/10 data-[state=active]:!bg-primary/30 data-[state=active]:!text-foreground cursor-pointer"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">{label}</span>
+                {value === "messages" && unreadThreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 min-w-[20px]">
+                    {unreadThreadCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <ScheduleTab />

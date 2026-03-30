@@ -1266,7 +1266,7 @@ export default function WellnessPage() {
       </div>
 
       {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-20 space-y-5">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Auth warning */}
         {!isAuthenticated && (
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4">
