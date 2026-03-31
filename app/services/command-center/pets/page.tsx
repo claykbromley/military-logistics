@@ -17,6 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Label } from "@/components/ui/label"
 import { useProperties, type EmergencyContact } from "@/hooks/use-properties"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -916,6 +917,78 @@ function ResourceCard({ resource }: { resource: (typeof RESOURCES)[number] }) {
   )
 }
 
+// ─── Vet Record → Calendar sync ──────────────────────────────────────────────
+
+function vetRecordTag(petName: string, recordType: string, recordDate: string): string {
+  return `[vet:${petName}:${recordType}:${recordDate}]`
+}
+
+async function syncVetRecordCalendarEvent(
+  petName: string, recordType: string, recordDate: string,
+  nextDue: string | null | undefined,
+  oldTag?: string,
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const newTag = vetRecordTag(petName, recordType, recordDate)
+
+  // Search for existing entry by new tag or old tag
+  const tagsToSearch = [newTag]
+  if (oldTag && oldTag !== newTag) tagsToSearch.push(oldTag)
+
+  let existingId: string | null = null
+  for (const tag of tagsToSearch) {
+    const { data } = await supabase
+      .from("calendar_entries").select("id")
+      .eq("user_id", user.id).eq("source", "vet_record")
+      .eq("linked_entity_tag", tag).maybeSingle()
+    if (data) { existingId = data.id; break }
+  }
+
+  if (!nextDue) {
+    if (existingId) await supabase.from("calendar_entries").delete().eq("id", existingId)
+    return
+  }
+
+  const startTime = new Date(`${nextDue}T00:00:00`).toISOString()
+  const endTime = new Date(`${nextDue}T23:59:59`).toISOString()
+  const title = `${petName} \u2014 ${recordType} Due`
+  const description = `Vet ${recordType.toLowerCase()} due for ${petName}`
+  const eventColor = "#06b6d4"
+
+  const payload = {
+    title, description, color: eventColor,
+    start_time: startTime, end_time: endTime,
+    all_day: true, is_recurring: false, recurrence_interval: 1,
+    is_completed: false, linked_entity_tag: newTag,
+  }
+
+  if (existingId) {
+    await supabase.from("calendar_entries").update(payload).eq("id", existingId)
+  } else {
+    await supabase.from("calendar_entries").insert({
+      user_id: user.id, type: "event" as const, source: "vet_record", ...payload,
+    })
+  }
+}
+
+async function deleteVetRecordCalendarEvent(petName: string, recordType: string, recordDate: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const tag = vetRecordTag(petName, recordType, recordDate)
+  const { data } = await supabase
+    .from("calendar_entries").select("id")
+    .eq("user_id", user.id).eq("source", "vet_record")
+    .eq("linked_entity_tag", tag)
+  if (data && data.length > 0) {
+    await supabase.from("calendar_entries").delete().in("id", data.map((e: any) => e.id))
+  }
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function PetCarePage() {
@@ -957,15 +1030,31 @@ export default function PetCarePage() {
 
   const handleSaveVetRecord = async (record: Omit<VetRecord, "id">) => {
     if (vetRecordPet && editingVetRecord) {
-      // Editing existing record
+      // Build the old tag from the original record data for matching
+      const oldTag = vetRecordTag(vetRecordPet.name, editingVetRecord.type, editingVetRecord.date)
       await updateVetRecord(vetRecordPet.id, editingVetRecord.id, record)
+      await syncVetRecordCalendarEvent(
+        vetRecordPet.name, record.type, record.date,
+        record.nextDue || null, oldTag,
+      )
     } else if (vetRecordPet) {
-      // Adding new record
       await addVetRecord(vetRecordPet.id, record)
+      if (record.nextDue) {
+        await syncVetRecordCalendarEvent(
+          vetRecordPet.name, record.type, record.date,
+          record.nextDue,
+        )
+      }
     }
   }
 
   const handleDeleteVetRecord = async (petId: string, recordId: string) => {
+    // Find the record to get its details for calendar cleanup
+    const pet = pets.find((p) => p.id === petId)
+    const record = pet?.vetRecords?.find((r) => r.id === recordId)
+    if (pet && record) {
+      await deleteVetRecordCalendarEvent(pet.name, record.type, record.date)
+    }
     await deleteVetRecord(petId, recordId)
   }
 
