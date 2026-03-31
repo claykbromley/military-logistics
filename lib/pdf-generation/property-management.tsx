@@ -41,7 +41,7 @@ export interface MaintenanceTask {
 
 export interface ExpiringItem {
   propertyName: string
-  type: string
+  itemType: string
   date: string
 }
 
@@ -586,7 +586,7 @@ export const PropertySummaryDocument = ({ data }: { data: SummaryData }) => (
               <View key={index} style={styles.alertItem}>
                 <View style={styles.alertDot} />
                 <Text style={styles.alertText}>
-                  {item.propertyName} — {item.type} expires {formatDate(item.date+"T00:00:00")}
+                  {item.propertyName} — {item.itemType} expires {formatDate(item.date+"T00:00:00")}
                 </Text>
               </View>
             ))}

@@ -53,6 +53,7 @@ interface TaskEntry {
   task_list_id: string | null
   task_priority: string
   task_sort_order: number
+  linked_entity_tag: string | null
   created_at: string
   updated_at: string
 }
@@ -72,6 +73,47 @@ const LIST_COLORS = [
 ]
 
 const CALENDAR_LIST_ID = "__calendar__"
+
+/* ─── Sync back to maintenance_records when editing maintenance-sourced tasks ─── */
+
+function parseMaintenanceTag(tag: string | null): { propertyId: string; taskId: string } | null {
+  if (!tag) return null
+  const match = tag.match(/^\[maint:([^:]+):([^\]]+)\]$/)
+  return match ? { propertyId: match[1], taskId: match[2] } : null
+}
+
+async function syncToMaintenanceRecord(
+  task: TaskEntry, updates: {
+    title?: string; description?: string | null; dueDate?: string | null; isCompleted?: boolean
+  }
+) {
+  const parsed = parseMaintenanceTag(task.linked_entity_tag)
+  if (!parsed || task.source !== "maintenance") return
+
+  const supabase = createClient()
+  const dbUpdates: Record<string, unknown> = {}
+
+  if (updates.title !== undefined) dbUpdates.title = updates.title
+  if (updates.description !== undefined) dbUpdates.description = updates.description || null
+  if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate || null
+  if (updates.isCompleted !== undefined) {
+    dbUpdates.status = updates.isCompleted ? "completed" : "pending"
+    if (updates.isCompleted) {
+      dbUpdates.completed_date = new Date().toISOString().split("T")[0]
+    }
+  }
+
+  if (Object.keys(dbUpdates).length > 0) {
+    await supabase.from("maintenance_records").update(dbUpdates).eq("id", parsed.taskId)
+  }
+}
+
+async function deleteMaintenanceRecord(task: TaskEntry) {
+  const parsed = parseMaintenanceTag(task.linked_entity_tag)
+  if (!parsed || task.source !== "maintenance") return
+  const supabase = createClient()
+  await supabase.from("maintenance_records").delete().eq("id", parsed.taskId)
+}
 
 /* ═══════════════════════ Helpers ═══════════════════════ */
 
@@ -209,6 +251,13 @@ export function MilitaryTasksPage() {
         color: listColor, start_time: startTime, end_time: endTime,
         all_day: !!taskForm.due_date, task_list_id: taskForm.list_id || null, task_priority: taskForm.priority,
       }).eq("id", editingTask.id)
+
+      // Sync back to maintenance_records if this is a maintenance-sourced task
+      await syncToMaintenanceRecord(editingTask, {
+        title: taskForm.title.trim(),
+        description: taskForm.description.trim() || null,
+        dueDate: taskForm.due_date || null,
+      })
     } else {
       const maxOrder = tasks.filter((t) => t.task_list_id === (taskForm.list_id || null)).reduce((m, t) => Math.max(m, t.task_sort_order), -1)
       await supabase.from("calendar_entries").insert({
@@ -225,12 +274,22 @@ export function MilitaryTasksPage() {
 
   const toggleComplete = async (task: TaskEntry) => {
     const supabase = createClient()
-    await supabase.from("calendar_entries").update({ is_completed: !task.is_completed }).eq("id", task.id)
+    const nowCompleted = !task.is_completed
+    await supabase.from("calendar_entries").update({ is_completed: nowCompleted }).eq("id", task.id)
+
+    // Sync completion back to maintenance_records
+    await syncToMaintenanceRecord(task, { isCompleted: nowCompleted })
+
     loadData()
   }
 
   const deleteTask = async (id: string) => {
     const supabase = createClient()
+    const task = tasks.find((t) => t.id === id)
+
+    // Delete the linked maintenance_record if this is a maintenance-sourced task
+    if (task) await deleteMaintenanceRecord(task)
+
     await supabase.from("calendar_entries").delete().eq("id", id)
     loadData()
   }

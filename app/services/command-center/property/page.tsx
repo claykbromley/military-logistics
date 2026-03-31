@@ -31,6 +31,7 @@ import {
   type EmergencyContact,
 } from "@/hooks/use-properties"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 
 const propertyTypes: { value: PropertyType; label: string; icon: React.ReactNode }[] = [
   { value: "home", label: "Home / Residence", icon: <Home className="w-4 h-4" /> },
@@ -1053,6 +1054,100 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   )
 }
 
+/* ─── Maintenance Task → Calendar sync (as task on "Properties" list) ─── */
+
+async function ensurePropertiesTaskList(userId: string): Promise<string> {
+  const supabase = createClient()
+
+  // Check if "Properties" list already exists
+  const { data: existing } = await supabase
+    .from("task_lists").select("id")
+    .eq("user_id", userId).eq("name", "Properties")
+    .maybeSingle()
+
+  if (existing) return existing.id
+
+  // Create it
+  const { data: created } = await supabase
+    .from("task_lists").insert({
+      user_id: userId, name: "Properties", color: "#f59e0b", sort_order: 999,
+    }).select("id").single()
+
+  return created!.id
+}
+
+function maintenanceTag(propertyId: string, taskId: string): string {
+  return `[maint:${propertyId}:${taskId}]`
+}
+
+async function syncMaintenanceCalendarEvent(
+  propertyId: string, taskId: string, propertyName: string,
+  taskName: string, nextDue: string | null | undefined,
+  isCompleted: boolean,
+  oldTag?: string,
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const newTag = maintenanceTag(propertyId, taskId)
+  const tagsToSearch = [newTag]
+  if (oldTag && oldTag !== newTag) tagsToSearch.push(oldTag)
+
+  let existingId: string | null = null
+  for (const tag of tagsToSearch) {
+    const { data } = await supabase
+      .from("calendar_entries").select("id")
+      .eq("user_id", user.id).eq("source", "maintenance")
+      .eq("linked_entity_tag", tag).maybeSingle()
+    if (data) { existingId = data.id; break }
+  }
+
+  if (!nextDue) {
+    if (existingId) await supabase.from("calendar_entries").delete().eq("id", existingId)
+    return
+  }
+
+  const listId = await ensurePropertiesTaskList(user.id)
+  const startTime = new Date(`${nextDue}T00:00:00`).toISOString()
+  const endTime = new Date(`${nextDue}T23:59:59`).toISOString()
+  const title = `${propertyName} \u2014 ${taskName}`
+  const description = `Maintenance task for ${propertyName}`
+  const eventColor = "#f59e0b"
+
+  const payload = {
+    title, description, color: eventColor,
+    start_time: startTime, end_time: endTime,
+    all_day: true, is_recurring: false, recurrence_interval: 1,
+    is_completed: isCompleted, linked_entity_tag: newTag,
+    task_list_id: listId, task_priority: "none", task_sort_order: 0,
+  }
+
+  if (existingId) {
+    await supabase.from("calendar_entries").update(payload).eq("id", existingId)
+  } else {
+    await supabase.from("calendar_entries").insert({
+      user_id: user.id, type: "task" as const, source: "maintenance", ...payload,
+    })
+  }
+}
+
+async function deleteMaintenanceCalendarEvent(propertyId: string, taskId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const tag = maintenanceTag(propertyId, taskId)
+  const { data } = await supabase
+    .from("calendar_entries").select("id")
+    .eq("user_id", user.id).eq("source", "maintenance")
+    .eq("linked_entity_tag", tag)
+  if (data && data.length > 0) {
+    await supabase.from("calendar_entries").delete()
+      .in("id", data.map((e: any) => e.id))
+  }
+}
+
 export default function PropertyManagerPage() {
   const {
     properties,
@@ -1091,26 +1186,49 @@ export default function PropertyManagerPage() {
     }
   }
 
-  const handleSaveTask = (task: Omit<MaintenanceTask, "id" | "propertyId" | "createdAt" | "updatedAt">) => {
+  const handleSaveTask = async (task: Omit<MaintenanceTask, "id" | "propertyId" | "createdAt" | "updatedAt">) => {
     if (!taskDialogState.property) return
+    const prop = taskDialogState.property
 
     if (taskDialogState.editingTask) {
-      updateMaintenanceTask(taskDialogState.property.id, taskDialogState.editingTask.id, task)
+      const editTask = taskDialogState.editingTask
+      await updateMaintenanceTask(prop.id, editTask.id, task)
+      await syncMaintenanceCalendarEvent(
+        prop.id, editTask.id, prop.propertyName,
+        task.taskName, task.nextDue || null, task.isCompleted ?? editTask.isCompleted,
+      )
     } else {
-      addMaintenanceTask(taskDialogState.property.id, task)
+      const result = await addMaintenanceTask(prop.id, task)
+      if (result && task.nextDue) {
+        await syncMaintenanceCalendarEvent(
+          prop.id, result.id, prop.propertyName,
+          task.taskName, task.nextDue, false,
+        )
+      }
     }
   }
 
-  const handleCompleteTask = (propertyId: string, taskId: string) => {
-    updateMaintenanceTask(propertyId, taskId, {
+  const handleCompleteTask = async (propertyId: string, taskId: string) => {
+    await updateMaintenanceTask(propertyId, taskId, {
       isCompleted: true,
       lastCompleted: new Date().toISOString().split("T")[0],
     })
+
+    // Sync completion status to calendar
+    const prop = properties.find((p) => p.id === propertyId)
+    const task = prop?.maintenanceTasks.find((t) => t.id === taskId)
+    if (prop && task) {
+      await syncMaintenanceCalendarEvent(
+        propertyId, taskId, prop.propertyName,
+        task.taskName, task.nextDue || null, true,
+      )
+    }
   }
 
-  const handleDeleteTask = (propertyId: string, taskId: string) => {
+  const handleDeleteTask = async (propertyId: string, taskId: string) => {
     if (confirm("Are you sure you want to delete this maintenance task?")) {
-      deleteMaintenanceTask(propertyId, taskId)
+      await deleteMaintenanceCalendarEvent(propertyId, taskId)
+      await deleteMaintenanceTask(propertyId, taskId)
     }
   }
 
@@ -1286,7 +1404,7 @@ export default function PropertyManagerPage() {
                       key={idx}
                       className="inline-flex items-center px-3 py-1.5 rounded-full bg-card/80 text-amber-800 dark:text-amber-400 text-xs font-medium border border-amber-500/20"
                     >
-                      {item.propertyName}: {item.type}
+                      {item.propertyName}: {item.itemType}
                       <span className="ml-2 text-amber-600 dark:text-amber-500">({formatDate(item.date)})</span>
                     </span>
                   ))}
