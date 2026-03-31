@@ -892,6 +892,87 @@ export default function DocumentVaultPage() {
   )
 }
 
+/* ─── Document → Calendar sync ─── */
+
+async function syncDocumentCalendarEvent(
+  docId: string, docName: string, docType: string,
+  expirationDate: string | null | undefined,
+  oldDocName?: string,
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  // Search for existing entry by all possible tags
+  const tagsToSearch = [
+    `[doc:${docId}]`,
+    `[doc:${docName}]`,
+  ]
+  if (oldDocName && oldDocName !== docName) {
+    tagsToSearch.push(`[doc:${oldDocName}]`)
+  }
+
+  let existingId: string | null = null
+  for (const tag of tagsToSearch) {
+    const { data } = await supabase
+      .from("calendar_entries").select("id")
+      .eq("user_id", user.id).eq("source", "document")
+      .eq("linked_entity_tag", tag).maybeSingle()
+    if (data) { existingId = data.id; break }
+  }
+
+  if (!expirationDate) {
+    if (existingId) await supabase.from("calendar_entries").delete().eq("id", existingId)
+    return
+  }
+
+  const startTime = new Date(`${expirationDate}T00:00:00`).toISOString()
+  const endTime = new Date(`${expirationDate}T23:59:59`).toISOString()
+  const typeLabel = getTypeLabel(docType as DocumentType)
+  const title = `${docName} \u2014 ${typeLabel} Expires`
+  const description = `${typeLabel} expiration: ${docName}`
+  const eventColor = "#ef4444"
+
+  // Always store the ID-based tag going forward
+  const canonicalTag = `[doc:${docId}]`
+  const payload = {
+    title, description, color: eventColor,
+    start_time: startTime, end_time: endTime,
+    all_day: true, is_recurring: false, recurrence_interval: 1,
+    is_completed: false, linked_entity_tag: canonicalTag,
+  }
+
+  if (existingId) {
+    await supabase.from("calendar_entries").update(payload).eq("id", existingId)
+  } else {
+    await supabase.from("calendar_entries").insert({
+      user_id: user.id, type: "event" as const, source: "document", ...payload,
+    })
+  }
+}
+
+async function deleteDocumentCalendarEvent(docId: string, docName?: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  // Search by all possible tags
+  const tagsToSearch = [`[doc:${docId}]`]
+  if (docName) tagsToSearch.push(`[doc:${docName}]`)
+
+  for (const tag of tagsToSearch) {
+    const { data } = await supabase
+      .from("calendar_entries").select("id")
+      .eq("user_id", user.id).eq("source", "document")
+      .eq("linked_entity_tag", tag)
+    if (data && data.length > 0) {
+      await supabase.from("calendar_entries").delete()
+        .in("id", data.map((e: any) => e.id))
+      return
+    }
+  }
+}
+
 function DocumentVaultPageContent() {
   const {
     documents,
@@ -947,10 +1028,43 @@ function DocumentVaultPageContent() {
     file?: File
   ) => {
     if (editingDocument) {
+      const oldName = editingDocument.documentName
       await updateDocument(editingDocument.id, docData, file)
+      await syncDocumentCalendarEvent(
+        editingDocument.id, docData.documentName, docData.documentType,
+        docData.expirationDate?.split("T")[0] || null,
+        oldName,
+      )
       setEditingDocument(null)
     } else {
       await addDocument(docData, file)
+
+      // Create calendar event for expiration date
+      if (docData.expirationDate && currentUserId) {
+        const supabase = createClient()
+        const expDate = docData.expirationDate.split("T")[0]
+        const typeLabel = getTypeLabel(docData.documentType)
+        const title = `${docData.documentName} \u2014 ${typeLabel} Expires`
+        const description = `${typeLabel} expiration: ${docData.documentName}`
+        const startTime = new Date(`${expDate}T00:00:00`).toISOString()
+        const endTime = new Date(`${expDate}T23:59:59`).toISOString()
+
+        await supabase.from("calendar_entries").insert({
+          user_id: currentUserId,
+          type: "event",
+          source: "document",
+          title,
+          description,
+          color: "#ef4444",
+          start_time: startTime,
+          end_time: endTime,
+          all_day: true,
+          is_recurring: false,
+          recurrence_interval: 1,
+          is_completed: false,
+          linked_entity_tag: `[doc:${docData.documentName}]`,
+        })
+      }
     }
   }
 
@@ -1248,7 +1362,7 @@ function DocumentVaultPageContent() {
                 key={doc.id}
                 document={doc}
                 onEdit={() => handleEdit(doc)}
-                onDelete={() => deleteDocument(doc.id)}
+                onDelete={() => { deleteDocumentCalendarEvent(doc.id, doc.documentName); deleteDocument(doc.id) }}
                 onToggleCritical={() => handleToggleCritical(doc)}
                 onShare={() => handleShare(doc)}
                 onDownload={() => handleDownload(doc)}
