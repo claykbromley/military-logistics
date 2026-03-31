@@ -6,7 +6,7 @@ import {
   ShieldCheck, Briefcase, PawPrint, Heart, ArrowRight, 
   AlertCircle, AlertTriangle, Clock, CheckCircle2, XCircle, TrendingUp, Bell,
   Star, Phone, Sparkles, ExternalLink, Flame, Receipt, Zap, Target,
-  Wrench, Video, Car, Circle, Search, MapPin
+  Wrench, Video, Car, Circle, Dumbbell, Moon, Timer
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -636,9 +636,13 @@ export function CommandCenterDashboard() {
     difficult: "text-red-500",
   }
 
-  const { entries, checkinEntries, isLoaded: wellnessLoaded, getStreak } = useWellness()
+  const { entries, checkinEntries, isLoaded: wellnessLoaded, workoutEntries, getStreak } = useWellness()
   const streak = wellnessLoaded ? getStreak() : 0
   const totalEntries = entries.length
+  const avgSleep = useMemo(() => { const ws = checkinEntries.filter((e) => (e.sleepHours || 0) > 0); return ws.length ? (ws.reduce((a, e) => a + (e.sleepHours || 0), 0) / ws.length).toFixed(1) : null }, [checkinEntries])
+  const avgEnergy = useMemo(() => { const we = checkinEntries.filter((e) => (e.energyLevel || 0) > 0); return we.length ? (we.reduce((a, e) => a + (e.energyLevel || 0), 0) / we.length).toFixed(1) : null }, [checkinEntries])
+  const totalWorkouts30d = useMemo(() => { const c = new Date(); c.setDate(c.getDate() - 30); return workoutEntries.filter((e) => e.entryDate >= c.toLocaleDateString("en-CA")).length }, [workoutEntries])
+  const totalExerciseMin = useMemo(() => { const c = new Date(); c.setDate(c.getDate() - 30); const cs = c.toLocaleDateString("en-CA"); return [...checkinEntries, ...workoutEntries].filter((e) => e.entryDate >= cs).reduce((a, e) => a + (e.exerciseMinutes || e.workoutDetails?.durationMinutes || 0), 0) }, [checkinEntries, workoutEntries])
 
   // Last 7 check-ins with mood scores for the mini bar chart
   const last7 = (() => {
@@ -656,7 +660,7 @@ export function CommandCenterDashboard() {
   // Average mood from last 7 days (only days with data)
   const scored = last7.filter((d) => d.score > 0)
   const avgMood = scored.length ? (scored.reduce((a, d) => a + d.score, 0) / scored.length) : null
-  const lastEntry = entries.length > 0 ? formatDate(entries[0].createdAt.split("T")[0]) : null
+  const lastEntry = entries.length > 0 ? formatDate(entries[0].entryDate.split("T")[0]) : null
   
   // Latest mood
   const latestMoodEntry = checkinEntries.find((e) => e.mood)
@@ -688,11 +692,9 @@ export function CommandCenterDashboard() {
   const totalMonthlyComp = basePay + bas + bah + Number(monthlyBonus)
   
   // ____________________________ All-loaded gate _________________________________________________
-  console.log(financialLoaded, commLoaded, calendarLoaded, legalLoading, docsLoaded, propsLoaded, petsLoaded, wellnessLoaded)
   const allLoaded = financialLoaded
     && (commLoaded ?? true)
     && calendarLoaded
-    && (!legalLoading)
     && (docsLoaded ?? true)
     && (propsLoaded ?? true)
     && (petsLoaded ?? true)
@@ -1427,6 +1429,32 @@ export function CommandCenterDashboard() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pb-3">
+                {[
+                  { label: "Workouts", sub: "30d", value: String(totalWorkouts30d), icon: Dumbbell, color: "var(--accent)" },
+                  { label: "Sleep", sub: "Avg", value: avgSleep ? `${avgSleep}h` : "—", icon: Moon, color: "var(--primary)" },
+                  { label: "Energy", sub: "Avg", value: avgEnergy ?? "—", icon: Zap, color: "var(--holiday)" },
+                  { label: "Exercise", sub: "Total", value: totalExerciseMin ? `${totalExerciseMin}m` : "-", icon: Timer, color: "var(--success)" },
+                ].map((s) => (
+                  <div
+                    key={s.label}
+                    className="bg-card border rounded-lg px-2 py-2 flex items-center gap-2"
+                  >
+                    <div className="flex flex-col leading-tight min-w-0">
+                      <div
+                        className="text-sm font-bold truncate"
+                        style={{ color: s.color }}
+                      >
+                        {s.value}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground/70 truncate">
+                        {s.label} {s.sub}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-between text-xs">
