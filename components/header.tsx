@@ -1,44 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import {
-  Menu,
-  Search,
-  ChevronDown,
-  Moon,
-  Sun,
-  Bell,
-  User,
-  Settings,
-  LogOut,
-  Shield,
-  Bookmark,
-  HelpCircle,
-  ArrowRight,
-  Clock,
-  Calendar,
-  MessageSquare,
-  CreditCard,
-  Briefcase,
-  MapPin,
+import { Menu, Search, ChevronDown, Moon, Sun, Bell, User, Settings, LogOut, Shield, Bookmark, HelpCircle,
+  ArrowRight, Clock, Calendar, MessageSquare, CreditCard, Briefcase, MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuGroup,
-} from "@/components/ui/dropdown-menu"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuGroup } from "@/components/ui/dropdown-menu"
 import { LoginModal } from "../app/auth/login-modal"
 import { SignupModal } from "../app/auth/signup-modal"
 import { createClient } from "@/lib/supabase/client"
@@ -80,7 +48,7 @@ const navItems = [
   {
     name: "Transitions",
     icon: ArrowRight,
-    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation"],
+    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation", "Changing Dependents"],
   },
   {
     name: "Discounts/Benefits",

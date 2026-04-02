@@ -272,55 +272,57 @@ export function useWellness() {
 
   useEffect(() => {
     const supabase = createClient()
+    let isMounted = true
 
-    const loadEntries = async (userId: string) => {
+    const loadAll = async (userId?: string) => {
       try {
-        const { data, error } = await supabase
-          .from("wellness_entries")
-          .select("*")
-          .order("entry_date", { ascending: false })
-
-        if (error) throw error
-
-        const localEntries = (data || []).map(mapDbToLocal)
-        setEntries(localEntries)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
-      } catch (error) {
-        console.error("Error loading wellness entries:", error)
-        setSyncError(error instanceof Error ? error.message : "Failed to load")
-        loadFromLocalStorage()
+        if (userId) {
+          setIsAuthenticated(true)
+          await Promise.all([
+            loadEntries(userId),
+            loadBranch(userId),
+          ])
+        } else {
+          loadFromLocalStorage()
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        if (isMounted) setIsLoaded(true)
       }
     }
 
-    const loadBranch = async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("military_branch")
-          .eq("id", userId)
-          .single()
+    const loadEntries = async (userId: string) => {
+      const { data, error } = await supabase
+        .from("wellness_entries")
+        .select("*")
+        .order("entry_date", { ascending: false })
 
-        if (!error && data?.military_branch) {
-          const branch = data.military_branch.toLowerCase().replace(/\s+/g, "_") as MilitaryBranch
-          setMilitaryBranch(branch)
-          localStorage.setItem("military_branch", branch || "")
-        }
-      } catch (error) {
-        console.error("Error loading military branch:", error)
-        const cached = localStorage.getItem("military_branch")
-        if (cached) setMilitaryBranch(cached as MilitaryBranch)
+      if (error) throw error
+
+      const localEntries = (data || []).map(mapDbToLocal)
+      setEntries(localEntries)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries))
+    }
+
+    const loadBranch = async (userId: string) => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("military_branch")
+        .eq("id", userId)
+        .single()
+
+      if (!error && data?.military_branch) {
+        const branch = data.military_branch.toLowerCase().replace(/\s+/g, "_")
+        setMilitaryBranch(branch as MilitaryBranch)
+        localStorage.setItem("military_branch", branch)
       }
     }
 
     const loadFromLocalStorage = () => {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        try {
-          setEntries(JSON.parse(stored))
-        } catch (e) {
-          console.error("Failed to parse journal entries:", e)
-        }
-      }
+      if (stored) setEntries(JSON.parse(stored))
+
       const cachedBranch = localStorage.getItem("military_branch")
       if (cachedBranch) setMilitaryBranch(cachedBranch as MilitaryBranch)
     }
@@ -333,33 +335,27 @@ export function useWellness() {
       localStorage.removeItem("military_branch")
     }
 
+    // ✅ Single source of truth
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const user = session?.user
-      if (user) {
-        setIsAuthenticated(true)
-        loadEntries(user.id)
-        loadBranch(user.id)
-      } else {
-        loadFromLocalStorage()
-      }
-      setIsLoaded(true)
+      loadAll(session?.user?.id)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        const user = session?.user
-        if (event === "SIGNED_IN" && user) {
-          setIsAuthenticated(true)
-          loadEntries(user.id)
-          loadBranch(user.id)
+        if (event === "SIGNED_IN") {
+          loadAll(session?.user?.id)
         }
         if (event === "SIGNED_OUT") {
           clearUserData()
+          setIsLoaded(true)
         }
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {

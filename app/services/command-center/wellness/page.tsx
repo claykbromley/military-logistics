@@ -337,8 +337,6 @@ function TrendsAndLogTab({
     else { addEntry(entryData) }
   }
 
-  const moodScores: Record<Mood, number> = { great: 5, good: 4, neutral: 3, struggling: 2, difficult: 1 }
-
   // ── 7-day streak dots ──
   const last7 = useMemo(() => {
     const days: { date: string; day: string; entry?: JournalEntry }[] = []
@@ -353,13 +351,46 @@ function TrendsAndLogTab({
   }, [checkinEntries, allEntries])
 
   // ── 30-day data ──
+  const checkinMap = new Map(checkinEntries.map(e => [e.entryDate, e]))
+  const workoutMap = new Map<string, JournalEntry[]>()
+
+  workoutEntries.forEach(e => {
+    if (!workoutMap.has(e.entryDate)) workoutMap.set(e.entryDate, [])
+    workoutMap.get(e.entryDate)!.push(e)
+  })
+
+  const formatLocalDate = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, "0")
+    const day = String(d.getDate()).padStart(2, "0")
+    return `${year}-${month}-${day}`
+  }
+
   const last30 = useMemo(() => {
-    const days: { date: string; label: string; checkin?: JournalEntry; workouts: JournalEntry[] }[] = []
+    const days: {
+      date: string
+      label: string
+      checkin?: JournalEntry
+      workouts: JournalEntry[]
+    }[] = []
+
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i)
-      const ds = d.toISOString().split("T")[0]
-      days.push({ date: ds, label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }), checkin: checkinEntries.find((e) => e.entryDate === ds), workouts: workoutEntries.filter((e) => e.entryDate === ds) })
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() - i)
+      const ds = formatLocalDate(d)
+
+      days.push({
+        date: ds,
+        label: d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        checkin: checkinMap.get(ds),
+        workouts: workoutMap.get(ds) || []
+      })
     }
+
     return days
   }, [checkinEntries, workoutEntries])
 
@@ -958,7 +989,7 @@ function ResourcesTab({ testConfigs }: { testConfigs: BranchTestConfig[] }) {
     { n: 2, sense: "SMELL", icon: Flower2, color: "var(--success)" },
     { n: 1, sense: "TASTE", icon: Cookie, color: "var(--destructive)" },
   ]
-  
+
   return (
     <div className="space-y-5">
       {/* Fitness resources */}
@@ -1099,7 +1130,7 @@ export default function WellnessPage() {
   if (!isLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center"><Loader2 className="w-8 h-8 mx-auto animate-spin text-accent mb-3" /><p className="text-sm text-muted-foreground">Loading Fitness Hub…</p></div>
+        <div className="text-center"><Loader2 className="w-8 h-8 mx-auto animate-spin text-accent mb-3" /><p className="text-sm text-muted-foreground">Loading Fitness and Wellness Hub…</p></div>
       </div>
     )
   }

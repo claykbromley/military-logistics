@@ -1052,7 +1052,7 @@ export function CommandCenterDashboard() {
                     <ShieldCheck className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Legal Ready</h3>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Legal Hub</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
                       Stay prepared
                     </p>
@@ -1214,7 +1214,7 @@ export function CommandCenterDashboard() {
                     <Home className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Property</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Properties</h3>
                     <span className="text-xs text-slate-600 dark:text-slate-400">{homes} home{homes !== 1 && 's'}, {vehicles.length} vehicle{vehicles.length !== 1 && 's'}</span>
                   </div>
                 </div>
@@ -1399,7 +1399,7 @@ export function CommandCenterDashboard() {
                   <Heart className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Wellness Hub</h3>
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Fitness and Wellness</h3>
                   <span className="text-xs text-slate-600 dark:text-slate-400">
                     {totalEntries} {totalEntries === 1 ? "entry" : "entries"}
                   </span>
