@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Users, Plus, ArrowLeft, Phone, Mail, Shield, AlertTriangle, ChevronDown, Trash2, Edit,
   Key, FileText, MapPin, Star, StarOff, GripVertical, Download, MessageSquare, Calendar, Video,
-  Clock, Send, CalendarPlus, History, RefreshCw, UserPlus, Search } from "lucide-react"
+  Clock, Send, CalendarPlus, History, RefreshCw, UserPlus, Search, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -19,9 +20,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
+import { ConnectionsProvider } from "@/hooks/use-connections"
+import { ConnectionRequestsInbox } from "@/components/command-center/connection-components"
 import { Contact, SharedContact } from "@/lib/types"
 import { format, formatDistanceToNow } from "date-fns"
 import { useDocuments } from "@/hooks/use-documents"
+import { useConnections } from "@/hooks/use-connections"
+import { MemberSearchBar } from "@/components/member-search"
 
 // ============================================
 // HELPER FUNCTIONS
@@ -65,6 +70,7 @@ function EmergencyContactCard({
   onToggleRole,
   onScheduleCall,
   onSendMessage,
+  onViewProfile,
   showPriority = false,
   onMoveUp,
   onMoveDown,
@@ -78,6 +84,7 @@ function EmergencyContactCard({
   onToggleRole?: (role: "emergency" | "poa" | "accounts") => void
   onScheduleCall?: () => void
   onSendMessage?: () => void
+  onViewProfile?: () => void
   showPriority?: boolean
   onMoveUp?: () => void
   onMoveDown?: () => void
@@ -102,7 +109,7 @@ function EmergencyContactCard({
                 </span>
               </div>
             )}
-            <Avatar className="w-12 h-12">
+            <Avatar className="w-12 h-12 cursor-pointer" onClick={onViewProfile}>
               <AvatarFallback
                 className={`text-sm font-medium ${
                   contact.isEmergencyContact
@@ -118,6 +125,16 @@ function EmergencyContactCard({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-foreground">{contact.contactName}</h3>
+                {/* Profile link if this contact has a linked user account */}
+                {contact.linked_profile_id && (
+                  <button
+                    onClick={onViewProfile}
+                    className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                    title="View profile"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
               {contact.relationship && (
                 <p className="text-sm text-muted-foreground">{contact.relationship}</p>
@@ -139,19 +156,28 @@ function EmergencyContactCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                {onViewProfile && contact.linked_profile_id && (
+                  <>
+                    <DropdownMenuItem onClick={onViewProfile}>
+                      <ExternalLink className="w-4 h-4 mr-2 hover:text-white" />
+                      View Profile
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={onEdit}>
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-4 h-4 mr-2 hover:text-white" />
                   Edit Contact
                 </DropdownMenuItem>
                 {showPriority && contact.isEmergencyContact && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onMoveUp} disabled={isFirst}>
-                      <GripVertical className="w-4 h-4 mr-2" />
+                      <GripVertical className="w-4 h-4 mr-2 hover:text-white" />
                       Move Up
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onMoveDown} disabled={isLast}>
-                      <GripVertical className="w-4 h-4 mr-2" />
+                      <GripVertical className="w-4 h-4 mr-2 hover:text-white" />
                       Move Down
                     </DropdownMenuItem>
                   </>
@@ -159,23 +185,23 @@ function EmergencyContactCard({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onToggleRole("emergency")}>
                   {contact.isEmergencyContact ? (
-                    <StarOff className="w-4 h-4 mr-2" />
+                    <StarOff className="w-4 h-4 mr-2 hover:text-white" />
                   ) : (
-                    <Star className="w-4 h-4 mr-2" />
+                    <Star className="w-4 h-4 mr-2 hover:text-white" />
                   )}
                   {contact.isEmergencyContact ? "Remove from" : "Add as"} Emergency
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onToggleRole("poa")}>
-                  <Shield className="w-4 h-4 mr-2" />
+                  <Shield className="w-4 h-4 mr-2 hover:text-white" />
                   {contact.isPoaHolder ? "Remove" : "Designate as"} POA
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onToggleRole("accounts")}>
-                  <Key className="w-4 h-4 mr-2" />
+                  <Key className="w-4 h-4 mr-2 hover:text-white" />
                   {contact.canAccessAccounts ? "Revoke" : "Grant"} Account Access
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-4 h-4 mr-2 hover:text-white" />
                   Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -285,10 +311,12 @@ function SharedContactCard({
   sharedContact,
   onEdit,
   onAddToContacts,
+  onViewProfile,
 }: {
   sharedContact: SharedContact
   onEdit: () => void
   onAddToContacts: () => void
+  onViewProfile: () => void
 }) {
   const displayName = sharedContact.localDisplayName || sharedContact.ownerDisplayName || sharedContact.ownerEmail.split("@")[0]
   const displayRelationship = sharedContact.localRelationship || "Listed you as contact"
@@ -298,7 +326,7 @@ function SharedContactCard({
       <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 border-b border-blue-200 dark:border-blue-800">
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
-            Listed you as their emergency contact
+            Listed you as a contact
           </span>
           {sharedContact.addedToContacts && (
             <Badge variant="outline" className="text-xs border-green-500 text-green-600">
@@ -310,13 +338,27 @@ function SharedContactCard({
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1">
-            <Avatar className="w-12 h-12">
+            <Avatar className="w-12 h-12 cursor-pointer" onClick={onViewProfile}>
               <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-sm font-medium">
                 {getInitials(displayName)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-foreground">{displayName}</h3>
+              <div className="flex items-center gap-2">
+                <h3
+                  className="font-semibold text-foreground hover:text-primary cursor-pointer transition-colors"
+                  onClick={onViewProfile}
+                >
+                  {displayName}
+                </h3>
+                <button
+                  onClick={onViewProfile}
+                  className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                  title="View profile"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
               <p className="text-sm text-muted-foreground">{displayRelationship}</p>
               <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                 {sharedContact.ownerEmail}
@@ -330,15 +372,20 @@ function SharedContactCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onViewProfile}>
+                <ExternalLink className="w-4 h-4 mr-2 hover:text-white" />
+                View Profile
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onEdit}>
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-2 hover:text-white" />
                 Edit Display Name
               </DropdownMenuItem>
               {!sharedContact.addedToContacts && (
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onAddToContacts}>
-                    <UserPlus className="w-4 h-4 mr-2" />
+                    <UserPlus className="w-4 h-4 mr-2 hover:text-white" />
                     Add to My Contacts
                   </DropdownMenuItem>
                 </>
@@ -515,7 +562,6 @@ function AddEmergencyContactDialog({
     else if (canAccessAccounts) role = "financial"
     else if (isPoaHolder) role = "legal"
 
-    // For new emergency contacts, use next priority; for existing, keep current
     const priority = editingContact
       ? editingContact.priority
       : isEmergencyContact
@@ -754,64 +800,29 @@ function QuickScheduleDialog({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="title">Title</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Call title"
-            />
+            <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Call title" />
           </div>
-
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={eventType === "call" ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setEventType("call")}
-            >
-              <Phone className="w-4 h-4 mr-2" />
-              Phone Call
+            <Button type="button" variant={eventType === "call" ? "default" : "outline"} className="flex-1" onClick={() => setEventType("call")}>
+              <Phone className="w-4 h-4 mr-2" />Phone Call
             </Button>
-            <Button
-              type="button"
-              variant={eventType === "video" ? "default" : "outline"}
-              className="flex-1"
-              onClick={() => setEventType("video")}
-            >
-              <Video className="w-4 h-4 mr-2" />
-              Video Call
+            <Button type="button" variant={eventType === "video" ? "default" : "outline"} className="flex-1" onClick={() => setEventType("video")}>
+              <Video className="w-4 h-4 mr-2" />Video Call
             </Button>
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="time">Time</Label>
-              <Input
-                id="time"
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-              />
+              <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
           </div>
-
           <div className="space-y-2">
             <Label htmlFor="duration">Duration</Label>
-            <select
-              id="duration"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-            >
+            <select id="duration" value={duration} onChange={(e) => setDuration(e.target.value)} className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
               <option value="15">15 minutes</option>
               <option value="30">30 minutes</option>
               <option value="45">45 minutes</option>
@@ -820,12 +831,9 @@ function QuickScheduleDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSchedule} disabled={!title || !date || !time}>
-            <CalendarPlus className="w-4 h-4 mr-2" />
-            Schedule
+            <CalendarPlus className="w-4 h-4 mr-2" />Schedule
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -852,7 +860,6 @@ function QuickMessageDialog({
   const [message, setMessage] = useState("")
   const [attachedFiles, setAttachedFiles] = useState<File[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
-  
 
   useEffect(() => {
     if (open) {
@@ -867,15 +874,11 @@ function QuickMessageDialog({
     onOpenChange(false)
   }
 
-  const handleFileClick = () => {
-    fileInputRef.current?.click()
-  }
-
+  const handleFileClick = () => { fileInputRef.current?.click() }
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
     setAttachedFiles((prev) => [...prev, ...Array.from(e.target.files || [])])
   }
-
   const removeFile = (index: number) => {
     setAttachedFiles((prev) => prev.filter((_, i) => i !== index))
   }
@@ -885,35 +888,21 @@ function QuickMessageDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Send className="w-5 h-5 text-indigo-500" />
-            Send Message
+            <Send className="w-5 h-5 text-indigo-500" />Send Message
           </DialogTitle>
           <DialogDescription>Send a message to {contact?.contactName}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="subject">Subject (optional)</Label>
-            <Input
-              id="subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="What's this about?"
-            />
+            <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="What's this about?" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="message">Message</Label>
-            <Textarea
-              id="message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your message..."
-              rows={4}
-            />
+            <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Type your message..." rows={4} />
           </div>
         </div>
-
         <input ref={fileInputRef} type="file" multiple hidden onChange={handleFilesSelected} />
-
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {attachedFiles.map((file, i) => (
@@ -928,19 +917,14 @@ function QuickMessageDialog({
             ))}
           </div>
         )}
-
         <div className="flex justify-between">
           <Button className="mb-2 cursor-pointer" type="button" onClick={handleFileClick}>
-            <Plus className="w-4 h-4 mr-1" />
-            Upload Attachment
+            <Plus className="w-4 h-4 mr-1" />Upload Attachment
           </Button>
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={handleSend} disabled={!message.trim() && attachedFiles.length === 0}>
-              <Send className="w-4 h-4 mr-2" />
-              Send
+              <Send className="w-4 h-4 mr-2" />Send
             </Button>
           </DialogFooter>
         </div>
@@ -955,13 +939,16 @@ function QuickMessageDialog({
 
 export default function EmergencyContactsPage() {
   return (
-    <CommunicationHubProvider>
-      <EmergencyContactsPageContent />
-    </CommunicationHubProvider>
+    <ConnectionsProvider>
+      <CommunicationHubProvider>
+        <EmergencyContactsPageContent />
+      </CommunicationHubProvider>
+    </ConnectionsProvider>
   )
 }
 
 function EmergencyContactsPageContent() {
+  const router = useRouter()
   const {
     contacts,
     sharedContacts,
@@ -985,6 +972,12 @@ function EmergencyContactsPageContent() {
     exportToPDF,
   } = useCommunicationHub()
   const { documents, shareDocument } = useDocuments()
+  const {
+    sendConnectionRequest,
+    resolveProfileIdFromEmail,
+    getConnectionStatus,
+    canMessageUser,
+  } = useConnections()
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
@@ -992,11 +985,9 @@ function EmergencyContactsPageContent() {
   const [isExporting, setIsExporting] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Shared contact editing
   const [editingSharedContact, setEditingSharedContact] = useState<SharedContact | null>(null)
   const [isEditSharedDialogOpen, setIsEditSharedDialogOpen] = useState(false)
 
-  // Quick action dialogs
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false)
   const [messageDialogOpen, setMessageDialogOpen] = useState(false)
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
@@ -1005,12 +996,23 @@ function EmergencyContactsPageContent() {
   const poaHolders = getPoaHolders()
   const accountAccessContacts = contacts.filter((c) => c.canAccessAccounts)
 
-  // Calculate next priority for new emergency contacts
   const nextEmergencyPriority = emergencyContacts.length > 0
     ? Math.max(...emergencyContacts.map(c => c.priority || 0)) + 1
     : 1
 
-  // Get recent activity for each contact
+  // Navigate to a contact's profile if they have a linked account
+  const handleViewProfile = (contact: Contact) => {
+    if (contact.linked_profile_id) {
+      router.push(`/profile/${contact.linked_profile_id}`)
+    }
+  }
+
+  const handleViewSharedProfile = (sharedContact: SharedContact) => {
+    if (sharedContact.ownerId) {
+      router.push(`/profile/${sharedContact.ownerId}`)
+    }
+  }
+
   const getRecentActivity = (contactId: string) => {
     const logs = communicationLog.filter((l) => l.contactId === contactId)
     const events = scheduledEvents.filter((e) =>
@@ -1044,7 +1046,28 @@ function EmergencyContactsPageContent() {
       await updateContact(editingContact.id, contactData)
       setEditingContact(null)
     } else {
-      await addContact(contactData)
+      // If this contact's email matches a registered user, link and connect
+      let linkedProfileId: string | undefined
+      if (contactData.email) {
+        linkedProfileId = (await resolveProfileIdFromEmail(contactData.email)) || undefined
+      }
+
+      await addContact({
+        ...contactData,
+        linked_profile_id: linkedProfileId,
+      })
+
+      // Auto-send connection request if they're a platform user and not already connected
+      if (linkedProfileId) {
+        const status = getConnectionStatus(linkedProfileId)
+        if (status === "none") {
+          try {
+            await sendConnectionRequest(linkedProfileId)
+          } catch {
+            // Non-critical — contact is still saved
+          }
+        }
+      }
     }
   }
 
@@ -1057,11 +1080,9 @@ function EmergencyContactsPageContent() {
     if (role === "emergency") {
       updates.isEmergencyContact = !contact.isEmergencyContact
       if (!contact.isEmergencyContact) {
-        // Adding as emergency - assign next priority
         updates.role = "primary"
         updates.priority = nextEmergencyPriority
       } else {
-        // Removing from emergency - clear priority
         updates.role = "other"
         updates.priority = 0
       }
@@ -1071,12 +1092,9 @@ function EmergencyContactsPageContent() {
       if (!contact.isPoaHolder && !contact.isEmergencyContact) {
         updates.role = "legal"
       }
-
       if (!contact.isPoaHolder && contact.email) {
         const legalTypes: string[] = ["will", "poa"]
-        const legalDocs = documents.filter((doc) =>
-          legalTypes.includes(doc.documentType)
-        )
+        const legalDocs = documents.filter((doc) => legalTypes.includes(doc.documentType))
         for (const doc of legalDocs) {
           const email = contact.email.trim().toLowerCase()
           if (!doc.sharedWith.includes(email)) {
@@ -1094,20 +1112,17 @@ function EmergencyContactsPageContent() {
 
     await updateContact(contact.id, updates)
 
-    // If removing from emergency, reorder remaining
     if (role === "emergency") {
       const updatedContact = { ...contact, ...updates }
       const nextContacts = contacts.map((c) =>
         c.id === contact.id ? updatedContact : c
       )
-
       await reorderEmergencyPriorities(nextContacts)
     }
   }
 
   const handleMovePriority = async (contactId: string, direction: "up" | "down") => {
     const currentIndex = emergencyContacts.findIndex((c) => c.id === contactId)
-
     if (currentIndex === -1) return
     if (direction === "up" && currentIndex === 0) return
     if (direction === "down" && currentIndex === emergencyContacts.length - 1) return
@@ -1116,7 +1131,6 @@ function EmergencyContactsPageContent() {
     const currentContact = emergencyContacts[currentIndex]
     const targetContact = emergencyContacts[targetIndex]
 
-    // Swap priorities
     await updateContact(currentContact.id, { priority: targetContact.priority })
     await updateContact(targetContact.id, { priority: currentContact.priority })
   }
@@ -1128,37 +1142,23 @@ function EmergencyContactsPageContent() {
     duration: number
   ) => {
     if (!selectedContact?.email) return
-
     await createEvent(
       {
-        title,
-        eventType,
-        startTime,
+        title, eventType, startTime,
         endTime: new Date(new Date(startTime).getTime() + duration * 60000).toISOString(),
         durationMinutes: duration,
         isRecurring: false,
         status: "scheduled",
       },
-      [
-        {
-          email: selectedContact.email,
-          name: selectedContact.contactName,
-          contactId: selectedContact.id,
-        },
-      ]
+      [{ email: selectedContact.email, name: selectedContact.contactName, contactId: selectedContact.id }]
     )
   }
 
   const handleQuickMessage = async (subject: string, message: string, attachedFiles?: File[]) => {
     if (!selectedContact?.email) return
-
     const thread = await createThread(
-      selectedContact.email,
-      selectedContact.contactName,
-      selectedContact.id,
-      subject || undefined
+      selectedContact.email, selectedContact.contactName, selectedContact.id, subject || undefined
     )
-
     if (thread) {
       await sendMessage(thread, message, attachedFiles)
     }
@@ -1166,11 +1166,7 @@ function EmergencyContactsPageContent() {
 
   const handleExportPDF = async () => {
     setIsExporting(true)
-    try {
-      await exportToPDF()
-    } finally {
-      setIsExporting(false)
-    }
+    try { await exportToPDF() } finally { setIsExporting(false) }
   }
 
   const handleEditSharedContact = (sc: SharedContact) => {
@@ -1190,20 +1186,15 @@ function EmergencyContactsPageContent() {
 
   const query = searchQuery.toLowerCase()
   let baseContacts: Contact[] =
-    activeTab === "all"
-      ? contacts
-      : activeTab === "emergency"
-      ? emergencyContacts
-      : activeTab === "poa"
-      ? poaHolders
-      : activeTab === "shared"
-      ? [] // handled separately
-      : accountAccessContacts
+    activeTab === "all" ? contacts
+    : activeTab === "emergency" ? emergencyContacts
+    : activeTab === "poa" ? poaHolders
+    : activeTab === "shared" ? []
+    : accountAccessContacts
 
   const filteredContacts = baseContacts
     .filter((contact) => {
       if (!query) return true
-
       return (
         contact.contactName.toLowerCase().includes(query) ||
         contact.notes?.toLowerCase().includes(query)
@@ -1211,27 +1202,23 @@ function EmergencyContactsPageContent() {
     })
     .sort((a, b) => {
       if (activeTab !== "all") return 0
-
       if (a.isEmergencyContact && !b.isEmergencyContact) return -1
       if (!a.isEmergencyContact && b.isEmergencyContact) return 1
       if (a.isEmergencyContact && b.isEmergencyContact) {
         return (a.priority || 0) - (b.priority || 0)
       }
-
       return 0
     })
 
   const filteredSharedContacts = sharedContacts
     .filter((contact) => {
       if (!query) return true
-
       return (
         contact.contactName.toLowerCase().includes(query) ||
         contact.notes?.toLowerCase().includes(query)
       )
     })
 
-  // Stats
   const upcomingEventsCount = scheduledEvents.filter(e => e.status === "scheduled" && new Date(e.startTime) >= new Date()).length
   const recentLogsCount = communicationLog.length
 
@@ -1247,7 +1234,7 @@ function EmergencyContactsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900">
+    <div className="min-h-screen bg-background">
       <Header />
 
       {/* Hero Header */}
@@ -1255,42 +1242,24 @@ function EmergencyContactsPageContent() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                asChild
-                className="text-white/80 hover:text-white hover:bg-white/10"
-              >
+              <Button variant="ghost" size="icon" asChild className="text-white/80 hover:text-white hover:bg-white/10">
                 <Link href="./">
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
               </Button>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white">
-                  Emergency Contact Network
-                </h1>
-                <p className="text-white/80 mt-1">
-                  Manage contacts, schedule calls, and track communications
-                </p>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Contact Network</h1>
+                <p className="text-white/80 mt-1">Manage contacts, schedule calls, and track communications</p>
               </div>
             </div>
             <div className="hidden sm:flex gap-2">
-              <Button
-                variant="secondary"
-                className="bg-white/10 hover:bg-white/20 text-white border-white/20"
-                asChild
-              >
+              <Button variant="secondary" className="bg-white/10 hover:bg-white/20 text-white border-white/20" asChild>
                 <Link href="./communication">
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Communication Hub
+                  <MessageSquare className="w-4 h-4 mr-2" />Communication Hub
                 </Link>
               </Button>
-              <Button
-                className="bg-white text-primary dark:text-secondary hover:bg-white/70 cursor-pointer"
-                onClick={() => setIsDialogOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Contact
+              <Button className="bg-white text-primary dark:text-secondary hover:bg-white/70 cursor-pointer" onClick={() => setIsDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />Add Contact
               </Button>
             </div>
           </div>
@@ -1349,13 +1318,11 @@ function EmergencyContactsPageContent() {
       <div className="sm:hidden flex gap-2 p-4 border-b bg-background">
         <Button variant="outline" className="flex-1" asChild>
           <Link href="./communication-hub">
-            <MessageSquare className="w-4 h-4 mr-2" />
-            Hub
+            <MessageSquare className="w-4 h-4 mr-2" />Hub
           </Link>
         </Button>
         <Button className="flex-1" onClick={() => setIsDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Contact
+          <Plus className="w-4 h-4 mr-2" />Add Contact
         </Button>
       </div>
 
@@ -1373,9 +1340,12 @@ function EmergencyContactsPageContent() {
           </Alert>
         )}
 
+        {/* Connection Requests — shows pending connection requests from other users */}
+        <ConnectionRequestsInbox />
+
         {/* Quick Reference Card */}
         {(emergencyContacts.length > 0 || poaHolders.length > 0) && (
-          <div className="bg-card border rounded-xl p-5 mb-8">
+          <div className="bg-card border rounded-xl p-5 mb-8 mt-6">
             <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5 text-indigo-500" />
               Quick Reference
@@ -1391,10 +1361,7 @@ function EmergencyContactsPageContent() {
                     {emergencyContacts[0].contactName}
                   </p>
                   {emergencyContacts[0].phonePrimary && (
-                    <a
-                      href={`tel:${emergencyContacts[0].phonePrimary}`}
-                      className="text-indigo-600 hover:underline flex items-center gap-2 mt-1"
-                    >
+                    <a href={`tel:${emergencyContacts[0].phonePrimary}`} className="text-indigo-600 hover:underline flex items-center gap-2 mt-1">
                       <Phone className="w-4 h-4" />
                       {formatPhone(emergencyContacts[0].phonePrimary)}
                     </a>
@@ -1411,10 +1378,7 @@ function EmergencyContactsPageContent() {
                     {poaHolders[0].contactName}
                   </p>
                   {poaHolders[0].phonePrimary && (
-                    <a
-                      href={`tel:${poaHolders[0].phonePrimary}`}
-                      className="text-indigo-600 hover:underline flex items-center gap-2 mt-1"
-                    >
+                    <a href={`tel:${poaHolders[0].phonePrimary}`} className="text-indigo-600 hover:underline flex items-center gap-2 mt-1">
                       <Phone className="w-4 h-4" />
                       {formatPhone(poaHolders[0].phonePrimary)}
                     </a>
@@ -1441,28 +1405,21 @@ function EmergencyContactsPageContent() {
               </TabsTrigger>
             </TabsList>
             <div className="flex gap-2 items-center">
+              <MemberSearchBar className="flex-1"/>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search contacts..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+                <Input placeholder="Search contacts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
               </div>
-              {activeTab === "shared"?
+              {activeTab === "shared" ?
                 <Button variant="outline" size="sm" onClick={refreshSharedContacts} className="cursor-pointer">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>:
-                <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)}  className="cursor-pointer">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Contact
+                  <RefreshCw className="w-4 h-4 mr-2" />Refresh
+                </Button> :
+                <Button variant="outline" size="sm" onClick={() => setIsDialogOpen(true)} className="cursor-pointer">
+                  <Plus className="w-4 h-4 mr-2" />Add Contact
                 </Button>
               }
               <Button variant="outline" size="sm" onClick={handleExportPDF} disabled={isExporting || contacts.length === 0} className="cursor-pointer">
-                <Download className="w-4 h-4 mr-2" />
-                {isExporting ? "Exporting..." : "Export PDF"}
+                <Download className="w-4 h-4 mr-2" />{isExporting ? "Exporting..." : "Export PDF"}
               </Button>
             </div>
           </div>
@@ -1472,7 +1429,7 @@ function EmergencyContactsPageContent() {
             {sharedContacts.length > 0 ? (
               <>
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Shared With You:</strong> These people have listed your email as their emergency contact. 
+                  <strong>Shared With You:</strong> These people have added your email as a contact.
                   You can customize how they appear and optionally add them to your own contacts.
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
@@ -1481,7 +1438,17 @@ function EmergencyContactsPageContent() {
                       key={sc.id}
                       sharedContact={sc}
                       onEdit={() => handleEditSharedContact(sc)}
-                      onAddToContacts={() => addSharedContactToMyContacts(sc)}
+                      onAddToContacts={async () => {
+                        await addSharedContactToMyContacts(sc)
+                        // Also send a connection request if they have a profile
+                        if (sc.ownerId) {
+                          const status = getConnectionStatus(sc.ownerId)
+                          if (status === "none") {
+                            try { await sendConnectionRequest(sc.ownerId) } catch {}
+                          }
+                        }
+                      }}
+                      onViewProfile={() => handleViewSharedProfile(sc)}
                     />
                   ))}
                 </div>
@@ -1492,9 +1459,7 @@ function EmergencyContactsPageContent() {
                   <Users className="w-8 h-8 text-blue-600" />
                 </div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">No shared contacts yet</h3>
-                <p className="text-muted-foreground">
-                  When someone adds your email as their emergency contact, they'll appear here.
-                </p>
+                <p className="text-muted-foreground">When someone adds your email to their contacts, they'll appear here.</p>
               </div>
             )}
           </TabsContent>
@@ -1527,10 +1492,19 @@ function EmergencyContactsPageContent() {
                       setSelectedContact(contact)
                       setScheduleDialogOpen(true)
                     }}
-                    onSendMessage={() => {
+                    onSendMessage={async () => {
+                      // If this contact is linked to a platform user, check privacy
+                      if (contact.linked_profile_id) {
+                        const check = await canMessageUser(contact.linked_profile_id)
+                        if (!check.allowed) {
+                          alert(check.reason || "Cannot message this user due to privacy restrictions")
+                          return
+                        }
+                      }
                       setSelectedContact(contact)
                       setMessageDialogOpen(true)
                     }}
+                    onViewProfile={() => handleViewProfile(contact)}
                     showPriority={activeTab === "all"}
                     onMoveUp={() => handleMovePriority(contact.id, "up")}
                     onMoveDown={() => handleMovePriority(contact.id, "down")}
@@ -1555,8 +1529,7 @@ function EmergencyContactsPageContent() {
                 </p>
                 {contacts.length === 0 && (
                   <Button onClick={() => setIsDialogOpen(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Contact
+                    <Plus className="w-4 h-4 mr-2" />Add Your First Contact
                   </Button>
                 )}
               </div>
@@ -1603,7 +1576,6 @@ function EmergencyContactsPageContent() {
         onSave={handleSaveSharedContactEdit}
       />
 
-      {/* Sync indicator */}
       {isSyncing && (
         <div className="fixed bottom-4 right-4 bg-card border rounded-lg shadow-lg px-4 py-2 flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />

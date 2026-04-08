@@ -18,6 +18,7 @@ import { MessageThread, Message, Contact, SharedContact } from "@/lib/types"
 import { useCommunicationHub } from "@/hooks/use-communication-hub"
 import { format, formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
+import { useConnections } from "@/hooks/use-connections"
 
 function getInitials(name: string): string {
   return name
@@ -312,7 +313,7 @@ function ThreadListItem({
   const inContacts = contacts.some(c => c.email === otherParty.email)
 
   return (
-    <div onClick={onClick} className={`p-3 border-b cursor-pointer transition-colors hover:bg-muted/50 ${isSelected ? "bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-l-indigo-500" : ""}`}>
+    <div onClick={onClick} className={`p-3 border-b cursor-pointer transition-colors hover:bg-primary/20 ${isSelected ? "bg-indigo-50 dark:bg-indigo-900/20 border-l-2 border-l-indigo-500" : ""}`}>
       <div className="flex items-start gap-3">
         <Avatar className="w-10 h-10">
           <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-500 text-white">{getInitials(otherParty.name)}</AvatarFallback>
@@ -328,11 +329,11 @@ function ThreadListItem({
         </div>
         <div className="flex flex-col items-center gap-1">
           {thread.unreadCount > 0 && <Badge variant="default" className="h-5 min-w-[20px] flex items-center justify-center">{thread.unreadCount}</Badge>}
-          <button onClick={(e) => { e.stopPropagation(); onStar() }} className="p-1 hover:bg-muted rounded">
-            {thread.isStarred ? <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> : <Star className="w-4 h-4 text-muted-foreground" />}
+          <button onClick={(e) => { e.stopPropagation(); onStar() }} className="p-1 hover:bg-muted cursor-pointer rounded">
+            {thread.isStarred ? <Star className="w-4 h-4 text-amber-500 fill-amber-500 dark:hover:text-white" /> : <Star className="w-4 h-4 text-muted-foreground dark:hover:text-white" />}
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1 hover:bg-muted rounded mt-2">
-            <Trash2 className="w-4 h-4 text-muted-foreground" />
+          <button onClick={(e) => { e.stopPropagation(); onDelete() }} className="p-1 hover:bg-muted rounded mt-2 cursor-pointer">
+            <Trash2 className="w-4 h-4 text-muted-foreground dark:hover:text-white" />
           </button>
         </div>
       </div>
@@ -371,10 +372,10 @@ function ThreadHeader({ thread, currentUser, contacts, sharedContacts, onStar, o
           </Button>
         }
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={onStar}>
+          <Button variant="ghost" size="icon" className="cursor-pointer" onClick={onStar}>
             {thread.isStarred ? <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> : <Star className="w-4 h-4" />}
           </Button>
-          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={onDelete}>
+          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive cursor-pointer" onClick={onDelete}>
             <Trash2 className="w-4 h-4"/>
           </Button>
         </div>
@@ -501,16 +502,16 @@ function MessageBubble({
       {/* Action buttons for current user's messages */}
       {isCurrentUser && showActions && !isEditing && (
         <div className="flex items-center gap-1 mr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleStartEdit}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 cursor-pointer" onClick={handleStartEdit}>
             <Pencil className="w-3 h-3" />
           </Button>
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={handleDelete}>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive cursor-pointer" onClick={handleDelete}>
             <Trash2 className="w-3 h-3" />
           </Button>
         </div>
       )}
 
-      <div className={`max-w-[70%] rounded-2xl px-4 py-2 space-y-2 ${isCurrentUser ? "bg-indigo-600 text-white rounded-br-md" : "bg-muted rounded-bl-md"}`}>
+      <div className={`max-w-[70%] rounded-2xl px-4 py-2 space-y-2 ${isCurrentUser ? "bg-indigo-600 text-white rounded-br-md" : "bg-primary/20 rounded-bl-md"}`}>
         {isEditing ? (
           <div className="space-y-3">
             {/* File input - using key to force re-render */}
@@ -720,6 +721,7 @@ export function MessagesTab() {
     addSharedContactToMyContacts,
     addNonContactToMyContacts
   } = useCommunicationHub()
+  const { canMessageUser, resolveProfileIdFromEmail, sendConnectionRequest } = useConnections()
 
   const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false)
   const [selectedThread, setSelectedThread] = useState<MessageThread | null>(null)
@@ -820,6 +822,16 @@ export function MessagesTab() {
     message: string,
     attachedFiles?: File[]
   ) => {
+    // Privacy check: resolve email to profile and check permissions
+    const profileId = await resolveProfileIdFromEmail(contactEmail)
+    if (profileId) {
+      const check = await canMessageUser(profileId)
+      if (!check.allowed) {
+        alert(check.reason || "Cannot message this user due to their privacy settings.")
+        return
+      }
+    }
+
     const thread = await createThread(contactEmail, contactName, contactId, subject)
     if (thread) {
       const newMessage = await sendMessage(thread, message, attachedFiles)
@@ -913,10 +925,10 @@ export function MessagesTab() {
                       placeholder="Search messages..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 dark:border-slate-500"
                     />
                   </div>
-                  <Button size="icon" onClick={() => setIsMessageDialogOpen(true)}>
+                  <Button size="icon" className="cursor-pointer" onClick={() => setIsMessageDialogOpen(true)}>
                     <Plus className="w-4 h-4" />
                   </Button>
                 </div>
@@ -1000,10 +1012,22 @@ export function MessagesTab() {
                         setSelectedThread(null)
                       }
                     }}
-                    onAddContact={() => {
+                    onAddContact={async () => {
                       const otherParty = getOtherPartyInfo(selectedThread, currentUser, contacts, sharedContacts)
                       const sc = sharedContacts.find(c => c.ownerEmail === otherParty.email)
-                      sc ? addSharedContactToMyContacts(sc) : addNonContactToMyContacts(otherParty.name, otherParty.email)
+                
+                      if (sc) {
+                        await addSharedContactToMyContacts(sc)
+                        if (sc.ownerId) {
+                          try { await sendConnectionRequest(sc.ownerId) } catch {}
+                        }
+                      } else {
+                        const profileId = await resolveProfileIdFromEmail(otherParty.email)
+                        await addNonContactToMyContacts(otherParty.name, otherParty.email, profileId || undefined)
+                        if (profileId) {
+                          try { await sendConnectionRequest(profileId) } catch {}
+                        }
+                      }
                     }}
                   />
 
@@ -1024,7 +1048,7 @@ export function MessagesTab() {
 
                   {/* Compose */}
                   <div
-                    className={`p-4 border-t transition-colors ${
+                    className={`p-4 border-t dark:border-slate-500 transition-colors ${
                       isDragging ? "bg-indigo-50 border-indigo-400" : ""
                     }`}
                     onDrop={handleDrop}
@@ -1074,7 +1098,7 @@ export function MessagesTab() {
                         placeholder="Type your message..."
                         value={newMessageContent}
                         onChange={(e) => setNewMessageContent(e.target.value)}
-                        className="min-h-[80px] resize-none"
+                        className="min-h-[80px] resize-none dark:border-slate-500"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault()

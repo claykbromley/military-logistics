@@ -586,7 +586,7 @@ export function LogTab() {
                 : "Try adjusting your filters to see more results"}
             </p>
             {communicationLog.length === 0 && (
-              <Button onClick={() => setIsLogDialogOpen(true)}>
+              <Button className="cursor-pointer" onClick={() => setIsLogDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Your First Log
               </Button>

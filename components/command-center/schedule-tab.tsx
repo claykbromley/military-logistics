@@ -568,7 +568,7 @@ function ScheduleTabInner({
             <p className="text-muted-foreground mb-6">
               Schedule meetings and tasks to stay organized
             </p>
-            <Button onClick={() => openModal()}>
+            <Button className="cursor-pointer" onClick={() => openModal()}>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule Your First Meeting
             </Button>

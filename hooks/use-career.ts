@@ -344,7 +344,7 @@ export function useCareer() {
             .eq("benefit_type", "military_benefit"),
           supabase
             .from("profiles")
-            .select("paygrade, military_branch, zip_code")
+            .select("paygrade, military_branch, zip_code, years_of_service")
             .eq("id", user.id)
             .maybeSingle(),
         ])
@@ -423,7 +423,7 @@ export function useCareer() {
           setProfile((prev) => ({
             ...prev,
             rank: rank.label,
-            yearsOfService: rank.typicalYOS ?? 4,
+            yearsOfService: dbProfile.years_of_service || rank.typicalYOS || 4,
             branch: dbProfile.military_branch || "army",
             dependentStatus: false,
             zipCode: dbProfile.zip_code || "",

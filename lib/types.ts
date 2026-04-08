@@ -308,6 +308,7 @@ export interface Contact {
   address?: string
   timezone?: string
   role: ContactRole
+  linked_profile_id?: string
   isEmergencyContact: boolean
   isPoaHolder: boolean
   poaType?: string
@@ -578,4 +579,52 @@ export interface AlpacaAccount {
   portfolio_value: string;
   buying_power: string;
   equity: string;
+}
+
+// ─── Privacy & Connection Types ──────────────────────────────────────────────
+
+export type PrivacyLevel = "public" | "connections_only" | "private"
+ 
+export type ConnectionStatus =
+  | "none"
+  | "pending_sent"
+  | "pending_received"
+  | "connected"
+  | "blocked"
+ 
+export interface ConnectionRequest {
+  id: string
+  senderId: string
+  senderName: string
+  senderEmail: string
+  senderAvatar?: string
+  senderBranch?: string
+  senderPaygrade?: string
+  recipientId: string
+  recipientName?: string
+  recipientEmail?: string
+  message?: string
+  status: "pending" | "accepted" | "declined"
+  createdAt: string
+  respondedAt?: string
+}
+ 
+export interface ProfilePrivacySettings {
+  privacyLevel: PrivacyLevel
+  showEmail: boolean
+  showPhone: boolean
+  showDutyStation: boolean
+  showBio: boolean
+  showInSearch: boolean
+  showMos: boolean
+}
+ 
+export const DEFAULT_PRIVACY_SETTINGS: ProfilePrivacySettings = {
+  privacyLevel: "public",
+  showEmail: true,
+  showPhone: false,
+  showDutyStation: true,
+  showBio: true,
+  showInSearch: true,
+  showMos: true,
 }

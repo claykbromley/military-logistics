@@ -95,6 +95,7 @@ function useCommunicationHubInternal() {
           canAccessAccounts: c.can_access_accounts,
           priority: c.priority || 0,
           notes: c.notes || undefined,
+          linked_profile_id: c.linked_profile_id || undefined,
           createdAt: c.created_at,
           updatedAt: c.updated_at,
         }))
@@ -408,6 +409,7 @@ function useCommunicationHubInternal() {
                 can_access_accounts: contact.canAccessAccounts || false,
                 notes: contact.notes || null,
                 priority: contact.priority || 0,
+                linked_profile_id: contact.linked_profile_id || null,
               })
               .select()
               .single()
@@ -428,6 +430,7 @@ function useCommunicationHubInternal() {
               poaType: data.poa_type || undefined,
               canAccessAccounts: data.can_access_accounts || false,
               priority: data.priority || 0,
+              linked_profile_id: data.linked_profile_id || undefined,
               notes: data.notes || undefined,
               createdAt: data.created_at,
               updatedAt: data.updated_at,
@@ -1788,7 +1791,6 @@ function useCommunicationHubInternal() {
 
   const addSharedContactToMyContacts = useCallback(
     async (sharedContact: SharedContact) => {
-      // Create a new contact from the shared contact info
       const newContact = await addContact({
         contactName: sharedContact.localDisplayName || sharedContact.ownerDisplayName || sharedContact.ownerEmail.split("@")[0],
         relationship: sharedContact.localRelationship || "Listed me as contact",
@@ -1800,22 +1802,17 @@ function useCommunicationHubInternal() {
         isPoaHolder: false,
         canAccessAccounts: false,
         priority: 0,
+        linked_profile_id: sharedContact.ownerId || undefined,
       })
 
       if (newContact) {
-        // Mark as added in shared contacts
         setSharedContacts((prev) =>
           prev.map((sc) =>
             sc.id === sharedContact.id ? { ...sc, addedToContacts: true } : sc
           )
         )
-
-        // Persist to localStorage
         const localEdits = JSON.parse(localStorage.getItem(SHARED_CONTACTS_KEY) || "{}")
-        localEdits[sharedContact.id] = {
-          ...localEdits[sharedContact.id],
-          addedToContacts: true,
-        }
+        localEdits[sharedContact.id] = { ...localEdits[sharedContact.id], addedToContacts: true }
         localStorage.setItem(SHARED_CONTACTS_KEY, JSON.stringify(localEdits))
       }
 
@@ -1825,7 +1822,7 @@ function useCommunicationHubInternal() {
   )
 
   const addNonContactToMyContacts = useCallback(
-    async (name: string, email: string) => {
+    async (name: string, email: string, profileId?: string) => {
       const newContact = await addContact({
         contactName: name,
         relationship: "In a message thread with me",
@@ -1835,6 +1832,7 @@ function useCommunicationHubInternal() {
         isPoaHolder: false,
         canAccessAccounts: false,
         priority: 0,
+        linked_profile_id: profileId || undefined,
       })
       return newContact
     },

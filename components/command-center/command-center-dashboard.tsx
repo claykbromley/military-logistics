@@ -26,6 +26,7 @@ import type { CalendarEntry } from "@/app/scheduler/calendar/types"
 import { getNextOccurrence } from "@/app/scheduler/calendar/utils"
 import { useCareer, ENLISTED_RANKS, WARRANT_RANKS, OFFICER_RANKS, } from "@/hooks/use-career"
 import { PAYGRADES } from "@/lib/types"
+import { isAfter, isBefore, addDays } from "date-fns";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
@@ -397,23 +398,91 @@ export function CommandCenterDashboard() {
 
   // ____________________________ Communications/Contacts _________________________________________________
 
-  const { getEmergencyContacts, getPoaHolders, contacts, scheduledEvents, messageThreads, communicationLog, isLoaded: commLoaded } = useCommunicationHub()
+  const { getEmergencyContacts, getPoaHolders, contacts, messageThreads, communicationLog, isLoaded: commLoaded } = useCommunicationHub()
   const emergencyContactsList = getEmergencyContacts()
   const poaHolders = getPoaHolders()
   const primaryContact = contacts.find(contact => contact.priority === 1)
 
-  const upcomingCalls = useMemo(() => {
-    const now = Date.now()
-    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000
-    const cutoff = now + THIRTY_DAYS
-    return scheduledEvents
-      .filter((e) => e.status === "scheduled" && new Date(e.startTime) >= new Date())
-      .filter((e) => {
-        const start = new Date(e.startTime).getTime()
-        return start <= cutoff
-      })
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-  }, [scheduledEvents])
+  const [totalMeetings, setTotalMeetings] = useState(0)
+  const [nextMeeting, setNextMeeting] = useState<{ title: string; startTime: string } | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!userId) return;
+
+    async function fetchMeetingData() {
+      const supabase = createClient();
+      const now = new Date();
+      const thirtyDaysOut = addDays(now, 30);
+
+      const { data, error } = await supabase
+        .from("calendar_entries")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("source", "meeting")
+        .eq("is_completed", false);
+
+      if (error || !data) {
+        setTotalMeetings(0);
+        setNextMeeting(null);
+        return;
+      }
+
+      // Use the same logic as ScheduleTabInner
+      const hasFutureOccurrences = (e: any): boolean => {
+        if (!e.is_recurring) return isAfter(new Date(e.start_time), now);
+        const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null;
+        if (!recEnd) return true;
+        return isAfter(new Date(recEnd), now);
+      };
+
+      const upcoming = data
+        .filter((e) => !e.is_completed && hasFutureOccurrences(e))
+        .map((e) => ({
+          ...e,
+          _nextOccurrence: getNextOccurrence(e, now) || new Date(e.start_time),
+        }))
+        .sort((a, b) => a._nextOccurrence.getTime() - b._nextOccurrence.getTime());
+
+      // Count only those with next occurrence within 30 days
+      const withinThirty = upcoming.filter((e) =>
+        isBefore(e._nextOccurrence, thirtyDaysOut)
+      );
+
+      setTotalMeetings(withinThirty.length);
+
+      // Next meeting = first in the sorted list
+      setNextMeeting(
+        upcoming.length > 0
+          ? {
+              title: upcoming[0].title,
+              startTime: upcoming[0]._nextOccurrence.toISOString(),
+            }
+          : null
+      );
+    }
+
+    fetchMeetingData();
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel("dashboard-meeting-count")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "calendar_entries", filter: `user_id=eq.${userId}` },
+        () => fetchMeetingData()
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
 
   const unreadCount = useMemo(() => {
     return messageThreads
@@ -921,9 +990,9 @@ export function CommandCenterDashboard() {
 
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
-                  <Video className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2" />
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{upcomingCalls.length}</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Scheduled Calls</div>
+                  <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400 mb-2" />
+                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{totalMeetings}</div>
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Upcoming Meetings</div>
                 </div>
 
                 <div className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-slate-200/50 dark:border-slate-700/50">
@@ -944,13 +1013,15 @@ export function CommandCenterDashboard() {
 
               <div className="bg-purple-600 dark:bg-purple-700 rounded-xl p-4 text-white">
                 <div className="flex items-center justify-between">
-                  {upcomingCalls.length > 0 ?
+                  {nextMeeting ? (
                     <div>
-                      <div className="text-sm opacity-90 mb-1">Next scheduled call</div>
-                      <div className="text-xl font-bold">{formatEventTime(upcomingCalls[0].startTime)}</div>
-                      <div className="text-sm opacity-75 mt-1">{upcomingCalls[0].title}</div>
+                      <div className="text-sm opacity-90 mb-1">Next scheduled meeting</div>
+                      <div className="text-xl font-bold">{formatEventTime(nextMeeting.startTime)}</div>
+                      <div className="text-sm opacity-75 mt-1">{nextMeeting.title}</div>
                     </div>
-                  : <div className="text-xl font-bold">No Upcoming Calls</div>}
+                  ) : (
+                    <div className="text-xl font-bold">No Upcoming Meetings</div>
+                  )}
                   <Phone className="w-8 h-8 opacity-50" />
                 </div>
               </div>
@@ -1291,7 +1362,7 @@ export function CommandCenterDashboard() {
                     <Users className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Emergency Contacts</h3>
+                    <h3 className="font-bold text-slate-900 dark:text-slate-100">Contacts</h3>
                     <span className="text-xs text-slate-600 dark:text-slate-400">{contacts.length} contact{contacts.length !== 1 && 's'}</span>
                   </div>
                 </div>
