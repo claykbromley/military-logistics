@@ -138,7 +138,7 @@ export function AddCommunicationDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={openContacts}
-                  className="w-full justify-between"
+                  className="w-full justify-between cursor-pointer"
                 >
                   {selectedContact
                     ? `${selectedContact.name} (${selectedContact.email})`
@@ -190,7 +190,7 @@ export function AddCommunicationDialog({
             <div className="space-y-2">
               <Label htmlFor="type">Type</Label>
               <Select value={type} onValueChange={(v) => setType(v as CommunicationType)}>
-                <SelectTrigger id="type">
+                <SelectTrigger id="type" className="cursor-pointer">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -209,7 +209,7 @@ export function AddCommunicationDialog({
                 value={direction}
                 onValueChange={(v) => setDirection(v as "incoming" | "outgoing" | "twoway")}
               >
-                <SelectTrigger id="direction">
+                <SelectTrigger id="direction" className="cursor-pointer">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -267,10 +267,10 @@ export function AddCommunicationDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" className="cursor-pointer" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={!contactId || !date || !time}>
+          <Button className='cursor-pointer' onClick={handleSave} disabled={!contactId || !date || !time}>
             {editingLog ? "Save Changes" : "Add Log"}
           </Button>
         </DialogFooter>
@@ -336,18 +336,18 @@ function CommunicationLogCard({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="icon" className="h-8 w-8 cursor-pointer">
               <MoreVertical className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onEdit}>
-              <Edit className="w-4 h-4 mr-2" />
+              <Edit className="w-4 h-4 mr-2 hover:text-white" />
               Edit
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive">
-              <Trash2 className="w-4 h-4 mr-2" />
+              <Trash2 className="w-4 h-4 mr-2 hover:text-white" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>

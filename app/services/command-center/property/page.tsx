@@ -223,16 +223,16 @@ function PropertyCard({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl">
               <DropdownMenuItem onClick={onEdit} className="rounded-lg">
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-2 hover:text-white" />
                 Edit Details
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onAddTask} className="rounded-lg">
-                <Wrench className="w-4 h-4 mr-2" />
+                <Wrench className="w-4 h-4 mr-2 hover:text-white" />
                 Add Task
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onDelete} className="text-destructive rounded-lg">
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Trash2 className="w-4 h-4 mr-2 hover:text-white" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -241,7 +241,7 @@ function PropertyCard({
 
         {/* Caretaker Info */}
         {property.caretakerName && (
-          <div className="mt-4 p-3 rounded-xl bg-background border border-border">
+          <div className="mt-4 p-3 rounded-xl bg-primary/20 border border-border">
             <div className="flex items-center gap-2 text-sm">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/30 flex items-center justify-center">
                 <User className="w-4 h-4 text-primary" />
@@ -288,7 +288,7 @@ function PropertyCard({
       {/* Maintenance Tasks */}
       {pendingTasks.length > 0 && (
         <div className="px-5 pb-5">
-          <div className="bg-background rounded-xl p-4 border border-border">
+          <div className="bg-primary/20 rounded-xl p-4 border border-border">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <Wrench className="w-3.5 h-3.5" />
               Maintenance ({pendingTasks.length})
@@ -325,12 +325,12 @@ function PropertyCard({
                         Complete
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEditTask(task)} className="rounded-lg">
-                        <Edit className="w-4 h-4 mr-2" />
+                        <Edit className="w-4 h-4 mr-2 hover:text-white" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => onDeleteTask(task.id)} className="text-destructive rounded-lg">
-                        <Trash2 className="w-4 h-4 mr-2" />
+                        <Trash2 className="w-4 h-4 mr-2 hover:text-white" />
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -1286,7 +1286,7 @@ export default function PropertyManagerPage() {
                       key={idx}
                       className="inline-flex items-center px-3 py-1.5 rounded-full bg-card/80 text-amber-800 dark:text-amber-400 text-xs font-medium border border-amber-500/20"
                     >
-                      {item.propertyName}: {item.type}
+                      {item.propertyName}: {item.itemType}
                       <span className="ml-2 text-amber-600 dark:text-amber-500">({formatDate(item.date)})</span>
                     </span>
                   ))}
@@ -1323,25 +1323,25 @@ export default function PropertyManagerPage() {
             <TabsList className="bg-card backdrop-blur-sm rounded-xl p-1 border border-border">
               <TabsTrigger 
                 value="all" 
-                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground cursor-pointer"
               >
                 All ({properties.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="homes"
-                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground cursor-pointer"
               >
                 Homes ({homes.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="vehicles"
-                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground cursor-pointer"
               >
                 Vehicles ({vehicles.length})
               </TabsTrigger>
               <TabsTrigger 
                 value="other"
-                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground cursor-pointer"
               >
                 Other
               </TabsTrigger>

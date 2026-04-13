@@ -6,7 +6,7 @@ import { SupabaseClient } from "@supabase/supabase-js"
 export type NotificationType =
   | "system"
   | "appointment"
-  | "benefit"
+  | "communication"
   | "community"
   | "transition"
   | "discount"
@@ -44,7 +44,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   types: {
     system: { enabled: true, email: true },
     appointment: { enabled: true, email: true },
-    benefit: { enabled: true, email: true },
+    communication: { enabled: true, email: true },
     community: { enabled: true, email: false },
     transition: { enabled: true, email: true },
     discount: { enabled: true, email: false },
@@ -68,9 +68,9 @@ export const NOTIFICATION_TYPE_LABELS: Record<
     description: "Upcoming appointments and schedule changes",
     color: "text-green-600",
   },
-  benefit: {
-    label: "Benefits & Eligibility",
-    description: "New benefits, eligibility changes, and deadlines",
+  communication: {
+    label: "Communications",
+    description: "New messages and meeting invitations",
     color: "text-purple-600",
   },
   community: {
@@ -161,6 +161,14 @@ export async function markAsRead(notificationId: string): Promise<void> {
     .eq("id", notificationId)
 }
 
+export async function markAsUnread(notificationId: string): Promise<void> {
+  const supabase = createClient()
+  await supabase
+    .from("notifications")
+    .update({ read: false })
+    .eq("id", notificationId)
+}
+
 /**
  * Mark all notifications as read for the current user.
  */
@@ -221,39 +229,33 @@ export function subscribeToNotifications(
  */
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return DEFAULT_NOTIFICATION_PREFERENCES
 
   const { data, error } = await supabase
-    .from("notification_preferences")
-    .select("*")
-    .eq("user_id", user.id)
+    .from("profiles")
+    .select("notifications")
+    .eq("id", user.id)
     .single()
 
-  if (error || !data) return DEFAULT_NOTIFICATION_PREFERENCES
-
-  return data.preferences as NotificationPreferences
+  if (error || !data?.notifications) return DEFAULT_NOTIFICATION_PREFERENCES
+  return data.notifications as NotificationPreferences
 }
 
-/**
- * Update notification preferences.
- */
 export async function updateNotificationPreferences(
   preferences: NotificationPreferences
 ): Promise<void> {
   const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase.from("notification_preferences").upsert({
-    user_id: user.id,
-    preferences,
-    updated_at: new Date().toISOString(),
-  })
+  await supabase
+    .from("profiles")
+    .update({
+      notifications: preferences,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id)
 }
 
 // ─── Server-side / Edge Function Helper ──────────────────────────────────────
@@ -287,29 +289,74 @@ export async function sendNotification(params: {
 }): Promise<Notification | null> {
   const supabase = createClient()
 
-  const { data, error } = await supabase
-    .from("notifications")
-    .insert({
-      user_id: params.userId,
-      type: params.type,
-      priority: params.priority || "medium",
-      title: params.title,
-      message: params.message,
-      action_url: params.actionUrl,
-      action_label: params.actionLabel,
-      read: false,
-      email_sent: false,
-      metadata: params.metadata || {},
-    })
-    .select()
-    .single()
+  const { data, error } = await supabase.rpc("create_notification", {
+    p_user_id: params.userId,
+    p_type: params.type,
+    p_priority: params.priority || "medium",
+    p_title: params.title,
+    p_message: params.message,
+    p_action_url: params.actionUrl || null,
+    p_action_label: params.actionLabel || null,
+    p_metadata: params.metadata || {},
+  })
 
   if (error) {
     console.error("Failed to send notification:", error)
     return null
   }
 
-  return data as Notification
+  if (!data) return null
+
+  const notificationId = data
+
+  // Send email from the client side --------------- domain must be added to resend before emails can be sent
+  // const { data: profile } = await supabase
+  //   .from("profiles")
+  //   .select("email, notifications")
+  //   .eq("id", params.userId)
+  //   .single()
+
+  // if (profile?.email && profile?.notifications) {
+  //   const prefs = profile.notifications as NotificationPreferences
+  //   const typePrefs = prefs.types[params.type]
+
+  //   if (
+  //     prefs.email_enabled &&
+  //     typePrefs?.email &&
+  //     prefs.email_frequency === "instant"
+  //   ) {
+  //     fetch("/api/send-notification-email", {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({
+  //         notification_id: notificationId,
+  //         user_id: params.userId,
+  //         email: profile.email,
+  //         type: params.type,
+  //         priority: params.priority || "medium",
+  //         title: params.title,
+  //         message: params.message,
+  //         action_url: params.actionUrl,
+  //         action_label: params.actionLabel,
+  //       }),
+  //     }).catch((err) => console.error("Email send failed:", err))
+  //   }
+  //}
+
+  return {
+    id: notificationId,
+    user_id: params.userId,
+    type: params.type,
+    priority: params.priority || "medium",
+    title: params.title,
+    message: params.message,
+    action_url: params.actionUrl,
+    action_label: params.actionLabel,
+    read: false,
+    email_sent: false,
+    created_at: new Date().toISOString(),
+    metadata: params.metadata,
+  } as Notification
 }
 
 /**
@@ -324,21 +371,18 @@ export async function sendBulkNotifications(params: {
   actionUrl?: string
   actionLabel?: string
 }): Promise<void> {
-  const supabase = createClient()
-
-  const rows = params.userIds.map((userId) => ({
-    user_id: userId,
-    type: params.type,
-    priority: params.priority || "medium",
-    title: params.title,
-    message: params.message,
-    action_url: params.actionUrl,
-    action_label: params.actionLabel,
-    read: false,
-    email_sent: false,
-    metadata: {},
-  }))
-
-  const { error } = await supabase.from("notifications").insert(rows)
-  if (error) console.error("Failed to send bulk notifications:", error)
+  // Send individually so each user's preferences are respected
+  await Promise.allSettled(
+    params.userIds.map((userId) =>
+      sendNotification({
+        userId,
+        type: params.type,
+        priority: params.priority,
+        title: params.title,
+        message: params.message,
+        actionUrl: params.actionUrl,
+        actionLabel: params.actionLabel,
+      })
+    )
+  )
 }

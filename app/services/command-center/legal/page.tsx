@@ -248,7 +248,7 @@ function ChecklistCategory({ category, items, completionMap, onToggle, linkedDoc
               >
                 <button
                   onClick={() => onToggle(item.id)}
-                  className="mt-0.5 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-full"
+                  className="mt-0.5 flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-full cursor-pointer"
                   aria-label={`${done ? "Uncheck" : "Check"}: ${item.label}`}
                   aria-pressed={done}
                 >
@@ -898,7 +898,7 @@ function LegalReadinessContent() {
                   <span className="text-xs font-semibold text-muted-foreground">{readinessPercent}%</span>
                   <div className="w-32"><Progress value={readinessPercent} className="h-2" aria-label={`Overall progress: ${readinessPercent}%`} /></div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-lg" onClick={resetAll}>
+                <Button variant="outline" size="sm" className="rounded-lg cursor-pointer" onClick={resetAll}>
                   <RotateCcw className="w-3 h-3 mr-1.5" aria-hidden="true" />Reset
                 </Button>
               </div>
@@ -935,7 +935,7 @@ function LegalReadinessContent() {
                 { label: "CFPB Servicemember Line", phone: "1-855-411-2372", desc: "Financial complaints & help", url: "https://www.consumerfinance.gov/consumer-tools/educator-tools/servicemembers/" },
                 { label: "Armed Forces Legal Aid", phone: null as string | null, desc: "Find office by zip code", url: "https://legalassistance.law.af.mil/content/locator.php" },
               ].map((h) => (
-                <div key={h.label} className="border rounded-xl p-4 bg-gradient-to-br from-accent/[0.04] to-transparent">
+                <div key={h.label} className="border rounded-xl p-4 bg-card">
                   <h4 className="font-bold text-sm">{h.label}</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">{h.desc}</p>
                   <div className="flex items-center gap-3 mt-2.5">

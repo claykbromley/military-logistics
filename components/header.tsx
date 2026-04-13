@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
   Menu, Search, ChevronDown, Moon, Sun, Bell, User, Settings, LogOut,
-  Shield, Bookmark, HelpCircle, ArrowRight, Clock, Calendar,
+  Shield, HelpCircle, ArrowRight, Clock, Calendar,
   MessageSquare, CreditCard, Briefcase, MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,13 +13,17 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
-import { LoginModal } from "../app/auth/login-modal"
-import { SignupModal } from "../app/auth/signup-modal"
+import { LoginModal } from "@/app/auth/login-modal"
+import { SignupModal } from "@/app/auth/signup-modal"
+import { ForgotPasswordModal } from "@/app/auth/forgot-password-modal"
 import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { useUI } from "@/context/ui-context"
 import { searchPages, type SearchablePage } from "@/lib/site-pages"
-import { getUnreadCount, subscribeToNotifications } from "@/lib/notifications"
+import { getUnreadCount, subscribeToNotifications, getNotifications, markAsRead } from "@/lib/notifications"
+import { createClient } from "@/lib/supabase/client"
+import type { Notification } from "@/lib/notifications"
+import { formatDistanceToNow } from "date-fns"
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -294,25 +298,62 @@ function CommandPalette({
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState(false)
+  const { user } = useAuth()
 
+  // Load theme from profile on mount / user change
   useEffect(() => {
-    const stored = localStorage.getItem("milify-theme")
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches
-    const dark = stored ? stored === "dark" : prefersDark
-    setIsDark(dark)
-    document.documentElement.classList.toggle("dark", dark)
+    const loadTheme = async () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+
+      if (!user) {
+        // Not logged in — fall back to system preference
+        setIsDark(prefersDark)
+        document.documentElement.classList.toggle("dark", prefersDark)
+        return
+      }
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("profiles")
+        .select("theme")
+        .eq("id", user.id)
+        .single()
+
+      const theme = data?.theme || "system"
+      const dark = theme === "system" ? prefersDark : theme === "dark"
+      setIsDark(dark)
+      document.documentElement.classList.toggle("dark", dark)
+    }
+
+    loadTheme()
+  }, [user])
+
+  // Stay in sync — watch for class changes on <html> (from settings page)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const dark = document.documentElement.classList.contains("dark")
+      setIsDark(dark)
+    })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+    return () => observer.disconnect()
   }, [])
 
-  const toggle = useCallback(() => {
-    setIsDark((prev) => {
-      const next = !prev
-      document.documentElement.classList.toggle("dark", next)
-      localStorage.setItem("milify-theme", next ? "dark" : "light")
-      return next
-    })
-  }, [])
+  const toggle = useCallback(async () => {
+    const next = !isDark
+    setIsDark(next)
+    document.documentElement.classList.toggle("dark", next)
+
+    if (!user) return
+
+    const supabase = createClient()
+    await supabase
+      .from("profiles")
+      .update({ theme: next ? "dark" : "light", updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+  }, [isDark, user])
 
   return { isDark, toggle }
 }
@@ -329,10 +370,12 @@ export function Header() {
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const { isDark, toggle: toggleDark } = useDarkMode()
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const router = useRouter()
 
   // Notification badge count
   const [unreadCount, setUnreadCount] = useState(0)
+  const [recentNotifications, setRecentNotifications] = useState<Notification[]>([])
 
   // Track scroll for condensed header style
   useEffect(() => {
@@ -354,20 +397,56 @@ export function Header() {
   }, [])
 
   // Fetch unread notification count + real-time subscription
+  const fetchUnread = useCallback(async () => {
+  if (!user) return
+  const [count, { data }] = await Promise.all([
+    getUnreadCount(),
+    getNotifications({ unreadOnly: true, limit: 5 }),
+  ])
+  setUnreadCount(count)
+  setRecentNotifications(data)
+  }, [user])
+
+  // Re-fetch on route changes
+  useEffect(() => {
+    fetchUnread()
+  }, [fetchUnread, router])
+
   useEffect(() => {
     if (!user) {
       setUnreadCount(0)
+      setRecentNotifications([])
       return
     }
 
-    getUnreadCount().then(setUnreadCount)
+    fetchUnread()
 
-    const unsubscribe = subscribeToNotifications(user.id, () => {
-      setUnreadCount((prev) => prev + 1)
-    })
+    const onFocus = () => fetchUnread()
+    window.addEventListener("focus", onFocus)
 
-    return unsubscribe
-  }, [user])
+    // Subscribe to ALL changes (insert, update, delete) on this user's notifications
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`header-notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchUnread()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      supabase.removeChannel(channel)
+    }
+  }, [user, fetchUnread])
 
   const handleSignOut = async () => {
     await signOut()
@@ -686,31 +765,65 @@ export function Header() {
                         </a>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                        {unreadCount > 0 ? (
-                          <>
-                            <p>
-                              You have {unreadCount} unread notification
-                              {unreadCount !== 1 ? "s" : ""}
-                            </p>
-                            <a
-                              href="/notifications"
-                              className="inline-flex items-center gap-1 mt-2 text-xs text-primary hover:underline"
+
+                      {recentNotifications.length > 0 ? (
+                        <div className="max-h-72 overflow-y-auto">
+                          {recentNotifications.map((notif) => (
+                            <DropdownMenuItem
+                              key={notif.id}
+                              className="flex flex-col items-start gap-1 p-3 cursor-pointer group"
+                              onClick={() => {
+                                markAsRead(notif.id)
+                                setRecentNotifications((prev) =>
+                                  prev.filter((n) => n.id !== notif.id)
+                                )
+                                setUnreadCount((prev) => Math.max(0, prev - 1))
+                                if (notif.action_url) {
+                                  router.push(notif.action_url)
+                                }
+                              }}
                             >
-                              View all notifications
-                              <ArrowRight className="h-3 w-3" />
-                            </a>
-                          </>
-                        ) : (
-                          <>
-                            <p>No new notifications</p>
-                            <p className="text-xs mt-1">
-                              We&apos;ll notify you about important updates
-                            </p>
-                          </>
-                        )}
-                      </div>
+                              <div className="flex items-start gap-2 w-full">
+                                <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium leading-tight truncate">
+                                    {notif.title}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground group-hover:text-white line-clamp-2 mt-0.5">
+                                    {notif.message}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground group-hover:text-white mt-1">
+                                    {formatDistanceToNow(new Date(notif.created_at), {
+                                      addSuffix: true,
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                          {unreadCount > recentNotifications.length && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <div className="p-2 text-center">
+                                <a
+                                  href="/notifications"
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  {unreadCount - recentNotifications.length} more unread
+                                </a>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                          <p>No new notifications</p>
+                          <p className="text-xs mt-1">
+                            We&apos;ll notify you about important updates
+                          </p>
+                        </div>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
 
@@ -844,6 +957,12 @@ export function Header() {
           setShowLogin(false)
           setShowSignup(true)
         }}
+        onSwitchToForgotPassword={() => { setShowLogin(false); setShowForgotPassword(true); }}
+      />
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onBackToLogin={() => { setShowForgotPassword(false); setShowLogin(true); }}
       />
       <SignupModal
         open={showSignup}

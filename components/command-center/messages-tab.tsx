@@ -146,12 +146,25 @@ function NewMessageDialog({
   }
 
   const filteredContacts = useMemo(() => {
-    const q = search.toLowerCase()
-    return contactsWithEmail.filter(
-      (c) =>
+  const q = search.toLowerCase()
+
+  const seen = new Set<string>()
+
+  return contactsWithEmail
+    .filter((c) => {
+      const matches =
         c.name.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q)
-    ).slice(0,5)
+
+      if (!matches) return false
+
+      const key = c.email || c.id
+      if (!key || seen.has(key)) return false
+
+      seen.add(key)
+      return true
+    })
+    .slice(0, 5)
   }, [contactsWithEmail, search])
 
   const selectedContact = contactsWithEmail.find(
@@ -171,10 +184,10 @@ function NewMessageDialog({
 
         <div className="space-y-4 py-4">
           <div className="flex gap-2">
-            <Button type="button" variant={!useCustomEmail ? "default" : "outline"} size="sm" onClick={() => setUseCustomEmail(false)}>
+            <Button type="button" className="cursor-pointer" variant={!useCustomEmail ? "default" : "outline"} size="sm" onClick={() => setUseCustomEmail(false)}>
               Select Contact
             </Button>
-            <Button type="button" variant={useCustomEmail ? "default" : "outline"} size="sm" onClick={() => setUseCustomEmail(true)}>
+            <Button type="button" className="cursor-pointer" variant={useCustomEmail ? "default" : "outline"} size="sm" onClick={() => setUseCustomEmail(true)}>
               Enter Email
             </Button>
           </div>
@@ -188,7 +201,7 @@ function NewMessageDialog({
                   variant="outline"
                   role="combobox"
                   aria-expanded={openContacts}
-                  className="w-full justify-between"
+                  className="w-full justify-between cursor-pointer"
                 >
                   {selectedContact
                     ? `${selectedContact.name} (${selectedContact.email})`
@@ -270,7 +283,7 @@ function NewMessageDialog({
                 ) : (
                   <span className="truncate max-w-[120px]">{file.name}</span>
                 )}
-                <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-black text-white rounded-full w-4 h-4 text-[10px]">✕</button>
+                <button onClick={() => removeFile(i)} className="absolute -top-2 -right-2 bg-black text-white rounded-full w-4 h-4 text-[10px] cursor-pointer">✕</button>
               </div>
             ))}
           </div>
@@ -283,8 +296,8 @@ function NewMessageDialog({
           </Button>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSend} disabled={(!useCustomEmail && !selectedContactId) || (useCustomEmail && !customEmail) || (!message.trim() && attachedFiles.length === 0)}>
+            <Button variant="outline" className='cursor-pointer' onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSend} className="cursor-pointer" disabled={(!useCustomEmail && !selectedContactId) || (useCustomEmail && !customEmail) || (!message.trim() && attachedFiles.length === 0)}>
               <Send className="w-4 h-4 mr-2" />
               Send Message
             </Button>
@@ -1135,7 +1148,7 @@ export function MessagesTab() {
                     <p className="text-muted-foreground mb-4">
                       Choose a thread from the list or start a new conversation
                     </p>
-                    <Button onClick={() => setIsMessageDialogOpen(true)}>
+                    <Button className="cursor-pointer" onClick={() => setIsMessageDialogOpen(true)}>
                       <Plus className="w-4 h-4 mr-2" />
                       New Message
                     </Button>

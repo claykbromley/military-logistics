@@ -278,7 +278,7 @@ function DocumentCard({
             <Button
               variant="ghost"
               size="icon"
-              className="flex-shrink-0 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              className="flex-shrink-0 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity duration-150 cursor-pointer"
             >
               <ChevronDown className="w-4 h-4" />
             </Button>
@@ -287,7 +287,7 @@ function DocumentCard({
             {document.fileUrl && (
               <>
                 <DropdownMenuItem onClick={onDownload} className="cursor-pointer">
-                  <Download className="w-4 h-4 mr-2" />
+                  <Download className="w-4 h-4 mr-2 hover:text-white" />
                   Download File
                 </DropdownMenuItem>
               </>
@@ -296,22 +296,22 @@ function DocumentCard({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onEdit} className="cursor-pointer">
-                  <Edit className="w-4 h-4 mr-2" />
+                  <Edit className="w-4 h-4 mr-2 hover:text-white" />
                   Edit Details
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onShare} className="cursor-pointer">
-                  <Share2 className="w-4 h-4 mr-2" />
+                  <Share2 className="w-4 h-4 mr-2 hover:text-white" />
                   Share Document
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onToggleCritical} className="cursor-pointer">
                   {document.isCritical ? (
                     <>
-                      <StarOff className="w-4 h-4 mr-2" />
+                      <StarOff className="w-4 h-4 mr-2 hover:text-white" />
                       Remove from Critical
                     </>
                   ) : (
                     <>
-                      <Star className="w-4 h-4 mr-2" />
+                      <Star className="w-4 h-4 mr-2 hover:text-white" />
                       Mark as Critical
                     </>
                   )}
@@ -1213,14 +1213,14 @@ function DocumentVaultPageContent() {
             value={filterType}
             onValueChange={(v) => setFilterType(v as DocumentType | "all")}
           >
-            <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl">
+            <SelectTrigger className="w-full sm:w-48 h-10 rounded-xl cursor-pointer">
               <Filter className="w-4 h-4 mr-2 text-muted-foreground" />
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
               {documentTypes.map((dt) => (
-                <SelectItem key={dt.value} value={dt.value}>
+                <SelectItem key={dt.value} value={dt.value} className="cursor-pointer">
                   {dt.label}
                 </SelectItem>
               ))}
@@ -1229,7 +1229,7 @@ function DocumentVaultPageContent() {
           <Button
             onClick={() => setShowCritDocs(!showCritDocs)}
             variant={showCritDocs ? "default" : "outline"}
-            className="rounded-xl h-10"
+            className="rounded-xl h-10 cursor-pointer"
           >
             {showCritDocs ? (
               <Shield className="w-4 h-4 mr-2" />
@@ -1302,7 +1302,7 @@ function DocumentVaultPageContent() {
                     "inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-medium",
                     "bg-card border shadow-sm",
                     "text-foreground hover:border-accent/50 hover:shadow-md hover:-translate-y-0.5",
-                    "transition-all duration-200"
+                    "transition-all duration-200 cursor-pointer"
                   )}
                 >
                   <Plus className="w-3 h-3 text-accent" />

@@ -267,7 +267,7 @@ function PetCard({
 
       {/* Caregiver */}
       {pet.caregiverName && (
-        <div className="mx-5 mb-3.5 p-3.5 bg-background border-border rounded-lg">
+        <div className="mx-5 mb-3.5 p-3.5 bg-primary/20 border-border rounded-lg">
           <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Caregiver</p>
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-text-foreground">
@@ -378,7 +378,7 @@ function VetRecordRow({
   const [menuOpen, setMenuOpen] = useState(false)
   
   return (
-    <div className="p-2.5 bg-background rounded-lg flex justify-between items-center group">
+    <div className="p-2.5 bg-primary/20 rounded-lg flex justify-between items-center group">
       <div>
         <p className="text-sm font-semibold text-text-foreground">{record.type}</p>
         <p className="text-xs text-text-muted-foreground mt-0.5">
@@ -1204,7 +1204,7 @@ export default function PetCarePage() {
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
                 {CHECKLIST.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2.5 p-2.5 bg-background rounded-lg">
+                  <div key={i} className="flex items-start gap-2.5 p-2.5 bg-primary/10 rounded-lg">
                     <item.icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${item.color}`} />
                     <span className="text-sm text-muted-foreground leading-snug">{item.text}</span>
                   </div>

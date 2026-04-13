@@ -1,8 +1,3 @@
-// app/api/send-notification-email/route.ts
-//
-// Next.js API Route — runs on Node.js, not Deno.
-// Sends formatted notification emails via the Resend npm package.
-//
 // This gets called by the Supabase database trigger (via webhook)
 // whenever a new notification is inserted, OR you can call it
 // directly from server-side code:
@@ -12,14 +7,6 @@
 //     headers: { "Content-Type": "application/json" },
 //     body: JSON.stringify({ notification_id, user_id, email, ... }),
 //   })
-//
-// Required env vars in .env.local:
-//   RESEND_API_KEY=re_xxxxxxxxx
-//   NEXT_PUBLIC_SITE_URL=https://milify.com  (or http://localhost:3000)
-//   SUPABASE_SERVICE_ROLE_KEY=eyJhb...       (only needed for webhook auth)
-//
-// Install dependency:
-//   npm install resend
 
 import { NextRequest, NextResponse } from "next/server"
 import { Resend } from "resend"
@@ -29,7 +16,7 @@ import { createClient } from "@supabase/supabase-js"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM_EMAIL = process.env.FROM_EMAIL || "Milify <notifications@milify.com>"
+const FROM_EMAIL = process.env.FROM_EMAIL || "clay.k.bromley@gmail.com"//"Milify <notifications@milify.com>"
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
 

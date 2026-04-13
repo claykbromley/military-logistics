@@ -90,19 +90,20 @@ function useConnectionsInternal(): ConnectionsContextValue {
       // Privacy settings
       const { data: prof } = await supabase
         .from("profiles")
-        .select("privacy_level, privacy_show_email, privacy_show_phone, privacy_show_duty_station, privacy_show_bio, privacy_show_in_search, privacy_show_mos")
+        .select("privacy")
         .eq("id", user.id)
         .single()
 
       if (prof) {
+        const parsed = JSON.parse(prof.privacy)
         setPrivacySettings({
-          privacyLevel: prof.privacy_level || "public",
-          showEmail: prof.privacy_show_email ?? true,
-          showPhone: prof.privacy_show_phone ?? false,
-          showDutyStation: prof.privacy_show_duty_station ?? true,
-          showBio: prof.privacy_show_bio ?? true,
-          showInSearch: prof.privacy_show_in_search ?? true,
-          showMos: prof.privacy_show_mos ?? true,
+          privacyLevel: parsed.privacy_level || "public",
+          showEmail: parsed.privacy_show_email ?? true,
+          showPhone: parsed.privacy_show_phone ?? false,
+          showDutyStation: parsed.privacy_show_duty_station ?? true,
+          showBio: parsed.privacy_show_bio ?? true,
+          showInSearch: parsed.privacy_show_in_search ?? true,
+          showMos: parsed.privacy_show_mos ?? true,
         })
       }
 
@@ -225,19 +226,24 @@ function useConnectionsInternal(): ConnectionsContextValue {
   const updatePrivacySettings = useCallback(async (updates: Partial<ProfilePrivacySettings>) => {
     if (!currentUserId) return
     const prev = privacySettings
-    setPrivacySettings({ ...prev, ...updates })
+    const merged = { ...prev, ...updates }
+    setPrivacySettings(merged)
     setSavingPrivacy(true)
     try {
       const supabase = createClient()
-      const db: Record<string, unknown> = {}
-      if (updates.privacyLevel !== undefined) db.privacy_level = updates.privacyLevel
-      if (updates.showEmail !== undefined) db.privacy_show_email = updates.showEmail
-      if (updates.showPhone !== undefined) db.privacy_show_phone = updates.showPhone
-      if (updates.showDutyStation !== undefined) db.privacy_show_duty_station = updates.showDutyStation
-      if (updates.showBio !== undefined) db.privacy_show_bio = updates.showBio
-      if (updates.showInSearch !== undefined) db.privacy_show_in_search = updates.showInSearch
-      if (updates.showMos !== undefined) db.privacy_show_mos = updates.showMos
-      const { error } = await supabase.from("profiles").update(db).eq("id", currentUserId)
+
+      // Write the full merged state so unchanged fields are preserved
+      const privacy = JSON.stringify({
+        privacy_level: merged.privacyLevel,
+        privacy_show_email: merged.showEmail,
+        privacy_show_phone: merged.showPhone,
+        privacy_show_duty_station: merged.showDutyStation,
+        privacy_show_bio: merged.showBio,
+        privacy_show_in_search: merged.showInSearch,
+        privacy_show_mos: merged.showMos,
+      })
+
+      const { error } = await supabase.from("profiles").update({ privacy }).eq("id", currentUserId)
       if (error) throw error
     } catch {
       setPrivacySettings(prev)

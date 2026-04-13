@@ -283,15 +283,15 @@ function EmergencyContactCard({
 
         {/* Quick Actions */}
         {(onScheduleCall || onSendMessage) && contact.email && (
-          <div className="mt-4 pt-3 border-t flex gap-2">
+          <div className="mt-4 pt-3 border-t dark:border-slate-500 flex gap-2">
             {onScheduleCall && (
-              <Button variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={onScheduleCall}>
+              <Button size="sm" className="flex-1 cursor-pointer" onClick={onScheduleCall}>
                 <CalendarPlus className="w-4 h-4 mr-2" />
                 Schedule
               </Button>
             )}
             {onSendMessage && (
-              <Button variant="outline" size="sm" className="flex-1 cursor-pointer" onClick={onSendMessage}>
+              <Button size="sm" className="flex-1 cursor-pointer" onClick={onSendMessage}>
                 <Send className="w-4 h-4 mr-2" />
                 Message
               </Button>

@@ -9,24 +9,17 @@ import {
   Mail, Phone, MapPin, Shield, ChevronRight,
   Camera, Save, Loader2, Award, Briefcase, Calendar,
   CheckCircle2, AlertCircle, Clock, ImagePlus,
-  Globe, Users, Lock, FileText, Search, Info
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"
-import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
-import { useConnections, ConnectionsProvider } from "@/hooks/use-connections"
-import { PrivacyLevel } from "@/lib/types"
+import { ConnectionsProvider } from "@/hooks/use-connections"
 import { ConnectionRequestsInbox } from "@/components/command-center/connection-components"
 import { MemberSearchBar } from "@/components/member-search"
 
@@ -99,205 +92,6 @@ function formatPhone(input: string | number): string | null {
   return `+${countryCode} (${rest.slice(0, 3)}) ${rest.slice(3, 6)}-${rest.slice(6)}`;
 }
 
-// ─── Privacy Settings ─────────────────────────────────────────────────────
- 
-const PRIVACY_LEVELS: {
-  value: PrivacyLevel
-  label: string
-  description: string
-  icon: React.ElementType
-}[] = [
-  {
-    value: "public",
-    label: "Public",
-    description: "Anyone can view your profile and send you messages",
-    icon: Globe,
-  },
-  {
-    value: "connections_only",
-    label: "Connections Only",
-    description: "Only your connections can view your full profile and message you",
-    icon: Users,
-  },
-  {
-    value: "private",
-    label: "Private",
-    description: "Nobody can view your profile. People must request a connection first",
-    icon: Lock,
-  },
-]
- 
-export function PrivacySettingsPanel() {
-  const {
-    privacySettings,
-    updatePrivacySettings,
-    savingPrivacy,
-  } = useConnections()
- 
-  const [saved, setSaved] = useState(false)
- 
-  const handleUpdate = async (updates: Parameters<typeof updatePrivacySettings>[0]) => {
-    await updatePrivacySettings(updates)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
-  }
- 
-  const isRestricted = privacySettings.privacyLevel !== "public"
- 
-  return (
-    <div className="bg-background border border-border rounded-xl p-6">
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          Privacy Settings
-        </h3>
-        {savingPrivacy && (
-          <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Saving...
-          </span>
-        )}
-        {saved && !savingPrivacy && (
-          <span className="text-xs text-green-600 flex items-center gap-1">
-            <CheckCircle2 className="h-3 w-3" />
-            Saved
-          </span>
-        )}
-      </div>
- 
-      {/* Privacy Level Selector */}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Profile Visibility</Label>
-          <div className="grid gap-2">
-            {PRIVACY_LEVELS.map((level) => {
-              const Icon = level.icon
-              const isActive = privacySettings.privacyLevel === level.value
-              return (
-                <button
-                  key={level.value}
-                  onClick={() => handleUpdate({ privacyLevel: level.value })}
-                  className={`flex items-start gap-3 w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${
-                    isActive
-                      ? "border-primary bg-primary/5 ring-1 ring-primary/20"
-                      : "border-border hover:border-primary/30 hover:bg-muted/50"
-                  }`}
-                >
-                  <div
-                    className={`mt-0.5 rounded-full p-1.5 ${
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${isActive ? "text-foreground" : "text-foreground"}`}>
-                      {level.label}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {level.description}
-                    </p>
-                  </div>
-                  {isActive && (
-                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
- 
-        {/* Granular visibility toggles — only relevant for connections_only */}
-        {privacySettings.privacyLevel === "connections_only" && (
-          <div className="pt-4 border-t space-y-1">
-            <div className="flex items-center gap-2 mb-3">
-              <Info className="h-4 w-4 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">
-                Non-connections will always see your name, branch, and paygrade.
-                Control what else they can see below.
-              </p>
-            </div>
- 
-            <TooltipProvider>
-              {[
-                {
-                  key: "showEmail" as const,
-                  label: "Email Address",
-                  icon: Mail,
-                  tip: "Show your email to people who aren't connected with you",
-                },
-                {
-                  key: "showPhone" as const,
-                  label: "Phone Number",
-                  icon: Phone,
-                  tip: "Show your phone number to non-connections",
-                },
-                {
-                  key: "showBio" as const,
-                  label: "Bio",
-                  icon: FileText,
-                  tip: "Show your bio to non-connections",
-                },
-                {
-                  key: "showDutyStation" as const,
-                  label: "Duty Station",
-                  icon: MapPin,
-                  tip: "Show your duty station to non-connections",
-                },
-                {
-                  key: "showMos" as const,
-                  label: "MOS / Rate / AFSC",
-                  icon: Award,
-                  tip: "Show your MOS to non-connections",
-                },
-                {
-                  key: "showInSearch" as const,
-                  label: "Appear in Member Search",
-                  icon: Search,
-                  tip: "Allow non-connections to find you when searching members",
-                },
-              ].map(({ key, label, icon: ItemIcon, tip }) => (
-                <div
-                  key={key}
-                  className="flex items-center justify-between py-2.5 px-1"
-                >
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-2.5 cursor-help">
-                        <ItemIcon className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-foreground">{label}</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      <p className="text-xs max-w-[200px]">{tip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  <Switch
-                    checked={privacySettings[key]}
-                    onCheckedChange={(checked) => handleUpdate({ [key]: checked })}
-                  />
-                </div>
-              ))}
-            </TooltipProvider>
-          </div>
-        )}
- 
-        {/* Private mode note */}
-        {privacySettings.privacyLevel === "private" && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
-            <strong>Private mode:</strong> Other members will only see your
-            display name and a prompt to request a connection. No profile details,
-            contact info, or service details will be visible. You must accept
-            connection requests before others can message you or view your profile.
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Wrapper with ConnectionsProvider ────────────────────────────────────────
 
 export default function ProfilePage() {
@@ -325,13 +119,6 @@ function ProfilePageContent() {
   const [uploadingBanner, setUploadingBanner] = useState(false)
   const avatarInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
-
-  // Email change state
-  const [showEmailDialog, setShowEmailDialog] = useState(false)
-  const [newEmail, setNewEmail] = useState("")
-  const [emailSaving, setEmailSaving] = useState(false)
-  const [emailSuccess, setEmailSuccess] = useState(false)
-  const [emailError, setEmailError] = useState<string | null>(null)
 
   // Form state
   const [form, setForm] = useState({
@@ -450,31 +237,6 @@ function ProfilePageContent() {
     } finally {
       setUploadingBanner(false)
       if (bannerInputRef.current) bannerInputRef.current.value = ""
-    }
-  }
-
-  const handleEmailChange = async () => {
-    if (!newEmail.trim()) {
-      setEmailError("Please enter a new email address")
-      return
-    }
-    if (newEmail === profile?.email) {
-      setEmailError("This is already your current email")
-      return
-    }
-
-    setEmailSaving(true)
-    setEmailError(null)
-
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.updateUser({ email: newEmail })
-      if (error) throw error
-      setEmailSuccess(true)
-    } catch (err) {
-      setEmailError(err instanceof Error ? err.message : "Failed to update email")
-    } finally {
-      setEmailSaving(false)
     }
   }
 
@@ -737,17 +499,6 @@ function ProfilePageContent() {
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <Mail className="h-4 w-4 shrink-0" />
                   <span className="truncate flex-1">{profile.email}</span>
-                  <button
-                    onClick={() => {
-                      setNewEmail("")
-                      setEmailSuccess(false)
-                      setEmailError(null)
-                      setShowEmailDialog(true)
-                    }}
-                    className="text-primary hover:underline text-xs shrink-0 cursor-pointer"
-                  >
-                    Change
-                  </button>
                 </div>
                 <div className="flex items-center gap-3 text-muted-foreground">
                   <Phone className="h-4 w-4 shrink-0" />
@@ -996,9 +747,6 @@ function ProfilePageContent() {
                     </div>
                   </div>
                 </div>
-
-                {/* Privacy Settings — NEW */}
-                <PrivacySettingsPanel />
               </>
             ) : (
               <>
@@ -1011,9 +759,6 @@ function ProfilePageContent() {
                     {profile.bio || "No bio yet. Click Edit Profile to add one."}
                   </p>
                 </div>
-
-                {/* Privacy Settings — always visible, even outside edit mode — NEW */}
-                <PrivacySettingsPanel />
 
                 {/* Activity / Timestamps */}
                 <div className="bg-background border border-border rounded-xl p-6">
@@ -1043,89 +788,6 @@ function ProfilePageContent() {
           </div>
         </div>
       </div>
-
-      {/* ── Email Change Dialog ───────────────────────────────── */}
-      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Change Email Address</DialogTitle>
-          </DialogHeader>
-
-          {emailSuccess ? (
-            <div className="py-4">
-              <div className="flex items-center gap-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900 p-4">
-                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
-                <div>
-                  <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                    Confirmation email sent
-                  </p>
-                  <p className="text-xs text-green-600 dark:text-green-500 mt-1">
-                    We sent a confirmation link to <strong>{newEmail}</strong>.
-                    Click the link in that email to confirm the change. You may
-                    also need to confirm from your current email address.
-                  </p>
-                </div>
-              </div>
-              <DialogFooter className="mt-4">
-                <Button onClick={() => setShowEmailDialog(false)}>
-                  Got it
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4 py-2">
-                <p className="text-sm text-muted-foreground">
-                  A confirmation link will be sent to your new email address.
-                  Your email won&apos;t change until you click that link.
-                </p>
-                <div className="space-y-2">
-                  <Label htmlFor="current-email">Current Email</Label>
-                  <Input
-                    id="current-email"
-                    value={profile?.email || ""}
-                    disabled
-                    className="opacity-60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-email">New Email Address</Label>
-                  <Input
-                    id="new-email"
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="your-new-email@example.com"
-                  />
-                </div>
-                {emailError && (
-                  <div className="flex items-center gap-2 text-sm text-red-600">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    {emailError}
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  className="cursor-pointer"
-                  onClick={() => setShowEmailDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleEmailChange} disabled={emailSaving || !newEmail} className="cursor-pointer">
-                  {emailSaving ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Mail className="h-4 w-4 mr-1" />
-                  )}
-                  Send Confirmation
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <Footer />
     </div>

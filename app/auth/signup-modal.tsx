@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Sparkles } from "lucide-react"
+import { Sparkles, Eye, EyeClosed } from "lucide-react"
 
 interface SignupModalProps {
   open: boolean
@@ -26,7 +26,9 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -44,6 +46,28 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
     }
 
     try {
+      const { data: existingUsername } = await supabase
+        .from("profiles")
+        .select('*')
+        .eq("display_name", username)
+        .maybeSingle()
+
+      if (existingUsername) {
+        alert("This username is already taken!")
+        return
+      }
+
+      const { data: existingEmail } = await supabase
+        .from("profiles")
+        .select('*')
+        .eq("email", email)
+        .maybeSingle()
+
+      if (existingEmail) {
+        alert("This email is already associated with an account!")
+        return
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -141,30 +165,56 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
               <Label htmlFor="signup-password" className="text-muted-foreground font-medium">
                 Password
               </Label>
-              <Input
-                id="signup-password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              />
+              <div className="relative">
+                <Input
+                  id="signup-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {showPassword ? (
+                    <EyeClosed className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password" className="text-muted-foreground font-medium">
                 Confirm Password
               </Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-              />
+              <div className="relative">
+                <Input
+                  id="confirm-password"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                >
+                  {showConfirmPassword ? (
+                    <EyeClosed className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
               {error && <p className="text-sm text-destructive">{error}</p>}
             </div>
             <hr className="border-slate-500"/>

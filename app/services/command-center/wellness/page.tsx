@@ -223,9 +223,9 @@ function JournalEntryCard({ entry, onEdit, onDelete }: { entry: JournalEntry; on
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="shrink-0 cursor-pointer"><ChevronDown className="w-4 h-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit} className="cursor-pointer hover:!text-white"><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit} className="cursor-pointer hover:!text-white"><Edit className="w-4 h-4 mr-2 hover:text-white" />Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDelete} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2 hover:text-white" />Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -659,9 +659,9 @@ function WorkoutCard({ entry, onEdit, onDelete }: { entry: JournalEntry; onEdit:
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="shrink-0 cursor-pointer"><ChevronDown className="w-4 h-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onEdit} className="cursor-pointer hover:!text-white"><Edit className="w-4 h-4 mr-2" />Edit</DropdownMenuItem>
+            <DropdownMenuItem onClick={onEdit} className="cursor-pointer hover:!text-white"><Edit className="w-4 h-4 mr-2 hover:text-white" />Edit</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+            <DropdownMenuItem onClick={onDelete} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2 hover:text-white" />Delete</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -944,7 +944,7 @@ function FitnessTestTab({ fitnessTestEntries, addEntry, deleteEntry, testConfigs
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="shrink-0 cursor-pointer"><ChevronDown className="w-4 h-4" /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => deleteEntry(entry.id)} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => deleteEntry(entry.id)} className="text-destructive cursor-pointer hover:!bg-destructive hover:!text-white"><Trash2 className="w-4 h-4 mr-2 hover:text-white" />Delete</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

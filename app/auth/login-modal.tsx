@@ -8,18 +8,21 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { LogIn } from "lucide-react"
+import { LogIn, Eye, EyeClosed } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { loadAndApplyUserTheme } from "@/app/settings/page"
 
 interface LoginModalProps {
   open: boolean
   onClose: () => void
   onSwitchToSignup: () => void
+  onSwitchToForgotPassword: () => void
 }
 
-export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps) {
+export function LoginModal({ open, onClose, onSwitchToSignup, onSwitchToForgotPassword }: LoginModalProps) {
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -58,6 +61,8 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
         })
 
       if (authError) throw authError
+
+      await loadAndApplyUserTheme()
       
       onClose()
       router.refresh()
@@ -117,15 +122,28 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
             <Label htmlFor="login-password" className="text-muted-foreground font-medium">
               Password
             </Label>
-            <Input
-              id="login-password"
-              type="password"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
-            />
+            <div className="relative">
+              <Input
+                id="login-password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="bg-white border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                {showPassword ? (
+                  <EyeClosed className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
@@ -140,6 +158,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup }: LoginModalProps)
           <div className="text-center pt-2">
             <button
               type="button"
+              onClick={onSwitchToForgotPassword}
               className="text-sm text-blue-600 dark:text-blue-700 font-medium hover:text-blue-700 hover:underline transition-colors cursor-pointer"
             >
               Forgot password?

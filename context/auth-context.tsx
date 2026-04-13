@@ -37,7 +37,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = createClient()
     let initialLoadDone = false
-    console.log(initialLoadDone)
 
     const {
       data: { subscription },

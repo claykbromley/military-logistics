@@ -7,6 +7,7 @@ import {
   getNotifications,
   getUnreadCount,
   markAsRead,
+  markAsUnread,
   markAllAsRead,
   deleteNotification,
   subscribeToNotifications,
@@ -15,8 +16,8 @@ import {
   type NotificationType,
 } from "@/lib/notifications"
 import {
-  Bell, BellOff, Check, CheckCheck, Trash2, Loader2,
-  Filter, ChevronRight, ExternalLink, Settings, Inbox,
+  CheckCheck, Trash2, Loader2,
+  Filter, Mail, MailOpen, ExternalLink, Settings, Inbox,
   AlertTriangle, Info, AlertCircle, Clock,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
 
 // ─── Priority & Type Styling ─────────────────────────────────────────────────
 
@@ -123,6 +126,15 @@ export default function NotificationsPage() {
     setUnreadCount((prev) => Math.max(prev - 1, 0))
   }
 
+  const handleMarkAsUnread = async (notif: Notification) => {
+    if (!notif.read) return
+    await markAsUnread(notif.id)
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notif.id ? { ...n, read: false } : n))
+    )
+    setUnreadCount((prev) => Math.max(prev + 1, 0))
+  }
+
   const handleMarkAllRead = async () => {
     await markAllAsRead()
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
@@ -157,9 +169,10 @@ export default function NotificationsPage() {
   const hasMore = totalCount > (page + 1) * PAGE_SIZE
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
+      <Header />
+
       <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* ── Header ──────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -180,7 +193,7 @@ export default function NotificationsPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleMarkAllRead}
-                className="text-xs"
+                className="text-xs dark:border-slate-500 cursor-pointer"
               >
                 <CheckCheck className="h-3.5 w-3.5 mr-1" />
                 Mark all read
@@ -190,7 +203,7 @@ export default function NotificationsPage() {
               variant="outline"
               size="sm"
               onClick={() => router.push("/settings")}
-              className="text-xs"
+              className="text-xs dark:border-slate-500 cursor-pointer"
             >
               <Settings className="h-3.5 w-3.5 mr-1" />
               Preferences
@@ -200,7 +213,7 @@ export default function NotificationsPage() {
 
         {/* ── Filters ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 mb-4 overflow-x-auto">
-          <div className="flex bg-background border border-border rounded-lg p-0.5">
+          <div className="flex bg-background border border-border dark:border-slate-500 rounded-lg p-0.5">
             <button
               onClick={() => {
                 setFilter("all")
@@ -231,7 +244,7 @@ export default function NotificationsPage() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="text-xs gap-1">
+              <Button variant="outline" size="sm" className="text-xs gap-1 dark:border-slate-500 cursor-pointer">
                 <Filter className="h-3.5 w-3.5" />
                 {typeFilter === "all"
                   ? "All types"
@@ -261,9 +274,9 @@ export default function NotificationsPage() {
                     setTypeFilter(type)
                     setPage(0)
                   }}
-                  className="cursor-pointer"
+                  className="cursor-pointer group"
                 >
-                  <span className={NOTIFICATION_TYPE_LABELS[type].color}>
+                  <span className={`${NOTIFICATION_TYPE_LABELS[type].color} group-hover:text-white`}>
                     {NOTIFICATION_TYPE_LABELS[type].label}
                   </span>
                 </DropdownMenuItem>
@@ -278,7 +291,7 @@ export default function NotificationsPage() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : notifications.length === 0 ? (
-          <div className="bg-background border border-border rounded-xl p-12 text-center">
+          <div className="bg-background border border-border dark:border-slate-500 rounded-xl p-12 text-center">
             <div className="mx-auto w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
               {filter === "unread" ? (
                 <CheckCheck className="h-8 w-8 text-muted-foreground" />
@@ -301,13 +314,12 @@ export default function NotificationsPage() {
           <div className="space-y-2">
             {notifications.map((notif) => {
               const pStyle = PRIORITY_STYLES[notif.priority]
-              const PriorityIcon = pStyle.icon
               const typeInfo = NOTIFICATION_TYPE_LABELS[notif.type]
 
               return (
                 <div
                   key={notif.id}
-                  className={`group relative bg-background border border-border rounded-xl overflow-hidden transition-all hover:shadow-md ${
+                  className={`group relative bg-card border border-border rounded-xl overflow-hidden transition-all hover:shadow-md ${
                     pStyle.bgColor
                   } ${!notif.read ? "border-l-4 " + pStyle.borderColor : ""}`}
                 >
@@ -365,18 +377,28 @@ export default function NotificationsPage() {
 
                     {/* Quick actions */}
                     <div className="shrink-0 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {!notif.read && (
+                      {notif.read ? 
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleMarkAsUnread(notif)
+                          }}
+                          className="p-1.5 text-muted-foreground hover:text-white hover:bg-accent rounded-lg transition-colors cursor-pointer"
+                          title="Mark as unread"
+                        >
+                          <MailOpen className="h-3.5 w-3.5" />
+                        </button>:
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
                             handleMarkAsRead(notif)
                           }}
-                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors cursor-pointer"
+                          className="p-1.5 text-muted-foreground hover:text-white hover:bg-accent rounded-lg transition-colors cursor-pointer"
                           title="Mark as read"
                         >
-                          <Check className="h-3.5 w-3.5" />
+                          <Mail className="h-3.5 w-3.5" />
                         </button>
-                      )}
+                      }
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
@@ -420,6 +442,7 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
+      <Footer />
     </div>
   )
 }

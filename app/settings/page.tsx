@@ -14,7 +14,8 @@ import {
 } from "@/lib/notifications"
 import {
   User, Shield, Bell, Palette, Eye, Loader2, Save, CheckCircle2,
-  AlertCircle, Lock, Mail, Trash2, Moon, Sun, Monitor, ChevronRight,
+  AlertCircle, Lock, Mail, Trash2, Moon, Sun, Monitor, EyeClosed,
+  Globe, Users, FileText, Search, Info, Phone, MapPin, Award
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,6 +29,46 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { Header } from "@/components/header"
+import { Footer } from "@/components/footer"
+import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "@/components/ui/tooltip"
+import { useConnections, ConnectionsProvider } from "@/hooks/use-connections"
+import { PrivacyLevel } from "@/lib/types"
+
+// ─── Theme Helpers (exported for use in login / layout) ──────────────────────
+
+/** Apply a theme value to the document */
+export function applyTheme(theme: "light" | "dark" | "system") {
+  if (theme === "system") {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+    document.documentElement.classList.toggle("dark", prefersDark)
+  } else {
+    document.documentElement.classList.toggle("dark", theme === "dark")
+  }
+}
+
+/** Load the user's theme from their profile and apply it */
+export async function loadAndApplyUserTheme(userId?: string) {
+  const supabase = createClient()
+
+  // If no userId provided, get current user
+  let uid = userId
+  if (!uid) {
+    const { data: { user } } = await supabase.auth.getUser()
+    uid = user?.id
+  }
+  if (!uid) return "system"
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("theme")
+    .eq("id", uid)
+    .single()
+
+  const theme = (data?.theme as "light" | "dark" | "system") || "system"
+  applyTheme(theme)
+  return theme
+}
 
 // ─── Tab Definitions ─────────────────────────────────────────────────────────
 
@@ -41,9 +82,216 @@ const tabs = [
 
 type TabId = (typeof tabs)[number]["id"]
 
-// ─── Settings Page ───────────────────────────────────────────────────────────
+// ─── Privacy Settings ─────────────────────────────────────────────────────
+ 
+const PRIVACY_LEVELS: {
+  value: PrivacyLevel
+  label: string
+  description: string
+  icon: React.ElementType
+}[] = [
+  {
+    value: "public",
+    label: "Public",
+    description: "Anyone can view your profile and send you messages",
+    icon: Globe,
+  },
+  {
+    value: "connections_only",
+    label: "Connections Only",
+    description: "Only your connections can view your full profile and message you",
+    icon: Users,
+  },
+  {
+    value: "private",
+    label: "Private",
+    description: "Nobody can view your profile. People must request a connection first",
+    icon: Lock,
+  },
+]
+ 
+export function PrivacySettingsPanel() {
+  const {
+    privacySettings,
+    updatePrivacySettings,
+    savingPrivacy,
+  } = useConnections()
+ 
+  const [saved, setSaved] = useState(false)
+ 
+  const handleUpdate = async (updates: Parameters<typeof updatePrivacySettings>[0]) => {
+    await updatePrivacySettings(updates)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+ 
+  return (
+    <div className="bg-card border border-border rounded-xl p-6">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          Privacy Settings
+        </h3>
+        {savingPrivacy && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Saving...
+          </span>
+        )}
+        {saved && !savingPrivacy && (
+          <span className="text-xs text-green-600 flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3" />
+            Saved
+          </span>
+        )}
+      </div>
+ 
+      {/* Privacy Level Selector */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Profile Visibility</Label>
+          <div className="grid gap-2">
+            {PRIVACY_LEVELS.map((level) => {
+              const Icon = level.icon
+              const isActive = privacySettings.privacyLevel === level.value
+              return (
+                <button
+                  key={level.value}
+                  onClick={() => handleUpdate({ privacyLevel: level.value })}
+                  className={`flex items-start gap-3 w-full text-left p-3 rounded-lg border transition-all dark:border-slate-500/40 cursor-pointer ${
+                    isActive
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/20"
+                      : "border-border hover:border-primary/30 hover:bg-primary/5"
+                  }`}
+                >
+                  <div
+                    className={`mt-0.5 rounded-full p-1.5 ${
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${isActive ? "text-foreground" : "text-foreground"}`}>
+                      {level.label}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {level.description}
+                    </p>
+                  </div>
+                  {isActive && (
+                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+ 
+        {/* Granular visibility toggles — only relevant for connections_only */}
+        {privacySettings.privacyLevel === "connections_only" && (
+          <div className="pt-4 border-t space-y-1">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                Non-connections will always see your name, branch, and paygrade.
+                Control what else they can see below.
+              </p>
+            </div>
+ 
+            <TooltipProvider>
+              {[
+                {
+                  key: "showEmail" as const,
+                  label: "Email Address",
+                  icon: Mail,
+                  tip: "Show your email to people who aren't connected with you",
+                },
+                {
+                  key: "showPhone" as const,
+                  label: "Phone Number",
+                  icon: Phone,
+                  tip: "Show your phone number to non-connections",
+                },
+                {
+                  key: "showBio" as const,
+                  label: "Bio",
+                  icon: FileText,
+                  tip: "Show your bio to non-connections",
+                },
+                {
+                  key: "showDutyStation" as const,
+                  label: "Duty Station",
+                  icon: MapPin,
+                  tip: "Show your duty station to non-connections",
+                },
+                {
+                  key: "showMos" as const,
+                  label: "MOS / Rate / AFSC",
+                  icon: Award,
+                  tip: "Show your MOS to non-connections",
+                },
+                {
+                  key: "showInSearch" as const,
+                  label: "Appear in Member Search",
+                  icon: Search,
+                  tip: "Allow non-connections to find you when searching members",
+                },
+              ].map(({ key, label, icon: ItemIcon, tip }) => (
+                <div
+                  key={key}
+                  className="flex items-center justify-between py-2.5 px-1"
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2.5 cursor-help">
+                        <ItemIcon className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm text-foreground">{label}</span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p className="text-xs max-w-[200px]">{tip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Switch
+                    checked={privacySettings[key]}
+                    onCheckedChange={(checked) => handleUpdate({ [key]: checked })}
+                  />
+                </div>
+              ))}
+            </TooltipProvider>
+          </div>
+        )}
+ 
+        {/* Private mode note */}
+        {privacySettings.privacyLevel === "private" && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
+            <strong>Private mode:</strong> Other members will only see your
+            display name and a prompt to request a connection. No profile details,
+            contact info, or service details will be visible. You must accept
+            connection requests before others can message you or view your profile.
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Wrapper with ConnectionsProvider ────────────────────────────────────────
 
 export default function SettingsPage() {
+  return (
+    <ConnectionsProvider>
+      <SettingsPageContent />
+    </ConnectionsProvider>
+  )
+}
+
+// ─── Settings Page ───────────────────────────────────────────────────────────
+
+function SettingsPageContent() {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<TabId>("account")
@@ -58,26 +306,29 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState("")
   const [emailChanging, setEmailChanging] = useState(false)
   const [emailChangeSuccess, setEmailChangeSuccess] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
+  const requiredText = "I want to delete my Milify account"
+  const isMatch = confirmText === requiredText
 
   // Security state
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   // Notification prefs
   const [notifPrefs, setNotifPrefs] = useState<NotificationPreferences>(
     DEFAULT_NOTIFICATION_PREFERENCES
   )
+  const [notifsSaving, setNotifsSaving] = useState(false)
+  const [notifsSaved, setNotifsSaved] = useState(false)
 
   // Appearance state
   const [theme, setTheme] = useState<"light" | "dark" | "system">("system")
-  const [compactMode, setCompactMode] = useState(false)
-
-  // Privacy state
-  const [profileVisible, setProfileVisible] = useState(true)
-  const [showPaygrade, setShowPaygrade] = useState(false)
-  const [showLocation, setShowLocation] = useState(true)
-  const [activityVisible, setActivityVisible] = useState(true)
+  const [themeSaving, setThemeSaving] = useState(false)
+  const [themeSaved, setThemeSaved] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) router.push("/")
@@ -94,37 +345,73 @@ export default function SettingsPage() {
     setEmail(user.email || "")
     setPhone(user.user_metadata?.phone || "")
 
-    // Load theme
-    const stored = localStorage.getItem("milify-theme")
-    if (stored === "dark") setTheme("dark")
-    else if (stored === "light") setTheme("light")
-    else setTheme("system")
+    // Load theme from profile
+    const loadTheme = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("profiles")
+        .select("theme")
+        .eq("id", user.id)
+        .single()
+      if (data?.theme) {
+        setTheme(data.theme as "light" | "dark" | "system")
+        applyTheme(data.theme as "light" | "dark" | "system")
+      }
+    }
+    loadTheme()
 
     // Load notification preferences
     getNotificationPreferences().then(setNotifPrefs)
 
-    // Load privacy settings from profile
-    const supabase = createClient()
-    supabase
-      .from("profiles")
-      .select("privacy_settings")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data?.privacy_settings) {
-          const ps = data.privacy_settings
-          setProfileVisible(ps.profile_visible ?? true)
-          setShowPaygrade(ps.show_paygrade ?? false)
-          setShowLocation(ps.show_location ?? true)
-          setActivityVisible(ps.activity_visible ?? true)
-        }
-      })
+    // Privacy settings are loaded via ConnectionsProvider / useConnections hook
   }, [user])
+
+  useEffect(() => {
+    const supabase = createClient()
+
+    supabase.auth.refreshSession().then(({ data: { session } }) => {
+      if (session?.user?.email) {
+        setEmail(session.user.email)
+      }
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user?.email) {
+          setEmail(session.user.email)
+        }
+      }
+    )
+    return () => subscription.unsubscribe()
+  }, [])
 
   const showSaved = useCallback(() => {
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }, [])
+
+  // ── Auto-save theme to profiles table ──────────────────────
+  const handleThemeChange = async (newTheme: "light" | "dark" | "system") => {
+    setTheme(newTheme)
+    applyTheme(newTheme)
+
+    if (!user) return
+
+    setThemeSaving(true)
+    try {
+      const supabase = createClient()
+      await supabase
+        .from("profiles")
+        .update({ theme: newTheme, updated_at: new Date().toISOString() })
+        .eq("id", user.id)
+      setThemeSaved(true)
+      setTimeout(() => setThemeSaved(false), 2000)
+    } catch (err) {
+      console.error("Failed to save theme:", err)
+    } finally {
+      setThemeSaving(false)
+    }
+  }
 
   // ── Save Account ───────────────────────────────────────────
   const saveAccount = async () => {
@@ -134,6 +421,18 @@ export default function SettingsPage() {
 
     try {
       const supabase = createClient()
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("display_name", displayName)
+        .neq("id", user.id)
+        .maybeSingle()
+
+      if (existing) {
+        alert("This Display Name is already taken!")
+        return
+      }
+
       await supabase.auth.updateUser({
         data: { display_name: displayName, full_name: displayName, phone },
       })
@@ -151,6 +450,8 @@ export default function SettingsPage() {
 
   // ── Change Email ─────────────────────────────────────────
   const changeEmail = async () => {
+    if (!user) return
+
     if (!newEmail.trim()) {
       setError("Please enter a new email address")
       return
@@ -165,6 +466,18 @@ export default function SettingsPage() {
 
     try {
       const supabase = createClient()
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", newEmail)
+        .neq("id", user.id)
+        .maybeSingle()
+
+      if (existing) {
+        alert("This email is already associated with an account!")
+        return
+      }
+
       const { error } = await supabase.auth.updateUser({ email: newEmail })
       if (error) throw error
       setEmailChangeSuccess(true)
@@ -206,64 +519,46 @@ export default function SettingsPage() {
   }
 
   // ── Save Notification Preferences ──────────────────────────
-  const saveNotifPrefs = async () => {
-    setSaving(true)
+
+  const saveNotifPrefs = async (update: NotificationPreferences)=> {
+    if (!user) return
+    setNotifsSaving(true)
     setError(null)
+    setNotifPrefs(update)
+
     try {
-      await updateNotificationPreferences(notifPrefs)
-      showSaved()
+      await updateNotificationPreferences(update)
+      setNotifsSaved(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save preferences")
     } finally {
-      setSaving(false)
-    }
-  }
-
-  // ── Save Appearance ────────────────────────────────────────
-  const saveAppearance = () => {
-    if (theme === "system") {
-      localStorage.removeItem("milify-theme")
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-      document.documentElement.classList.toggle("dark", prefersDark)
-    } else {
-      localStorage.setItem("milify-theme", theme)
-      document.documentElement.classList.toggle("dark", theme === "dark")
-    }
-    showSaved()
-  }
-
-  // ── Save Privacy ───────────────────────────────────────────
-  const savePrivacy = async () => {
-    if (!user) return
-    setSaving(true)
-    setError(null)
-    try {
-      const supabase = createClient()
-      await supabase
-        .from("profiles")
-        .update({
-          privacy_settings: {
-            profile_visible: profileVisible,
-            show_paygrade: showPaygrade,
-            show_location: showLocation,
-            activity_visible: activityVisible,
-          },
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id)
-      showSaved()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save privacy settings")
-    } finally {
-      setSaving(false)
+      setNotifsSaving(false)
     }
   }
 
   // ── Delete Account ─────────────────────────────────────────
+
   const deleteAccount = async () => {
-    // In production, this should call a server-side function
-    // that uses the service role key to delete the user
-    alert("Account deletion requires server-side processing. Contact support.")
+    const supabase = createClient()
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const res = await fetch("/api/delete-account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ userId: user?.id }),
+    })
+
+    if (!res.ok) {
+      throw new Error("Failed to delete account")
+    }
+
+    await supabase.auth.signOut()
+    router.push("/")
   }
 
   if (authLoading) {
@@ -277,7 +572,9 @@ export default function SettingsPage() {
   if (!user) return null
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
+      <Header />
+
       <div className="container mx-auto px-4 py-8 max-w-5xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
@@ -309,7 +606,7 @@ export default function SettingsPage() {
         <div className="flex flex-col md:flex-row gap-6">
           {/* ── Sidebar Tabs ────────────────────────────────────── */}
           <nav className="md:w-56 shrink-0">
-            <div className="bg-background border border-border rounded-xl p-1.5 md:sticky md:top-20">
+            <div className="bg-card border border-border rounded-xl p-1.5 md:sticky md:top-20">
               {/* Mobile: horizontal scroll */}
               <div className="flex md:flex-col gap-1 overflow-x-auto md:overflow-visible">
                 {tabs.map((tab) => {
@@ -324,7 +621,7 @@ export default function SettingsPage() {
                       className={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                         activeTab === tab.id
                           ? "bg-primary text-primary-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                          : "text-muted-foreground hover:text-white hover:bg-accent"
                       }`}
                     >
                       <Icon className="h-4 w-4 shrink-0" />
@@ -341,7 +638,7 @@ export default function SettingsPage() {
             {/* ════════ ACCOUNT TAB ════════ */}
             {activeTab === "account" && (
               <div className="space-y-6">
-                <div className="bg-background border border-border rounded-xl p-6">
+                <div className="bg-card border border-border rounded-xl p-6">
                   <h2 className="text-base font-semibold text-foreground mb-5">
                     Account Information
                   </h2>
@@ -350,6 +647,7 @@ export default function SettingsPage() {
                       <Label htmlFor="s-name">Display Name</Label>
                       <Input
                         id="s-name"
+                        className="dark:border-slate-500"
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
                       />
@@ -360,6 +658,7 @@ export default function SettingsPage() {
                         id="s-phone"
                         type="tel"
                         value={phone}
+                        className="dark:border-slate-500"
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="(555) 123-4567"
                       />
@@ -373,14 +672,14 @@ export default function SettingsPage() {
                           value={newEmail || email}
                           onChange={(e) => setNewEmail(e.target.value)}
                           placeholder="your-email@example.com"
-                          className="flex-1"
+                          className="flex-1 dark:border-slate-500"
                         />
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={changeEmail}
                           disabled={emailChanging || (!newEmail.trim()) || newEmail === email}
-                          className="shrink-0 self-start h-9"
+                          className="shrink-0 self-start h-9 cursor-pointer"
                         >
                           {emailChanging ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -391,19 +690,25 @@ export default function SettingsPage() {
                         </Button>
                       </div>
                       {emailChangeSuccess ? (
-                        <div className="flex items-center gap-2 text-sm text-green-600">
-                          <CheckCircle2 className="h-4 w-4 shrink-0" />
-                          Confirmation link sent to <strong>{newEmail}</strong>. Check your inbox to complete the change.
+                        <div className="flex items-start gap-2 text-sm text-green-600 max-w-full">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+                          
+                          <p className="leading-snug break-words">
+                            Confirmation links sent to{" "}
+                            <strong className="break-all">{newEmail}</strong> and{" "}
+                            <strong className="break-all">{email}</strong>.{" "}
+                            Check your inboxes to complete the change.
+                          </p>
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">
-                          A confirmation link will be sent to the new address. Your email won&apos;t change until you click it.
+                          A confirmation link will be sent to the new and old addresses. Your email won&apos;t change until you click both links.
                         </p>
                       )}
                     </div>
                   </div>
                   <div className="flex justify-end mt-6">
-                    <Button onClick={saveAccount} disabled={saving}>
+                    <Button onClick={saveAccount} className="cursor-pointer" disabled={saving}>
                       {saving ? (
                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                       ) : (
@@ -423,13 +728,15 @@ export default function SettingsPage() {
                     Permanently delete your account and all associated data.
                     This action cannot be undone.
                   </p>
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm">
+                      <Button variant="destructive" className="cursor-pointer" size="sm">
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete Account
                       </Button>
                     </AlertDialogTrigger>
+
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Account?</AlertDialogTitle>
@@ -437,13 +744,32 @@ export default function SettingsPage() {
                           This will permanently delete your account, profile,
                           saved items, and all associated data. This action
                           cannot be undone.
+                          <br /><br />
+                          Please type <strong>{requiredText}</strong> to confirm.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
+
+                      <input
+                        type="text"
+                        value={confirmText}
+                        onChange={(e) => setConfirmText(e.target.value)}
+                        placeholder="Type confirmation phrase..."
+                        className="w-full mt-2 px-3 py-2 text-sm border rounded-md bg-background"
+                      />
+
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel className="cursor-pointer">
+                          Cancel
+                        </AlertDialogCancel>
+
                         <AlertDialogAction
                           onClick={deleteAccount}
-                          className="bg-red-600 hover:bg-red-700"
+                          disabled={!isMatch}
+                          className={`cursor-pointer ${
+                            isMatch
+                              ? "bg-red-600 hover:bg-red-700"
+                              : "bg-red-300 cursor-not-allowed"
+                          }`}
                         >
                           Yes, delete my account
                         </AlertDialogAction>
@@ -457,7 +783,7 @@ export default function SettingsPage() {
             {/* ════════ SECURITY TAB ════════ */}
             {activeTab === "security" && (
               <div className="space-y-6">
-                <div className="bg-background border border-border rounded-xl p-6">
+                <div className="bg-card border border-border rounded-xl p-6">
                   <h2 className="text-base font-semibold text-foreground mb-5 flex items-center gap-2">
                     <Lock className="h-4 w-4" />
                     Change Password
@@ -465,37 +791,79 @@ export default function SettingsPage() {
                   <div className="space-y-5 max-w-md">
                     <div className="space-y-2">
                       <Label htmlFor="s-curpw">Current Password</Label>
-                      <Input
-                        id="s-curpw"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                        placeholder="Enter current password"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="s-curpw"
+                          type={showCurrentPassword ? "text" : "password"}
+                          value={currentPassword}
+                          className="dark:border-slate-500"
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          placeholder="Enter current password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showCurrentPassword ? (
+                            <EyeClosed className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="s-newpw">New Password</Label>
-                      <Input
-                        id="s-newpw"
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="At least 8 characters"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="s-newpw"
+                          type={showNewPassword ? "text" : "password"}
+                          className="dark:border-slate-500"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          placeholder="At least 8 characters"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showNewPassword ? (
+                            <EyeClosed className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="s-confpw">Confirm New Password</Label>
-                      <Input
-                        id="s-confpw"
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Confirm new password"
-                      />
+                      <div className="relative">
+                        <Input
+                          id="s-confpw"
+                          type={showConfirmPassword ? "text" : "password"}
+                          className="dark:border-slate-500"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          placeholder="Confirm new password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          {showConfirmPassword ? (
+                            <EyeClosed className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex justify-end mt-6">
-                    <Button onClick={savePassword} disabled={saving}>
+                  <div className="flex justify-center mt-6">
+                    <Button onClick={savePassword} disabled={saving || newPassword.length < 8 || newPassword !== confirmPassword} className="cursor-pointer">
                       {saving ? (
                         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                       ) : (
@@ -505,19 +873,6 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                 </div>
-
-                <div className="bg-background border border-border rounded-xl p-6">
-                  <h2 className="text-base font-semibold text-foreground mb-2 flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Two-Factor Authentication
-                  </h2>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Add an extra layer of security to your account with 2FA.
-                  </p>
-                  <Button variant="outline" size="sm" disabled>
-                    Coming Soon
-                  </Button>
-                </div>
               </div>
             )}
 
@@ -525,10 +880,25 @@ export default function SettingsPage() {
             {activeTab === "notifications" && (
               <div className="space-y-6">
                 {/* Global toggles */}
-                <div className="bg-background border border-border rounded-xl p-6">
-                  <h2 className="text-base font-semibold text-foreground mb-5">
-                    Notification Delivery
-                  </h2>
+                <div className="bg-card border border-border rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-base font-semibold text-foreground">
+                      Notification Delivery
+                    </h2>
+                    {notifsSaving && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Saving...
+                      </span>
+                    )}
+                    {notifsSaved && !notifsSaving && (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Saved
+                      </span>
+                    )}
+                  </div>
+                  
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div>
@@ -541,8 +911,9 @@ export default function SettingsPage() {
                       </div>
                       <Switch
                         checked={notifPrefs.email_enabled}
+                        className="dark:border-slate-500 cursor-pointer"
                         onCheckedChange={(v) =>
-                          setNotifPrefs({ ...notifPrefs, email_enabled: v })
+                          saveNotifPrefs({ ...notifPrefs, email_enabled: v })
                         }
                       />
                     </div>
@@ -553,13 +924,13 @@ export default function SettingsPage() {
                         <Select
                           value={notifPrefs.email_frequency}
                           onValueChange={(v) =>
-                            setNotifPrefs({
+                            saveNotifPrefs({
                               ...notifPrefs,
                               email_frequency: v as "instant" | "daily" | "weekly",
                             })
                           }
                         >
-                          <SelectTrigger className="w-48">
+                          <SelectTrigger className="w-48 cursor-pointer dark:border-slate-500">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -582,8 +953,9 @@ export default function SettingsPage() {
                       </div>
                       <Switch
                         checked={notifPrefs.push_enabled}
+                        className="dark:border-slate-500 cursor-pointer"
                         onCheckedChange={(v) =>
-                          setNotifPrefs({ ...notifPrefs, push_enabled: v })
+                          saveNotifPrefs({ ...notifPrefs, push_enabled: v })
                         }
                       />
                     </div>
@@ -591,7 +963,7 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Per-type toggles */}
-                <div className="bg-background border border-border rounded-xl p-6">
+                <div className="bg-card border border-border rounded-xl p-6">
                   <h2 className="text-base font-semibold text-foreground mb-5">
                     Notification Categories
                   </h2>
@@ -604,7 +976,7 @@ export default function SettingsPage() {
                       return (
                         <div
                           key={type}
-                          className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-b border-border last:border-0"
+                          className="flex flex-col sm:flex-row sm:items-center gap-3 py-3 border-b border-border dark:border-slate-500 last:border-0"
                         >
                           <div className="flex-1">
                             <p
@@ -620,8 +992,9 @@ export default function SettingsPage() {
                             <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                               <Switch
                                 checked={typePrefs.enabled}
+                                className="dark:border-slate-500 cursor-pointer"
                                 onCheckedChange={(v) =>
-                                  setNotifPrefs({
+                                  saveNotifPrefs({
                                     ...notifPrefs,
                                     types: {
                                       ...notifPrefs.types,
@@ -635,8 +1008,9 @@ export default function SettingsPage() {
                             <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
                               <Switch
                                 checked={typePrefs.email}
+                                className="dark:border-slate-500 cursor-pointer"
                                 onCheckedChange={(v) =>
-                                  setNotifPrefs({
+                                  saveNotifPrefs({
                                     ...notifPrefs,
                                     types: {
                                       ...notifPrefs.types,
@@ -654,27 +1028,30 @@ export default function SettingsPage() {
                     })}
                   </div>
                 </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={saveNotifPrefs} disabled={saving}>
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-1" />
-                    )}
-                    Save Notification Preferences
-                  </Button>
-                </div>
               </div>
             )}
 
             {/* ════════ APPEARANCE TAB ════════ */}
             {activeTab === "appearance" && (
               <div className="space-y-6">
-                <div className="bg-background border border-border rounded-xl p-6">
-                  <h2 className="text-base font-semibold text-foreground mb-5">
-                    Theme
-                  </h2>
+                <div className="bg-card border border-border rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-5">
+                    <h2 className="text-base font-semibold text-foreground">
+                      Theme
+                    </h2>
+                    {themeSaving && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Saving...
+                      </span>
+                    )}
+                    {themeSaved && !themeSaving && (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Saved
+                      </span>
+                    )}
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-3">
                     {(
                       [
@@ -687,11 +1064,11 @@ export default function SettingsPage() {
                       return (
                         <button
                           key={t.value}
-                          onClick={() => setTheme(t.value)}
+                          onClick={() => handleThemeChange(t.value)}
                           className={`flex flex-col items-center gap-3 p-5 rounded-xl border-2 transition-all cursor-pointer ${
                             theme === t.value
                               ? "border-primary bg-primary/5"
-                              : "border-border hover:border-primary/40"
+                              : "border-border dark:border-slate-500/30 hover:border-primary/60 dark:hover:border-primary/60"
                           }`}
                         >
                           <Icon
@@ -715,115 +1092,20 @@ export default function SettingsPage() {
                     })}
                   </div>
                 </div>
-
-                <div className="bg-background border border-border rounded-xl p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        Compact Mode
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Reduce spacing and padding for denser information display
-                      </p>
-                    </div>
-                    <Switch
-                      checked={compactMode}
-                      onCheckedChange={setCompactMode}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={saveAppearance}>
-                    <Save className="h-4 w-4 mr-1" />
-                    Apply Theme
-                  </Button>
-                </div>
               </div>
             )}
 
             {/* ════════ PRIVACY TAB ════════ */}
             {activeTab === "privacy" && (
               <div className="space-y-6">
-                <div className="bg-background border border-border rounded-xl p-6">
-                  <h2 className="text-base font-semibold text-foreground mb-5">
-                    Profile Visibility
-                  </h2>
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Public Profile
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Allow other service members to find and view your profile
-                        </p>
-                      </div>
-                      <Switch
-                        checked={profileVisible}
-                        onCheckedChange={setProfileVisible}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Show Paygrade
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Display your paygrade on your public profile
-                        </p>
-                      </div>
-                      <Switch
-                        checked={showPaygrade}
-                        onCheckedChange={setShowPaygrade}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Show Location
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Display your duty station / zip code area
-                        </p>
-                      </div>
-                      <Switch
-                        checked={showLocation}
-                        onCheckedChange={setShowLocation}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-foreground">
-                          Activity Visibility
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Show your forum posts and marketplace activity on your profile
-                        </p>
-                      </div>
-                      <Switch
-                        checked={activityVisible}
-                        onCheckedChange={setActivityVisible}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end">
-                  <Button onClick={savePrivacy} disabled={saving}>
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-1" />
-                    )}
-                    Save Privacy Settings
-                  </Button>
-                </div>
+                <PrivacySettingsPanel />
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   )
 }

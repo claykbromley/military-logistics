@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, createContext, useContext, ReactNode 
 import { createClient } from "@/lib/supabase/client"
 import { CommunicationType, EventType, EventStatus, InvitationStatus,
          Contact, CommunicationLog, ScheduledEvent, EventInvitation, MessageThread, Message, SharedContact } from "@/lib/types"
+import { sendNotification } from "@/lib/notifications"
 
 // ============================================
 // STORAGE KEYS
@@ -876,6 +877,29 @@ function useCommunicationHubInternal() {
 
               if (invError) throw invError
               invitationsData = invData || []
+
+              // Notify each invitee
+              if (invitationsData.length > 0) {
+                const inviteeEmails = invitationsData.map((inv: any) => inv.invitee_email)
+                const { data: inviteeProfiles } = await supabase
+                  .from("profiles")
+                  .select("id, email")
+                  .in("email", inviteeEmails)
+
+                if (inviteeProfiles) {
+                  for (const profile of inviteeProfiles) {
+                    sendNotification({
+                      userId: profile.id,
+                      type: "communication",
+                      priority: "high",
+                      title: `Meeting Invitation: ${eventData.title}`,
+                      message: `You've been invited to "${eventData.title}" on ${new Date(eventData.start_time).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}.`,
+                      actionUrl: "/services/command-center/communication",
+                      actionLabel: "View Invitation",
+                    }).catch((err) => console.error("Invitation notification failed:", err))
+                  }
+                }
+              }
             }
 
             const createdEvent = mapEventFromSupabase(eventData, invitationsData)
@@ -1197,6 +1221,27 @@ function useCommunicationHubInternal() {
               )
             )
             setSyncError(null)
+
+            // Notify the invitee
+            const { data: inviteeProfile } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("email", invitee.email)
+              .single()
+
+            if (inviteeProfile) {
+              // Get the event title
+              const event = scheduledEvents.find((e) => e.id === eventId)
+              sendNotification({
+                userId: inviteeProfile.id,
+                type: "communication",
+                priority: "high",
+                title: `Meeting Invitation: ${event?.title || "New Meeting"}`,
+                message: `You've been invited to "${event?.title || "a meeting"}".`,
+                actionUrl: "/services/command-center/communication",
+                actionLabel: "View Invitation",
+              }).catch((err) => console.error("Invitation notification failed:", err))
+            }
             return newInvitation
           }
         } catch (error) {
@@ -1384,6 +1429,31 @@ function useCommunicationHubInternal() {
               }, {
                 onConflict: "thread_id,user_email"
               })
+
+            // Notify the recipient
+            const { data: recipientProfile } = await supabase
+              .from("profiles")
+              .select("id")
+              .eq("email", recipient)
+              .single()
+            
+            const { data: display_name } = await supabase
+              .from('profiles')
+              .select('display_name')
+              .eq('id', user?.id)
+              .single()
+
+            if (recipientProfile) {
+              sendNotification({
+                userId: recipientProfile.id,
+                type: "communication",
+                priority: "medium",
+                title: `New message from ${display_name?.display_name || user.email?.split("@")[0] || "someone"}`,
+                message: content.length > 100 ? content.slice(0, 100) + "…" : content,
+                actionUrl: "/services/command-center/communication",
+                actionLabel: "View Message",
+              }).catch((err) => console.error("Notification failed:", err))
+            }
 
             const createdMessage: Message = {
               id: data.id,
