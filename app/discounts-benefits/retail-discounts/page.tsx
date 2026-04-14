@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { MapView } from "@/components/discountMap/map-view"
 import { SearchBar } from "@/components/discountMap/search-bar"
 import { CategoryFilter } from "@/components/discountMap/category-filter"
@@ -27,6 +27,7 @@ export default function MilitaryDiscountMap() {
     isLoaded, 
     isPlacesLoaded, 
     isSearching, 
+    chainsReady,
     status, 
     statusMessage, 
     businesses, 
@@ -102,25 +103,29 @@ export default function MilitaryDiscountMap() {
     }
   }, [])
 
-  // Initial search on load
+  // Initial search — waits for both Places API AND chains database to be ready
+  const initialSearchDone = useRef(false)
   useEffect(() => {
-    if (isLoaded && businesses.length === 0) {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords
-            setCenter({ lat: latitude, lng: longitude })
-            setCurrentAddress("Your current location")
-            searchNearby(latitude, longitude)
-          },
-          () => {
-            searchNearby(center.lat, center.lng)
-          },
-          { enableHighAccuracy: true, timeout: 5000 },
-        )
-      }
+    if (!isPlacesLoaded || !chainsReady || initialSearchDone.current) return
+    initialSearchDone.current = true
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          setCenter({ lat: latitude, lng: longitude })
+          setCurrentAddress("Your current location")
+          searchNearby(latitude, longitude)
+        },
+        () => {
+          searchNearby(center.lat, center.lng)
+        },
+        { enableHighAccuracy: true, timeout: 5000 },
+      )
+    } else {
+      searchNearby(center.lat, center.lng)
     }
-  }, [isLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isPlacesLoaded, chainsReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-background">
