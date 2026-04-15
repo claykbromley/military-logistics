@@ -10,7 +10,7 @@ import { FeedbackSection } from "@/components/discountMap/feedback-section"
 import { CacheControls } from "@/components/discountMap/cache-controls"
 import { useGoogleMaps } from "@/hooks/use-google-maps"
 import type { Business } from "@/lib/known-chains"
-import { Map, List } from "lucide-react"
+import { Map, List, RefreshCw } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
@@ -22,6 +22,8 @@ export default function MilitaryDiscountMap() {
   const [isGettingLocation, setIsGettingLocation] = useState(false)
   const [currentAddress, setCurrentAddress] = useState("United States")
   const [activeTab, setActiveTab] = useState("map")
+  const [showSearchButton, setShowSearchButton] = useState(false)
+  const [pendingCenter, setPendingCenter] = useState<{ lat: number; lng: number } | null>(null)
 
   const { 
     isLoaded, 
@@ -30,6 +32,7 @@ export default function MilitaryDiscountMap() {
     chainsReady,
     status, 
     statusMessage, 
+    searchProgress,
     businesses, 
     cacheStats, 
     searchNearby, 
@@ -52,23 +55,35 @@ export default function MilitaryDiscountMap() {
     (lat: number, lng: number, address: string) => {
       setCenter({ lat, lng })
       setCurrentAddress(address)
+      setShowSearchButton(false)
+      setPendingCenter(null)
       searchNearby(lat, lng)
     },
     [searchNearby],
   )
 
-  // Handle map movement
+  // Handle map movement — show "Search this area" button instead of auto-searching
   const handleMapMove = useCallback(
     (newCenter: { lat: number; lng: number }) => {
       const distance = Math.sqrt(Math.pow(newCenter.lat - center.lat, 2) + Math.pow(newCenter.lng - center.lng, 2))
-
-      if (distance > 0.05) {
-        setCenter(newCenter)
-        searchNearby(newCenter.lat, newCenter.lng)
+      if (distance > 0.02) {
+        setPendingCenter(newCenter)
+        setShowSearchButton(true)
       }
     },
-    [center, searchNearby],
+    [center],
   )
+
+  // "Search this area" handler
+  const handleSearchThisArea = useCallback(() => {
+    if (pendingCenter) {
+      setCenter(pendingCenter)
+      setCurrentAddress("Map location")
+      searchNearby(pendingCenter.lat, pendingCenter.lng)
+      setShowSearchButton(false)
+      setPendingCenter(null)
+    }
+  }, [pendingCenter, searchNearby])
 
   // Handle current location
   const handleUseCurrentLocation = useCallback(() => {
@@ -103,7 +118,7 @@ export default function MilitaryDiscountMap() {
     }
   }, [])
 
-  // Initial search — waits for both Places API AND chains database to be ready
+  // Initial search on load — waits for both Places API and chains
   const initialSearchDone = useRef(false)
   useEffect(() => {
     if (!isPlacesLoaded || !chainsReady || initialSearchDone.current) return
@@ -151,6 +166,21 @@ export default function MilitaryDiscountMap() {
               ...cacheStats
             }} 
           />
+
+          {/* Search progress bar */}
+          {searchProgress && (
+            <div className="space-y-1">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-300"
+                  style={{ width: `${Math.round((searchProgress.searched / searchProgress.total) * 100)}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-right">
+                {searchProgress.searched}/{searchProgress.total} chains searched
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -171,7 +201,7 @@ export default function MilitaryDiscountMap() {
                   </TabsTrigger>
                 </TabsList>
                 <TabsContent value="map" className="mt-4">
-                  <div className="h-[400px] rounded-lg overflow-hidden border border-border">
+                  <div className="h-[400px] rounded-lg overflow-hidden border border-border relative">
                     <MapView
                       center={center}
                       businesses={filteredBusinesses}
@@ -180,6 +210,15 @@ export default function MilitaryDiscountMap() {
                       onBusinessSelect={handleBusinessSelect}
                       isLoaded={isLoaded}
                     />
+                    {showSearchButton && !isSearching && (
+                      <button
+                        onClick={handleSearchThisArea}
+                        className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all text-sm font-medium cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Search this area
+                      </button>
+                    )}
                   </div>
                 </TabsContent>
                 <TabsContent value="list" className="mt-4">
@@ -194,7 +233,7 @@ export default function MilitaryDiscountMap() {
             </div>
 
             {/* Desktop Map */}
-            <div className="hidden lg:block h-[600px] rounded-lg overflow-hidden border border-border">
+            <div className="hidden lg:block h-[600px] rounded-lg overflow-hidden border border-border relative">
               <MapView
                 center={center}
                 businesses={filteredBusinesses}
@@ -203,6 +242,15 @@ export default function MilitaryDiscountMap() {
                 onBusinessSelect={handleBusinessSelect}
                 isLoaded={isLoaded}
               />
+              {showSearchButton && !isSearching && (
+                <button
+                  onClick={handleSearchThisArea}
+                  className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-all text-sm font-medium cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Search this area
+                </button>
+              )}
             </div>
           </div>
 

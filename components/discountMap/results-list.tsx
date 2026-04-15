@@ -2,9 +2,8 @@
 
 import type { Business } from "@/lib/known-chains"
 import { CATEGORY_COLORS } from "@/lib/known-chains"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Percent, Info } from "lucide-react"
+import { MapPin, Info, Tag } from "lucide-react"
 
 interface ResultsListProps {
   businesses: Business[]
@@ -13,13 +12,21 @@ interface ResultsListProps {
   isLoading: boolean
 }
 
+function getCategoryEmoji(category: string): string {
+  const emojis: Record<string, string> = {
+    restaurant: "🍽️", retail: "🛍️", automotive: "🚗",
+    hotel: "🏨", entertainment: "🎯", fitness: "💪",
+  }
+  return emojis[category] || "📍"
+}
+
 export function ResultsList({ businesses, selectedBusiness, onBusinessSelect, isLoading }: ResultsListProps) {
   if (isLoading) {
     return (
       <div className="space-y-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="animate-pulse">
-            <div className="bg-muted rounded-lg h-32" />
+            <div className="bg-muted rounded-xl h-24" />
           </div>
         ))}
       </div>
@@ -29,65 +36,78 @@ export function ResultsList({ businesses, selectedBusiness, onBusinessSelect, is
   if (businesses.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-          <MapPin className="h-8 w-8 text-muted-foreground" />
+        <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <MapPin className="h-7 w-7 text-muted-foreground/50" />
         </div>
-        <h3 className="font-semibold text-lg mb-2">No businesses found</h3>
+        <h3 className="font-semibold text-base mb-1">No businesses found</h3>
         <p className="text-muted-foreground text-sm">
-          Try searching for a different location or adjusting your filters.
+          Try a different location or adjust your filters.
         </p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+    <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
       {businesses.map((business) => {
         const color = CATEGORY_COLORS[business.category] || "#6b7280"
         const isSelected = selectedBusiness?.id === business.id
+        const hasNote = business.note && business.note.trim().length > 0
 
         return (
-          <Card
+          <div
             key={business.id}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              isSelected ? "ring-2 ring-primary shadow-md" : ""
-            }`}
             onClick={() => onBusinessSelect(business)}
+            className={`group relative rounded-xl border bg-card p-3.5 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-[1px] ${
+              isSelected
+                ? "ring-2 ring-primary shadow-md border-primary/30"
+                : "border-border hover:border-border/80"
+            }`}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-semibold text-foreground truncate">{business.name}</h3>
-                    <Badge
-                      variant="secondary"
-                      className="shrink-0 text-xs"
-                      style={{ backgroundColor: `${color}20`, color }}
-                    >
-                      {business.category}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
-                    <MapPin className="h-3 w-3 shrink-0" />
-                    <span className="truncate">{business.address}</span>
-                  </div>
-                  <div
-                    className="p-3 rounded-md"
-                    style={{ backgroundColor: `${color}10`, borderLeft: `3px solid ${color}` }}
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <Percent className="h-4 w-4" style={{ color }} />
-                      <span className="font-medium text-sm">{business.discount}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Info className="h-3 w-3" />
-                      <span>{business.note}</span>
-                    </div>
-                  </div>
-                </div>
+            {/* Color accent */}
+            <div
+              className="absolute left-0 top-3 bottom-3 w-1 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+
+            <div className="pl-3">
+              {/* Header: name + category */}
+              <div className="flex items-start justify-between gap-2 mb-1.5">
+                <h3 className="font-semibold text-sm text-foreground leading-tight line-clamp-1">
+                  {business.name}
+                </h3>
+                <Badge
+                  variant="outline"
+                  className="shrink-0 text-[10px] font-medium px-1.5 py-0 h-5 border-0"
+                  style={{ backgroundColor: `${color}15`, color }}
+                >
+                  {getCategoryEmoji(business.category)} {business.category}
+                </Badge>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Address */}
+              <div className="flex items-center gap-1.5 mb-2.5">
+                <MapPin className="h-3 w-3 text-muted-foreground/60 shrink-0" />
+                <span className="text-xs text-muted-foreground truncate">{business.address}</span>
+              </div>
+
+              {/* Discount info */}
+              <div
+                className="rounded-lg px-3 py-2"
+                style={{ backgroundColor: `${color}12` }}
+              >
+                <p className="text-sm font-medium text-foreground leading-snug">
+                  {business.discount}
+                </p>
+                {hasNote && (
+                  <div className="flex items-start gap-1.5 mt-1.5">
+                    <Info className="h-3 w-3 text-muted-foreground/50 shrink-0 mt-0.5" />
+                    <p className="text-xs text-muted-foreground leading-relaxed">{business.note}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )
       })}
     </div>
