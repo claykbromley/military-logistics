@@ -2,56 +2,28 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import {
-  Menu,
-  Search,
-  ChevronDown,
-  Moon,
-  Sun,
-  Bell,
-  User,
-  Settings,
-  LogOut,
-  Shield,
-  Bookmark,
-  HelpCircle,
-  ArrowRight,
-  Clock,
-  Calendar,
-  MessageSquare,
-  CreditCard,
-  Briefcase,
-  MapPin,
+  Menu, Search, ChevronDown, Moon, Sun, Bell, User, Settings, LogOut,
+  Shield, HelpCircle, ArrowRight, Clock, Calendar,
+  MessageSquare, CreditCard, Briefcase, MapPin,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuLabel,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu"
-import { LoginModal } from "../app/auth/login-modal"
-import { SignupModal } from "../app/auth/signup-modal"
-import { createClient } from "@/lib/supabase/client"
+import { LoginModal } from "@/app/auth/login-modal"
+import { SignupModal } from "@/app/auth/signup-modal"
+import { ForgotPasswordModal } from "@/app/auth/forgot-password-modal"
+import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { useUI } from "@/context/ui-context"
-
-type User = {
-  email?: string
-  user_metadata?: {
-    full_name?: string
-    avatar_url?: string
-  }
-} | null
+import { searchPages, type SearchablePage } from "@/lib/site-pages"
+import { getUnreadCount, subscribeToNotifications, getNotifications, markAsRead } from "@/lib/notifications"
+import { createClient } from "@/lib/supabase/client"
+import type { Notification } from "@/lib/notifications"
+import { formatDistanceToNow } from "date-fns"
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -80,7 +52,7 @@ const navItems = [
   {
     name: "Transitions",
     icon: ArrowRight,
-    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation"],
+    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation", "Changing Dependents"],
   },
   {
     name: "Discounts/Benefits",
@@ -107,37 +79,6 @@ const navItems = [
     name: "Contact Us",
     icon: HelpCircle,
     items: ["Support", "Feedback", "Report Issue", "FAQs"],
-  },
-]
-
-// Searchable index for the command palette
-const searchableItems = [
-  ...navItems.flatMap((section) =>
-    section.items.map((item) => ({
-      label: item,
-      section: section.name,
-      icon: section.icon,
-      url: getItemUrl(section.name, item),
-    }))
-  ),
-  { label: "My Profile", section: "Account", icon: User, url: "/profile" },
-  {
-    label: "Settings",
-    section: "Account",
-    icon: Settings,
-    url: "/settings",
-  },
-  {
-    label: "Saved Items",
-    section: "Account",
-    icon: Bookmark,
-    url: "/saved",
-  },
-  {
-    label: "Notifications",
-    section: "Account",
-    icon: Bell,
-    url: "/notifications",
   },
 ]
 
@@ -174,15 +115,12 @@ function CommandPalette({
     "Military Discounts",
     "Schedule Appointment",
     "Benefits Guide",
+    "GI Bill",
+    "PCS Move",
   ]
 
-  const filtered = query.trim()
-    ? searchableItems.filter(
-        (item) =>
-          item.label.toLowerCase().includes(query.toLowerCase()) ||
-          item.section.toLowerCase().includes(query.toLowerCase())
-      )
-    : []
+  // Use the enhanced site-wide search
+  const filtered: SearchablePage[] = query.trim() ? searchPages(query) : []
 
   const grouped = filtered.reduce(
     (acc, item) => {
@@ -190,7 +128,7 @@ function CommandPalette({
       acc[item.section].push(item)
       return acc
     },
-    {} as Record<string, typeof filtered>
+    {} as Record<string, SearchablePage[]>
   )
 
   const flatResults = Object.values(grouped).flat()
@@ -206,6 +144,15 @@ function CommandPalette({
   useEffect(() => {
     setSelectedIndex(0)
   }, [query])
+
+  useEffect(() => {
+    if (listRef.current && flatResults.length > 0) {
+      const selectedEl = listRef.current.querySelector(
+        `[data-index="${selectedIndex}"]`
+      )
+      selectedEl?.scrollIntoView({ block: "nearest" })
+    }
+  }, [selectedIndex, flatResults.length])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
@@ -242,7 +189,7 @@ function CommandPalette({
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search services, benefits, pages..."
+              placeholder="Search pages, services, benefits, settings..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -258,7 +205,7 @@ function CommandPalette({
             {query.trim() === "" ? (
               <div className="p-3">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                  Recent & Popular
+                  Popular Searches
                 </p>
                 {recentSearches.map((term) => (
                   <button
@@ -287,19 +234,31 @@ function CommandPalette({
                     return (
                       <button
                         key={item.url}
+                        data-index={globalIdx}
                         onClick={() => {
                           onNavigate(item.url)
                           onClose()
                         }}
-                        className={`flex items-center gap-3 w-full px-3 py-2 text-sm rounded-lg transition-colors cursor-pointer ${
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-colors cursor-pointer ${
                           globalIdx === selectedIndex
                             ? "bg-primary text-primary-foreground"
                             : "text-foreground hover:bg-accent"
                         }`}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1 text-left">{item.label}</span>
-                        <ArrowRight className="h-3 w-3 opacity-50" />
+                        <div className="flex-1 text-left min-w-0">
+                          <span className="block">{item.label}</span>
+                          <span
+                            className={`block text-xs truncate ${
+                              globalIdx === selectedIndex
+                                ? "text-primary-foreground/70"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {item.description}
+                          </span>
+                        </div>
+                        <ArrowRight className="h-3 w-3 opacity-50 shrink-0" />
                       </button>
                     )
                   })}
@@ -339,25 +298,62 @@ function CommandPalette({
 
 function useDarkMode() {
   const [isDark, setIsDark] = useState(false)
+  const { user } = useAuth()
 
+  // Load theme from profile on mount / user change
   useEffect(() => {
-    const stored = localStorage.getItem("milify-theme")
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches
-    const dark = stored ? stored === "dark" : prefersDark
-    setIsDark(dark)
-    document.documentElement.classList.toggle("dark", dark)
+    const loadTheme = async () => {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
+
+      if (!user) {
+        // Not logged in — fall back to system preference
+        setIsDark(prefersDark)
+        document.documentElement.classList.toggle("dark", prefersDark)
+        return
+      }
+
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("profiles")
+        .select("theme")
+        .eq("id", user.id)
+        .single()
+
+      const theme = data?.theme || "system"
+      const dark = theme === "system" ? prefersDark : theme === "dark"
+      setIsDark(dark)
+      document.documentElement.classList.toggle("dark", dark)
+    }
+
+    loadTheme()
+  }, [user])
+
+  // Stay in sync — watch for class changes on <html> (from settings page)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      const dark = document.documentElement.classList.contains("dark")
+      setIsDark(dark)
+    })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+    return () => observer.disconnect()
   }, [])
 
-  const toggle = useCallback(() => {
-    setIsDark((prev) => {
-      const next = !prev
-      document.documentElement.classList.toggle("dark", next)
-      localStorage.setItem("milify-theme", next ? "dark" : "light")
-      return next
-    })
-  }, [])
+  const toggle = useCallback(async () => {
+    const next = !isDark
+    setIsDark(next)
+    document.documentElement.classList.toggle("dark", next)
+
+    if (!user) return
+
+    const supabase = createClient()
+    await supabase
+      .from("profiles")
+      .update({ theme: next ? "dark" : "light", updated_at: new Date().toISOString() })
+      .eq("id", user.id)
+  }, [isDark, user])
 
   return { isDark, toggle }
 }
@@ -365,7 +361,8 @@ function useDarkMode() {
 // ─── Header Component ────────────────────────────────────────────────────────
 
 export function Header() {
-  const [user, setUser] = useState<User>(null)
+  const { user, loading: authLoading, signOut } = useAuth()
+
   const { showLogin, setShowLogin } = useUI()
   const [showSignup, setShowSignup] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -373,7 +370,12 @@ export function Header() {
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
   const [scrolled, setScrolled] = useState(false)
   const { isDark, toggle: toggleDark } = useDarkMode()
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
   const router = useRouter()
+
+  // Notification badge count
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [recentNotifications, setRecentNotifications] = useState<Notification[]>([])
 
   // Track scroll for condensed header style
   useEffect(() => {
@@ -394,21 +396,60 @@ export function Header() {
     return () => document.removeEventListener("keydown", handler)
   }, [])
 
-  // Auth listener
+  // Fetch unread notification count + real-time subscription
+  const fetchUnread = useCallback(async () => {
+  if (!user) return
+  const [count, { data }] = await Promise.all([
+    getUnreadCount(),
+    getNotifications({ unreadOnly: true, limit: 5 }),
+  ])
+  setUnreadCount(count)
+  setRecentNotifications(data)
+  }, [user])
+
+  // Re-fetch on route changes
   useEffect(() => {
+    fetchUnread()
+  }, [fetchUnread, router])
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0)
+      setRecentNotifications([])
+      return
+    }
+
+    fetchUnread()
+
+    const onFocus = () => fetchUnread()
+    window.addEventListener("focus", onFocus)
+
+    // Subscribe to ALL changes (insert, update, delete) on this user's notifications
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-    return () => subscription.unsubscribe()
-  }, [])
+    const channel = supabase
+      .channel(`header-notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchUnread()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      supabase.removeChannel(channel)
+    }
+  }, [user, fetchUnread])
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut()
     router.refresh()
   }
 
@@ -417,7 +458,11 @@ export function Header() {
   }
 
   const displayName =
-    user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"
+    user?.user_metadata?.display_name ||
+    user?.user_metadata?.full_name ||
+    user?.email?.split("@")[0] ||
+    "User"
+  const avatarUrl = user?.user_metadata?.avatar_url || null
   const initials = displayName
     .split(" ")
     .map((n: string) => n[0])
@@ -464,9 +509,17 @@ export function Header() {
                   {user && (
                     <div className="p-4 border-b bg-muted/30">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
-                          {initials}
-                        </div>
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt={displayName}
+                            className="h-10 w-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-semibold">
+                            {initials}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
                             {displayName}
@@ -568,6 +621,19 @@ export function Header() {
                             <Settings className="h-4 w-4 text-muted-foreground" />
                             <span>Settings</span>
                           </a>
+                          <a
+                            href="/notifications"
+                            className="flex items-center gap-3 w-full px-3 py-2.5 text-sm text-foreground hover:bg-accent rounded-lg transition-colors"
+                            onClick={() => setShowMobileMenu(false)}
+                          >
+                            <Bell className="h-4 w-4 text-muted-foreground" />
+                            <span>Notifications</span>
+                            {unreadCount > 0 && (
+                              <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                                {unreadCount}
+                              </span>
+                            )}
+                          </a>
                           <button
                             onClick={() => {
                               handleSignOut()
@@ -634,7 +700,7 @@ export function Header() {
               <Search className="h-4 w-4" />
               <span className="flex-1 text-left">Search...</span>
               <kbd className="hidden lg:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium bg-background border border-border rounded">
-                ⌘-K or Ctrl-K
+                ⌘K or Ctrl-K
               </kbd>
             </button>
 
@@ -665,7 +731,11 @@ export function Header() {
                 )}
               </Button>
 
-              {user ? (
+              {authLoading ? (
+                <div className="flex items-center gap-1.5 ml-1">
+                  <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
+                </div>
+              ) : user ? (
                 <>
                   {/* Notifications */}
                   <DropdownMenu>
@@ -677,8 +747,11 @@ export function Header() {
                         aria-label="Notifications"
                       >
                         <Bell className="h-[1.15rem] w-[1.15rem]" />
-                        {/* Notification dot */}
-                        <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
+                        {unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold ring-2 ring-background">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-80">
@@ -692,36 +765,83 @@ export function Header() {
                         </a>
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <div className="p-4 text-center text-sm text-muted-foreground">
-                        <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                        <p>No new notifications</p>
-                        <p className="text-xs mt-1">
-                          We&apos;ll notify you about important updates
-                        </p>
-                      </div>
+
+                      {recentNotifications.length > 0 ? (
+                        <div className="max-h-72 overflow-y-auto">
+                          {recentNotifications.map((notif) => (
+                            <DropdownMenuItem
+                              key={notif.id}
+                              className="flex flex-col items-start gap-1 p-3 cursor-pointer group"
+                              onClick={() => {
+                                markAsRead(notif.id)
+                                setRecentNotifications((prev) =>
+                                  prev.filter((n) => n.id !== notif.id)
+                                )
+                                setUnreadCount((prev) => Math.max(0, prev - 1))
+                                if (notif.action_url) {
+                                  router.push(notif.action_url)
+                                }
+                              }}
+                            >
+                              <div className="flex items-start gap-2 w-full">
+                                <span className="mt-1 h-2 w-2 rounded-full bg-primary shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium leading-tight truncate">
+                                    {notif.title}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground group-hover:text-white line-clamp-2 mt-0.5">
+                                    {notif.message}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground group-hover:text-white mt-1">
+                                    {formatDistanceToNow(new Date(notif.created_at), {
+                                      addSuffix: true,
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                          {unreadCount > recentNotifications.length && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <div className="p-2 text-center">
+                                <a
+                                  href="/notifications"
+                                  className="text-xs text-primary hover:underline"
+                                >
+                                  {unreadCount - recentNotifications.length} more unread
+                                </a>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          <Bell className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                          <p>No new notifications</p>
+                          <p className="text-xs mt-1">
+                            We&apos;ll notify you about important updates
+                          </p>
+                        </div>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-
-                  {/* Saved/Bookmarks */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hidden md:flex cursor-pointer"
-                    aria-label="Saved items"
-                    onClick={() => router.push("/saved")}
-                  >
-                    <Bookmark className="h-[1.15rem] w-[1.15rem]" />
-                  </Button>
 
                   {/* User menu */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        className="relative h-8 w-8 rounded-full ml-1 cursor-pointer"
-                      >
-                        <div className="h-8 w-8 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
-                          {initials}
-                        </div>
+                      <Button className="relative h-8 w-8 rounded-full ml-1 cursor-pointer overflow-hidden p-0">
+                        {avatarUrl ? (
+                          <img
+                            src={avatarUrl}
+                            alt={displayName}
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                            {initials}
+                          </div>
+                        )}
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
@@ -739,22 +859,27 @@ export function Header() {
                           className="cursor-pointer"
                           onClick={() => router.push("/profile")}
                         >
-                          <User className="mr-2 h-4 w-4" />
+                          <User className="mr-2 h-4 w-4 hover:text-white" />
                           My Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer"
-                          onClick={() => router.push("/saved")}
-                        >
-                          <Bookmark className="mr-2 h-4 w-4" />
-                          Saved Items
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="cursor-pointer"
                           onClick={() => router.push("/settings")}
                         >
-                          <Settings className="mr-2 h-4 w-4" />
+                          <Settings className="mr-2 h-4 w-4 hover:text-white" />
                           Settings
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={() => router.push("/notifications")}
+                        >
+                          <Bell className="mr-2 h-4 w-4 hover:text-white" />
+                          Notifications
+                          {unreadCount > 0 && (
+                            <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
+                              {unreadCount}
+                            </span>
+                          )}
                         </DropdownMenuItem>
                       </DropdownMenuGroup>
                       <DropdownMenuSeparator />
@@ -762,7 +887,7 @@ export function Header() {
                         className="cursor-pointer"
                         onClick={() => router.push("/contact-us/support")}
                       >
-                        <HelpCircle className="mr-2 h-4 w-4" />
+                        <HelpCircle className="mr-2 h-4 w-4 hover:text-white" />
                         Help & Support
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -770,7 +895,7 @@ export function Header() {
                         className="cursor-pointer text-red-600 focus:text-white"
                         onClick={handleSignOut}
                       >
-                        <LogOut className="mr-2 h-4 w-4" />
+                        <LogOut className="mr-2 h-4 w-4 hover:text-white" />
                         Sign Out
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -781,11 +906,12 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="cursor-pointer"
                     onClick={() => setShowLogin(true)}
                   >
                     Log in
                   </Button>
-                  <Button size="sm" onClick={() => setShowSignup(true)}>
+                  <Button size="sm"  className="cursor-pointer" onClick={() => setShowSignup(true)}>
                     Sign Up
                   </Button>
                 </div>
@@ -831,6 +957,12 @@ export function Header() {
           setShowLogin(false)
           setShowSignup(true)
         }}
+        onSwitchToForgotPassword={() => { setShowLogin(false); setShowForgotPassword(true); }}
+      />
+      <ForgotPasswordModal
+        open={showForgotPassword}
+        onClose={() => setShowForgotPassword(false)}
+        onBackToLogin={() => { setShowForgotPassword(false); setShowLogin(true); }}
       />
       <SignupModal
         open={showSignup}

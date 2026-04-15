@@ -39,6 +39,10 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  if (request.nextUrl.pathname === "/api/send-notification-email") {
+    return NextResponse.next()
+  }
+
   // IMPORTANT: Do NOT use `getSession()` here — it reads from storage
   // without validating. `getUser()` actually calls Supabase auth and
   // triggers a token refresh if the access token has expired.

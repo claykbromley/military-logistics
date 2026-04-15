@@ -830,11 +830,11 @@ export function BillsTracker() {
                     placeholder="Search bills..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 dark:border-slate-500"
                   />
                 </div>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-full sm:w-44 dark:border-slate-500">
+                  <SelectTrigger className="w-full sm:w-44 dark:border-slate-500 cursor-pointer">
                     <Filter className="w-4 h-4 mr-2" />
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>

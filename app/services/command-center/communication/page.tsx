@@ -8,8 +8,9 @@ import { ArrowLeft, Calendar, CalendarPlus, MessageCircle, NotebookText, AlertCi
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { CommunicationLog, ScheduledEvent } from "@/lib/types"
+import { CommunicationLog } from "@/lib/types"
 import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
+import { ConnectionsProvider } from "@/hooks/use-connections"
 import { MessagesTab } from "@/components/command-center/messages-tab"
 import { ScheduleTab } from "@/components/command-center/schedule-tab"
 import { LogTab, AddCommunicationDialog } from "@/components/command-center/log-tab"
@@ -21,9 +22,11 @@ import { ConnectedEntryDetailPopover } from "@/components/calendar/entry-detail-
 
 export default function CommunicationHubPage() {
   return (
-    <CommunicationHubProvider>
-      <CommunicationHubPageContent />
-    </CommunicationHubProvider>
+    <ConnectionsProvider>
+      <CommunicationHubProvider>
+        <CommunicationHubPageContent />
+      </CommunicationHubProvider>
+    </ConnectionsProvider>
   )
 }
 
@@ -31,7 +34,6 @@ function CommunicationHubPageContent() {
   const {
     contacts,
     communicationLog,
-    scheduledEvents,
     messageThreads,
     isLoaded,
     isSyncing,
@@ -40,7 +42,6 @@ function CommunicationHubPageContent() {
     updateCommunication,
   } = useCommunicationHub()
 
-  // Get the authenticated user ID for the EntryModalProvider
   const [userId, setUserId] = useState<string | null>(null)
   const [totalMeetings, setTotalMeetings] = useState(0)
 
@@ -51,8 +52,6 @@ function CommunicationHubPageContent() {
     })
   }, [])
 
-  // Fetch upcoming meeting count directly from calendar_entries
-  // to stay in sync with the schedule tab
   const fetchMeetingCount = useCallback(async () => {
     if (!userId) return
     const supabase = createClient()
@@ -71,23 +70,17 @@ function CommunicationHubPageContent() {
       return
     }
 
-    // Count meetings with future occurrences within 30 days
-    // (same logic as schedule tab's hasFutureOccurrences + upcomingCount)
     const count = data.filter((e) => {
       const start = new Date(e.start_time)
       const recEnd = e.recurrence_end && e.recurrence_end.trim() ? e.recurrence_end : null
 
       if (e.is_recurring) {
-        // Recurring with future occurrences
         const hasMore = !recEnd || new Date(recEnd) > now
         if (!hasMore) return false
-        // If start is in the future, check within 30 days
         if (start > now) return start < thirtyDaysOut
-        // Already started recurring = next occurrence is ~now, counts
         return true
       }
 
-      // Non-recurring: must be in the future and within 30 days
       return start > now && start < thirtyDaysOut
     }).length
 
@@ -98,7 +91,6 @@ function CommunicationHubPageContent() {
     fetchMeetingCount()
   }, [fetchMeetingCount])
 
-  // Re-fetch count when schedule tab data changes (listen for realtime)
   useEffect(() => {
     if (!userId) return
     const supabase = createClient()
@@ -118,11 +110,8 @@ function CommunicationHubPageContent() {
     return () => { supabase.removeChannel(channel) }
   }, [userId, fetchMeetingCount])
 
-  // Dialog states
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false)
   const [editingLog, setEditingLog] = useState<CommunicationLog | null>(null)
-
-  // View states
   const [activeTab, setActiveTab] = useState("schedule")
 
   const contactOptions = contacts.map((c) => ({
@@ -131,7 +120,6 @@ function CommunicationHubPageContent() {
     email: c.email || "",
   }))
 
-  // Calculate unread count from threads
   const unreadCount = useMemo(() => {
     return messageThreads
       .filter(t => !t.isArchived)
@@ -142,7 +130,6 @@ function CommunicationHubPageContent() {
     return messageThreads.filter(t => !t.isArchived && t.unreadCount > 0).length
   }, [messageThreads])
 
-  // Stats
   const totalEvents = totalMeetings
   const totalLogs = communicationLog.length
 
@@ -229,7 +216,7 @@ function CommunicationHubPageInner({
       {/* Hero Header */}
       <div className="relative overflow-hidden border-b bg-primary dark:bg-secondary">
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 relative">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 relative">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Button variant="ghost" size="icon" asChild className="text-white/80 hover:text-white hover:bg-white/10">
@@ -318,36 +305,36 @@ function CommunicationHubPageInner({
       {/* Mobile Actions */}
       <div className="sm:hidden flex gap-2 p-4 border-b bg-background">
         <Button variant="outline" className="flex-1" onClick={() => setIsLogDialogOpen(true)}>
-          <NotebookText className="w-4 h-4 mr-2" />
-          Log
+          <NotebookText className="w-4 h-4 mr-2" />Log
         </Button>
         <Button className="flex-1" onClick={() => openEntryModal()}>
-          <CalendarPlus className="w-4 h-4 mr-2" />
-          Schedule
+          <CalendarPlus className="w-4 h-4 mr-2" />Schedule
         </Button>
       </div>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-muted/50 p-1">
-            <TabsTrigger value="schedule" className="gap-2">
-              <Calendar className="w-4 h-4" />
-              Schedule
-            </TabsTrigger>
-            <TabsTrigger value="messages" className="gap-2">
-              <MessageCircle className="w-4 h-4" />
-              Messages
-              {unreadThreadCount > 0 && (
-                <Badge variant="destructive" className="ml-1 h-5 min-w-[20px]">
-                  {unreadThreadCount}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="logs" className="gap-2">
-              <NotebookText className="w-4 h-4" />
-              Logs
-            </TabsTrigger>
+          <TabsList className="w-full h-auto flex gap-3 overflow-x-auto rounded-2xl bg-muted/60 p-1.5 backdrop-blur-sm border border-border shadow-sm">
+            {[
+              { value: "schedule", icon: Calendar, label: "Schedule" },
+              { value: "messages", icon: MessageCircle, label: "Messages" },
+              { value: "logs", icon: NotebookText, label: "Logs" },
+            ].map(({ value, icon: Icon, label }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="flex items-center gap-2 rounded-xl text-sm font-medium transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-accent/10 data-[state=active]:!bg-primary/30 data-[state=active]:!text-foreground cursor-pointer"
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="whitespace-nowrap">{label}</span>
+                {value === "messages" && unreadThreadCount > 0 && (
+                  <Badge variant="destructive" className="ml-1 h-5 min-w-[20px]">
+                    {unreadThreadCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            ))}
           </TabsList>
 
           <ScheduleTab />
@@ -369,11 +356,9 @@ function CommunicationHubPageInner({
         editingLog={editingLog}
       />
 
-      {/* Self-wired entry modal & detail popover */}
       <ConnectedEntryModal />
       <ConnectedEntryDetailPopover />
 
-      {/* Sync indicator */}
       {isSyncing && (
         <div className="fixed bottom-4 right-4 bg-card border rounded-lg shadow-lg px-4 py-2 flex items-center gap-2">
           <div className="w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -381,7 +366,6 @@ function CommunicationHubPageInner({
         </div>
       )}
 
-      {/* Error indicator */}
       {syncError && (
         <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground rounded-lg shadow-lg px-4 py-2 flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />

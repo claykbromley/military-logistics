@@ -1,12 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { UIProvider } from "@/context/ui-context"
-
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+import { AuthProvider } from "@/context/auth-context"
 
 export const metadata: Metadata = {
   title: "Milify - Logistics Management Resources for Service Members",
@@ -56,9 +53,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="font-sans antialiased bg-background text-foreground">
-        <UIProvider>
-          {children}
-        </UIProvider>
+        <AuthProvider>
+          <UIProvider>
+            {children}
+          </UIProvider>
+        </AuthProvider>
         <Analytics />
       </body>
     </html>

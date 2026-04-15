@@ -40,9 +40,11 @@ export interface MaintenanceTask {
 }
 
 export interface ExpiringItem {
-  propertyName: string
-  itemType: string
-  date: string
+  propertyId: string;
+  propertyName: string;
+  itemType: string;
+  date: string;
+  daysUntil: number
 }
 
 export interface SummaryData {

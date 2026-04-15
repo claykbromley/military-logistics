@@ -46,31 +46,41 @@ export const MILITARY_STATUS: { value: string; label: string }[] = [
   { value: "other", label: "Other" },
 ]
 
-export const PAYGRADES: { value: string; label: string }[] = [
-  { value: "e1", label: "E-1" },
-  { value: "e2", label: "E-2" },
-  { value: "e3", label: "E-3" },
-  { value: "e4", label: "E-4" },
-  { value: "e5", label: "E-5" },
-  { value: "e6", label: "E-6" },
-  { value: "e7", label: "E-7" },
-  { value: "e8", label: "E-8" },
-  { value: "e9", label: "E-9" },
-  { value: "w1", label: "W-1" },
-  { value: "w2", label: "W-2" },
-  { value: "w3", label: "W-3" },
-  { value: "w4", label: "W-4" },
-  { value: "w5", label: "W-5" },
-  { value: "o1", label: "O-1" },
-  { value: "o2", label: "O-2" },
-  { value: "o3", label: "O-3" },
-  { value: "o4", label: "O-4" },
-  { value: "o5", label: "O-5" },
-  { value: "o6", label: "O-6" },
-  { value: "o7", label: "O-7" },
-  { value: "o8", label: "O-8" },
-  { value: "o9", label: "O-9" },
-  { value: "o10", label: "O-10" },
+export const PAYGRADES: { value: string; label: string; next?: string; typicalYOS?: number, note?: string }[] = [
+  // ENLISTED
+  { value: "e1", label: "E-1", next: "E-2", typicalYOS: 0, note: "Automatic on enlistment" },
+  { value: "e2", label: "E-2", next: "E-3", typicalYOS: 1, note: "6 months TIS" },
+  { value: "e3", label: "E-3", next: "E-4", typicalYOS: 2, note: "12 months TIS, 4 months TIG" },
+  { value: "e4", label: "E-4", next: "E-5", typicalYOS: 3, note: "24 months TIS, 6 months TIG" },
+  { value: "e5", label: "E-5", next: "E-6", typicalYOS: 6, note: "Promotion board, ~4-6 YOS typical" },
+  { value: "e6", label: "E-6", next: "E-7", typicalYOS: 10, note: "Promotion board, ~8-12 YOS typical" },
+  { value: "e7", label: "E-7", next: "E-8", typicalYOS: 16, note: "Centralized board, ~14-18 YOS typical" },
+  { value: "e8", label: "E-8", next: "E-9", typicalYOS: 20, note: "Centralized board, ~18-22 YOS typical" },
+  { value: "e9", label: "E-9", typicalYOS: 24, note: "Centralized board, ~22-26 YOS typical" },
+
+  // WARRANT OFFICER
+  { value: "w1", label: "W-1", next: "W-2", typicalYOS: 8, note: "Warrant Officer Candidate School" },
+  { value: "w2", label: "W-2", next: "W-3", typicalYOS: 12, note: "~2 years as W-1" },
+  { value: "w3", label: "W-3", next: "W-4", typicalYOS: 16, note: "~4 years as W-2, promotion board" },
+  { value: "w4", label: "W-4", next: "W-5", typicalYOS: 22, note: "~6 years as W-3, promotion board" },
+  { value: "w5", label: "W-5", typicalYOS: 28, note: "~4 years as W-4, centralized board" },
+
+  // OFFICER
+  { value: "o1", label: "O-1", next: "O-2", typicalYOS: 0, note: "Commission (OCS/ROTC/Service Academy)" },
+  { value: "o1e", label: "O-1E", next: "O-2E", typicalYOS: 4, note: "Commission (STA-21/Green to Gold/MECEP)" },
+  { value: "o2", label: "O-2", next: "O-3", typicalYOS: 2, note: "2 years as O-1" },
+  { value: "o2e", label: "O-2E", next: "O-3E", typicalYOS: 6, note: "2 years as O-1E" },
+  { value: "o3", label: "O-3", next: "O-4", typicalYOS: 4, note: "2 years as O-2" },
+  { value: "o3e", label: "O-3E", next: "O-4", typicalYOS: 8, note: "2 years as O-2E" },
+  { value: "o4", label: "O-4", next: "O-5", typicalYOS: 10, note: "~4-6 years as O-3, promotion board" },
+  { value: "o5", label: "O-5", next: "O-6", typicalYOS: 16, note: "~5-6 years as O-4, promotion board" },
+  { value: "o6", label: "O-6", next: "O-7", typicalYOS: 22, note: "~5-6 years as O-5, promotion board" },
+  { value: "o7", label: "O-7", next: "O-8", typicalYOS: 26, note: "Presidential nomination, Senate confirmation" },
+  { value: "o8", label: "O-8", next: "O-9", typicalYOS: 30, note: "Presidential nomination, Senate confirmation" },
+  { value: "o9", label: "O-9", next: "O-10", typicalYOS: 32, note: "Presidential nomination, Senate confirmation" },
+  { value: "o10", label: "O-10", typicalYOS: 34, note: "Presidential nomination, Senate confirmation" },
+
+  // OTHER
   { value: "cdt-midn", label: "CDT/MIDN" },
   { value: "civilian", label: "Civilian" },
   { value: "other", label: "Other" },
@@ -298,6 +308,7 @@ export interface Contact {
   address?: string
   timezone?: string
   role: ContactRole
+  linked_profile_id?: string
   isEmergencyContact: boolean
   isPoaHolder: boolean
   poaType?: string
@@ -568,4 +579,52 @@ export interface AlpacaAccount {
   portfolio_value: string;
   buying_power: string;
   equity: string;
+}
+
+// ─── Privacy & Connection Types ──────────────────────────────────────────────
+
+export type PrivacyLevel = "public" | "connections_only" | "private"
+ 
+export type ConnectionStatus =
+  | "none"
+  | "pending_sent"
+  | "pending_received"
+  | "connected"
+  | "blocked"
+ 
+export interface ConnectionRequest {
+  id: string
+  senderId: string
+  senderName: string
+  senderEmail: string
+  senderAvatar?: string
+  senderBranch?: string
+  senderPaygrade?: string
+  recipientId: string
+  recipientName?: string
+  recipientEmail?: string
+  message?: string
+  status: "pending" | "accepted" | "declined"
+  createdAt: string
+  respondedAt?: string
+}
+ 
+export interface ProfilePrivacySettings {
+  privacyLevel: PrivacyLevel
+  showEmail: boolean
+  showPhone: boolean
+  showDutyStation: boolean
+  showBio: boolean
+  showInSearch: boolean
+  showMos: boolean
+}
+ 
+export const DEFAULT_PRIVACY_SETTINGS: ProfilePrivacySettings = {
+  privacyLevel: "public",
+  showEmail: true,
+  showPhone: false,
+  showDutyStation: true,
+  showBio: true,
+  showInSearch: true,
+  showMos: true,
 }

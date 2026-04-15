@@ -143,7 +143,6 @@ interface EventCardProps {
 
 function EventCard({
   entry,
-  user,
   compact = false,
   displayDate,
   onCardClick,
@@ -255,7 +254,7 @@ function EventCard({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
               >
                 <MoreVertical className="w-4 h-4" />
               </Button>
@@ -264,18 +263,18 @@ function EventCard({
               {!isCompleted && !isPast && entry.type === "task" && (
                 <>
                   <DropdownMenuItem onClick={onComplete}>
-                    <Check className="w-4 h-4 mr-2" />
+                    <Check className="w-4 h-4 mr-2 hover:text-white" />
                     Mark Complete
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                 </>
               )}
               <DropdownMenuItem onClick={onEdit}>
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit className="w-4 h-4 mr-2 hover:text-white" />
                 Edit
               </DropdownMenuItem>
               <DropdownMenuItem onClick={onDelete} className="text-destructive">
-                <Trash2 className="w-4 h-4 mr-2" />
+                <Trash2 className="w-4 h-4 mr-2 hover:text-white" />
                 Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -537,7 +536,7 @@ function ScheduleTabInner({
                   {upcomingCount}
                 </span>
               </div>
-              <Button variant="outline" size="sm" onClick={() => openModal()}>
+              <Button variant="outline" className="cursor-pointer" size="sm" onClick={() => openModal()}>
                 <Plus className="w-4 h-4 mr-2" />
                 Add Meeting
               </Button>
@@ -568,7 +567,7 @@ function ScheduleTabInner({
             <p className="text-muted-foreground mb-6">
               Schedule meetings and tasks to stay organized
             </p>
-            <Button onClick={() => openModal()}>
+            <Button className="cursor-pointer" onClick={() => openModal()}>
               <Calendar className="w-4 h-4 mr-2" />
               Schedule Your First Meeting
             </Button>
