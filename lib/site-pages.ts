@@ -108,7 +108,7 @@ export const sitePages: SearchablePage[] = [
     section: "Transitions",
     icon: Users,
     url: "/transitions/changing-dependents",
-    keywords: ["deers", "dependent", "spouse", "child", "marriage", "divorce", "birth"],
+    keywords: ["deers", "dependent", "spouse", "child", "marriage", "divorce", "birth", "family"],
   },
 
   // ── Discounts & Benefits ─────────────────────────────────────────────
@@ -263,14 +263,6 @@ export const sitePages: SearchablePage[] = [
     icon: Bell,
     url: "/notifications",
     keywords: ["notification", "alert", "message", "inbox", "updates"],
-  },
-  {
-    label: "Saved Items",
-    description: "View your bookmarked pages, resources, and saved content",
-    section: "Account",
-    icon: Bookmark,
-    url: "/saved",
-    keywords: ["saved", "bookmark", "favorite", "starred"],
   },
 ]
 

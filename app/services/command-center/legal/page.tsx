@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
 } from "@/components/ui/dialog"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -399,7 +399,7 @@ function NoteDialog({ open, onOpenChange, onSave, editing }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>{editing ? "Edit Note" : "Add Note"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{editing ? "Edit Note" : "Add Note"}</DialogTitle><DialogDescription /></DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="note-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</Label>

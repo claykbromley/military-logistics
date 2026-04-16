@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -87,6 +87,7 @@ export function ForgotPasswordModal({ open, onClose, onBackToLogin }: ForgotPass
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md bg-card border-2 border-border">
         <DialogTitle className="sr-only">Forgot Password</DialogTitle>
+        <DialogDescription />
         <div
           className="absolute inset-0 -z-10 opacity-5"
           style={{

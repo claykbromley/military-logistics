@@ -31,6 +31,7 @@ export function CategoryFilter({ selectedCategory, onCategoryChange }: CategoryF
         <Button
           variant={selectedCategory === null ? "default" : "outline"}
           size="sm"
+          className="cursor-pointer"
           onClick={() => onCategoryChange(null)}
         >
           All
@@ -41,7 +42,7 @@ export function CategoryFilter({ selectedCategory, onCategoryChange }: CategoryF
             variant={selectedCategory === category.value ? "default" : "outline"}
             size="sm"
             onClick={() => onCategoryChange(category.value)}
-            className="gap-2"
+            className="gap-2 cursor-pointer"
           >
             {categoryIcons[category.value]}
             {category.label}

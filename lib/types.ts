@@ -21,6 +21,7 @@ export interface Profile {
   display_name: string | null
   location: string | null
   military_branch: string | null
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }
@@ -222,6 +223,7 @@ export interface MarketplaceProfile {
   longitude: number | null
   nearby_base: string | null
   military_branch: string | null
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }

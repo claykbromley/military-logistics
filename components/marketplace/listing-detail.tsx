@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation"
 import type { MarketplaceListing, MarketplaceProfile } from "@/lib/types"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import { MARKETPLACECATEGORIES, MARKETPLACECONDITIONS } from "@/lib/types"
+import { sendNotification } from "@/lib/notifications"
 
 interface ListingDetailProps {
   listing: MarketplaceListing & { profiles: MarketplaceProfile | null }
@@ -131,6 +132,19 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
     setMessageSent(true)
     setIsLoading(false)
 
+    // Send notification
+    if (listing.profiles) {
+      sendNotification({
+        userId: listing.profiles.id,
+        type: "community",
+        priority: "medium",
+        title: `New marketplace message from ${listing.profiles.display_name || user.email?.split("@")[0] || "someone"} about ${listing.title}`,
+        message: message.length > 100 ? message.slice(0, 100) + "…" : message,
+        actionUrl: `/community/marketplace/dashboard/messages/${conversationId}`,
+        actionLabel: "View Message in Marketplace",
+      }).catch((err) => console.error("Notification failed:", err))
+    }
+
     // Redirect to conversation after a moment
     setTimeout(() => {
       router.push(`/community/marketplace/dashboard/messages/${conversationId}`)
@@ -178,7 +192,7 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`h-20 w-20 overflow-hidden rounded-lg border-2 ${
+                  className={`h-20 w-20 overflow-hidden rounded-lg border-2 cursor-pointer ${
                     selectedImage === index ? "border-primary" : "border-transparent"
                   }`}
                 >
@@ -206,7 +220,7 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
                   <h1 className="text-2xl font-bold">{listing.title}</h1>
                   <p className="mt-2 text-3xl font-bold text-primary">{formatPrice(listing.price)}</p>
                 </div>
-                <Button variant="outline" size="icon" onClick={toggleSave} disabled={isLoading}>
+                <Button variant="outline" size="icon" className="cursor-pointer" onClick={toggleSave} disabled={isLoading}>
                   <Heart className={`h-5 w-5 ${isSaved ? "fill-red-500 text-red-500" : ""}`} />
                 </Button>
               </div>
@@ -245,19 +259,28 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
               <CardTitle className="text-base">Seller</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-                  <User className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="font-medium">{listing.profiles?.display_name || "Anonymous"}</p>
-                  {listing.profiles?.military_branch && (
-                    <p className="text-sm capitalize text-muted-foreground">
-                      {listing.profiles.military_branch.replace("-", " ")}
-                    </p>
+              <button className="justify-start items-center w-full p-2 border-2 rounded-xl border-card hover:border-primary hover:bg-primary/20 transition-colors group">
+                <a className="flex gap-3" href={"/profile/" + listing.profiles?.id}>
+                  {listing.profiles?.avatar_url ? (
+                    <img
+                      src={listing.profiles?.avatar_url}
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <User className="h-6 w-6 text-primary" />
+                    </div>
                   )}
-                </div>
-              </div>
+                  <div>
+                    <p className="font-medium group-hover:text-primary">{listing.profiles?.display_name || "Anonymous"}</p>
+                    {listing.profiles?.military_branch && (
+                      <p className="text-sm capitalize text-muted-foreground">
+                        {listing.profiles.military_branch.replace("-", " ")}
+                      </p>
+                    )}
+                  </div>
+                </a>
+              </button>
             </CardContent>
           </Card>
 
@@ -282,7 +305,7 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
                       onChange={(e) => setMessage(e.target.value)}
                       rows={3}
                     />
-                    <Button type="submit" className="mt-3 w-full" disabled={isLoading || !message.trim()}>
+                    <Button type="submit" className="mt-3 w-full cursor-pointer" disabled={isLoading || !message.trim()}>
                       <MessageSquare className="mr-2 h-4 w-4" />
                       Send Message
                     </Button>
@@ -294,19 +317,16 @@ export function ListingDetail({ listing, user, isSaved: initialSaved }: ListingD
 
           {!user && (
             <Card>
-              <CardContent className="pt-6">
+              <CardContent>
                 <p className="text-center text-sm text-muted-foreground">
-                  <Link href="/auth/login" className="text-primary underline">
-                    Sign in
-                  </Link>{" "}
-                  to contact the seller
+                  Sign in to contact the seller
                 </p>
               </CardContent>
             </Card>
           )}
 
           {user && user.id === listing.user_id && (
-            <Button variant="outline" asChild>
+            <Button variant="outline" className="cursor-pointer" asChild>
               <Link href={`/community/marketplace/dashboard/listings/${listing.id}/edit`}>Edit Listing</Link>
             </Button>
           )}

@@ -99,9 +99,7 @@ function PublicProfilePageContent() {
       const supabase = createClient()
       const { data, error } = await supabase
         .from("profiles")
-        .select(
-          "id, display_name, email, phone, military_branch, service_status, paygrade, zip_code, bio, duty_station, mos, years_of_service, avatar_url, banner_url, created_at, privacy_level, privacy_show_email, privacy_show_phone, privacy_show_duty_station, privacy_show_bio, privacy_show_mos"
-        )
+        .select("*")
         .eq("id", profileId)
         .single()
       if (error || !data) { setNotFound(true) } else { setProfile(data as PublicProfile) }
@@ -270,8 +268,11 @@ function PublicProfilePageContent() {
 
   if (loading || !connectionsLoaded) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+          <p className="text-sm text-muted-foreground">Loading Profile...</p>
+        </div>
       </div>
     )
   }
@@ -281,11 +282,11 @@ function PublicProfilePageContent() {
       <div className="min-h-screen bg-muted/30">
         <Header />
         <div className="container mx-auto px-4 py-16 max-w-lg text-center">
-          <div className="bg-background border border-border rounded-xl p-8">
+          <div className="bg-card border border-border rounded-xl p-8">
             <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Profile Not Found</h2>
             <p className="text-sm text-muted-foreground mb-6">This profile doesn&apos;t exist or may have been removed.</p>
-            <Button variant="outline" onClick={() => router.back()}>
+            <Button variant="outline" className="cursor-pointer" onClick={() => router.back()}>
               <ChevronLeft className="h-4 w-4 mr-1" />Go Back
             </Button>
           </div>

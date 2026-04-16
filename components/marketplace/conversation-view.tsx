@@ -14,8 +14,8 @@ import type { MarketplaceConversation, MarketplaceMessage, Profile, MarketplaceL
 interface ConversationViewProps {
   conversation: MarketplaceConversation & {
     listings: Pick<MarketplaceListing, "id" | "title" | "images" | "price" | "status"> | null
-    buyer: Pick<Profile, "id" | "display_name" | "military_branch"> | null
-    seller: Pick<Profile, "id" | "display_name" | "military_branch"> | null
+    buyer: Pick<Profile, "id" | "display_name" | "military_branch" | "avatar_url"> | null
+    seller: Pick<Profile, "id" | "display_name" | "military_branch" | "avatar_url"> | null
   }
   messages: (MarketplaceMessage & { sender: Pick<Profile, "id" | "display_name"> | null })[]
   userId: string
@@ -32,13 +32,20 @@ export function ConversationView({ conversation, messages: initialMessages, user
   const otherPersonName = otherPerson?.display_name || "Unknown User"
   const receiverId = isBuyer ? conversation.seller_id : conversation.buyer_id
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight
+      }
+    }, 100)
+    return () => clearTimeout(timeout)
+  }, [])
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    if (messages.length > initialMessages.length && messagesEndRef.current) {
+      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight
+    }
+  }, [messages, initialMessages.length])
 
   // Subscribe to new messages
   useEffect(() => {
@@ -184,33 +191,46 @@ export function ConversationView({ conversation, messages: initialMessages, user
       {/* Listing Info Header */}
       {conversation.listings && (
         <Card className="mb-4">
-          <CardContent className="flex items-center gap-4 p-4">
-            <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-              {conversation.listings.images?.[0] ? (
-                <img
-                  src={conversation.listings.images[0] || "/placeholder.svg"}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-muted-foreground">No image</div>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <Link
-                href={`/community/marketplace/listings/${conversation.listings.id}`}
-                className="font-semibold hover:underline line-clamp-1"
-              >
-                {conversation.listings.title}
-              </Link>
-              <p className="text-lg font-bold text-primary">{formatPrice(conversation.listings.price)}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-muted-foreground">{isBuyer ? "Seller" : "Buyer"}</p>
-              <div className="flex items-center gap-1">
-                <User className="h-4 w-4" />
-                <span className="font-medium">{otherPersonName}</span>
+          <CardContent className="flex items-center justify-between p-4">
+            <Link
+              href={`/community/marketplace/listings/${conversation.listings.id}`}
+              className="flex font-semibold hover:underline gap-4 items-center line-clamp-1"
+            >
+              <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                {conversation.listings.images?.[0] ? (
+                  <img
+                    src={conversation.listings.images[0] || "/placeholder.svg"}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">No image</div>
+                )}
               </div>
+              <div>
+                {conversation.listings.title}
+                <p className="text-lg font-bold text-primary">{formatPrice(conversation.listings.price)}</p>
+              </div>
+            </Link>
+            <div className="text-right">
+              <button className="justify-start items-center w-full p-2 border-2 rounded-xl border-card hover:border-primary hover:bg-primary/20 transition-colors group">
+                <a className="flex gap-3" href={"/profile/" + otherPerson?.id}>
+                  {otherPerson?.avatar_url ? (
+                    <img
+                      src={otherPerson.avatar_url}
+                      className="h-12 w-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                      <User className="h-6 w-6 text-primary" />
+                    </div>
+                  )}
+                  <div className="text-start">
+                    <p className="text-sm text-muted-foreground">{isBuyer ? "Seller" : "Buyer"}</p>
+                    <p className="font-medium group-hover:text-primary">{otherPersonName || "Anonymous"}</p>
+                  </div>
+                </a>
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -218,10 +238,10 @@ export function ConversationView({ conversation, messages: initialMessages, user
 
       {/* Messages */}
       <Card className="flex flex-col" style={{ height: "calc(100vh - 400px)", minHeight: "400px" }}>
-        <CardHeader className="border-b py-3">
+        <CardHeader className="border-b dark:border-slate-500 py-3">
           <CardTitle className="text-base">Conversation with {otherPersonName}</CardTitle>
         </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto p-4">
+        <CardContent ref={messagesEndRef} className="flex-1 overflow-y-auto p-4">
           <div className="flex flex-col gap-4">
             {groupedMessages.map((group, groupIndex) => (
               <div key={groupIndex}>
@@ -235,7 +255,7 @@ export function ConversationView({ conversation, messages: initialMessages, user
                     <div key={message.id} className={`mb-3 flex ${isOwn ? "justify-end" : "justify-start"}`}>
                       <div
                         className={`max-w-[75%] rounded-2xl px-4 py-2 ${
-                          isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
+                          isOwn ? "bg-primary text-primary-foreground" : "bg-primary/20"
                         }`}
                       >
                         <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -248,12 +268,12 @@ export function ConversationView({ conversation, messages: initialMessages, user
                 })}
               </div>
             ))}
-            <div ref={messagesEndRef} />
+            <div />
           </div>
         </CardContent>
 
         {/* Message Input */}
-        <div className="border-t p-4">
+        <div className="border-t dark:border-slate-500 p-4">
           <form onSubmit={sendMessage} className="flex gap-2">
             <Textarea
               placeholder="Type a message..."
@@ -266,9 +286,9 @@ export function ConversationView({ conversation, messages: initialMessages, user
                 }
               }}
               rows={1}
-              className="min-h-[44px] resize-none"
+              className="min-h-[44px] resize-none dark:border-slate-500"
             />
-            <Button type="submit" size="icon" disabled={isSending || !newMessage.trim()}>
+            <Button type="submit" size="icon" className="cursor-pointer" disabled={isSending || !newMessage.trim()}>
               <Send className="h-4 w-4" />
               <span className="sr-only">Send message</span>
             </Button>

@@ -20,7 +20,7 @@ import { useAuth } from "@/context/auth-context"
 import { useRouter } from "next/navigation"
 import { useUI } from "@/context/ui-context"
 import { searchPages, type SearchablePage } from "@/lib/site-pages"
-import { getUnreadCount, subscribeToNotifications, getNotifications, markAsRead } from "@/lib/notifications"
+import { getUnreadCount, getNotifications, markAsRead } from "@/lib/notifications"
 import { createClient } from "@/lib/supabase/client"
 import type { Notification } from "@/lib/notifications"
 import { formatDistanceToNow } from "date-fns"
@@ -211,9 +211,9 @@ function CommandPalette({
                   <button
                     key={term}
                     onClick={() => setQuery(term)}
-                    className="flex items-center gap-3 w-full px-3 py-2 text-sm text-foreground hover:bg-accent rounded-lg transition-colors cursor-pointer"
+                    className="flex items-center gap-3 w-full px-3 py-2 text-sm text-foreground hover:bg-accent hover:text-white rounded-lg transition-colors cursor-pointer group"
                   >
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <Clock className="h-4 w-4 text-muted-foreground group-hover:text-white" />
                     {term}
                   </button>
                 ))}
@@ -239,17 +239,17 @@ function CommandPalette({
                           onNavigate(item.url)
                           onClose()
                         }}
-                        className={`flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-colors cursor-pointer ${
+                        className={`flex items-center gap-3 w-full px-3 py-2.5 text-sm rounded-lg transition-colors cursor-pointer group ${
                           globalIdx === selectedIndex
                             ? "bg-primary text-primary-foreground"
                             : "text-foreground hover:bg-accent"
                         }`}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
+                        <Icon className="h-4 w-4 shrink-0 group-hover:text-white" />
                         <div className="flex-1 text-left min-w-0">
-                          <span className="block">{item.label}</span>
+                          <span className="block group-hover:text-white">{item.label}</span>
                           <span
-                            className={`block text-xs truncate ${
+                            className={`block group-hover:text-white text-xs truncate ${
                               globalIdx === selectedIndex
                                 ? "text-primary-foreground/70"
                                 : "text-muted-foreground"
@@ -665,7 +665,7 @@ export function Header() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="hidden sm:flex gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    className="hidden sm:flex gap-1 text-xs text-muted-foreground hover:text-primary-foreground cursor-pointer"
                   >
                     <MapPin className="h-3 w-3" />
                     Branch

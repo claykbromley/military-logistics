@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from "@/components/ui/dialog"
 import { useConnections } from "@/hooks/use-connections"
 import { MILITARY_BRANCHES, PAYGRADES } from "@/lib/types"
@@ -24,8 +24,7 @@ interface SearchResult {
   avatar_url?: string
   military_branch?: string
   paygrade?: string
-  privacy_level?: string
-  privacy_show_in_search?: boolean
+  privacy: string
 }
 
 function getInitials(name: string): string {
@@ -90,7 +89,7 @@ export function MemberSearchDialog({
       const searchTerm = `%${q.trim()}%`
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, display_name, email, avatar_url, military_branch, paygrade, privacy_level, privacy_show_in_search")
+        .select("id, display_name, email, avatar_url, military_branch, paygrade, privacy")
         .or(`display_name.ilike.${searchTerm},email.ilike.${searchTerm}`)
         .neq("id", currentUserId || "")
         .limit(20)
@@ -98,7 +97,8 @@ export function MemberSearchDialog({
 
       // Filter out users who opted out of search (unless connected)
       const filtered = (data || []).filter((u) => {
-        if (u.privacy_show_in_search ?? true) return true
+        const parsed = JSON.parse(u.privacy)
+        if (parsed.privacy_show_in_search ?? true) return true
         return getConnectionStatus(u.id) === "connected"
       })
       setResults(filtered)
@@ -121,6 +121,7 @@ export function MemberSearchDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[80vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-4 pt-4 pb-0">
+          <DialogDescription />
           <DialogTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             Find Members
