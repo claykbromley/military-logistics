@@ -309,6 +309,7 @@ export interface Contact {
   email?: string
   address?: string
   timezone?: string
+  avatar_url?: string
   role: ContactRole
   linked_profile_id?: string
   isEmergencyContact: boolean
@@ -419,6 +420,7 @@ export interface SharedContact {
   phone?: string
   contactEmail?: string
   address?: string
+  avatar_url?: string
   role?: string
   hasPoa: boolean
   poaType?: string
@@ -585,7 +587,7 @@ export interface AlpacaAccount {
 
 // ─── Privacy & Connection Types ──────────────────────────────────────────────
 
-export type PrivacyLevel = "public" | "connections_only" | "private"
+export type PrivacyLevel = "public" | "connections_only"
  
 export type ConnectionStatus =
   | "none"

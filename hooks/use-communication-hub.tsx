@@ -75,12 +75,12 @@ function useCommunicationHubInternal() {
         // Load contacts
         const { data: contactsData, error: contactsError } = await supabase
           .from("emergency_contacts")
-          .select("*")
+          .select(`*, profile:profiles!linked_profile_id(avatar_url)`)
           .eq("user_id", user.id)
           .order("priority", { ascending: true })
 
         if (contactsError) throw contactsError
-
+        
         const localContacts: Contact[] = (contactsData || []).map((c) => ({
           id: c.id,
           user_id: c.user_id,
@@ -89,6 +89,7 @@ function useCommunicationHubInternal() {
           phonePrimary: c.phone || undefined,
           email: c.email || undefined,
           address: c.address || undefined,
+          avatar_url: c.profile?.avatar_url,
           role: c.role || "other",
           isEmergencyContact: c.role === "primary" || c.role === "secondary",
           isPoaHolder: c.has_poa || false,
@@ -107,10 +108,10 @@ function useCommunicationHubInternal() {
         // Load shared contacts
         const { data: sharedData, error: sharedError } = await supabase
           .from("emergency_contacts")
-          .select(`*, profile:profiles(display_name, email, id, phone)`)
+          .select(`*, profile:profiles!user_id(display_name, email, id, phone, avatar_url)`)
           .eq("email", user.email)
           .order("updated_at", { ascending: true })
-
+        
         if (!sharedError && sharedData) {
           const localEdits = JSON.parse(
             localStorage.getItem(SHARED_CONTACTS_KEY) || "{}"
@@ -135,6 +136,7 @@ function useCommunicationHubInternal() {
               phone: s.phone || undefined,
               contactEmail: s.email || undefined,
               address: s.address || undefined,
+              avatar_url: s.profile.avatar_url || undefined,
               role: s.role || undefined,
               hasPoa: s.has_poa || false,
               poaType: s.poa_type || undefined,
@@ -373,6 +375,116 @@ function useCommunicationHubInternal() {
       localStorage.setItem(THREADS_KEY, JSON.stringify(messageThreads))
     }
   }, [contacts, communicationLog, scheduledEvents, messageThreads, isLoaded])
+
+  const refreshSharedContacts = useCallback(async () => {
+    if (!isAuthenticated) return
+
+    try {
+      const supabase = createClient()
+
+      if (currentUser) {
+        const { data: sharedData, error: sharedError } = await supabase
+          .from("emergency_contacts")
+          .select(`*, profile:profiles(display_name, email, id, phone)`)
+          .eq("email", currentUser.email)
+          .order("updated_at", { ascending: true })
+
+        if (!sharedError && sharedData) {
+          // Load local edits from localStorage
+          const localEdits = JSON.parse(localStorage.getItem(SHARED_CONTACTS_KEY) || "{}")
+          const localShared: SharedContact[] = sharedData.map((s: any) => ({
+            id: s.id,
+            ownerId: s.profile.id,
+            ownerDisplayName: s.profile.display_name || undefined,
+            ownerEmail: s.profile.email,
+            ownerPhone: s.profile.phone,
+            contactName: s.name,
+            relationship: s.relationship || undefined,
+            phone: s.phone || undefined,
+            contactEmail: s.email || undefined,
+            address: s.address || undefined,
+            role: s.role || undefined,
+            hasPoa: s.has_poa || false,
+            poaType: s.poa_type || undefined,
+            notes: s.notes || undefined,
+            priority: s.priority || 0,
+            createdAt: s.created_at,
+            updatedAt: s.updated_at,
+            // Apply local edits if any
+            localDisplayName: localEdits[s.id]?.localDisplayName,
+            localRelationship: localEdits[s.id]?.localRelationship,
+            addedToContacts: localEdits[s.id]?.addedToContacts || false,
+          }))
+
+          setSharedContacts(localShared)
+        }
+      }
+    } catch (error) {
+      console.error("Error refreshing shared contacts:", error)
+    }
+  }, [isAuthenticated, currentUser])
+
+
+  useEffect(() => {
+    if (!currentUser?.id) return
+    const supabase = createClient()
+  
+    const contactsChannel = supabase
+      .channel(`contacts-pg-${currentUser.id}`)
+      .on("postgres_changes", {
+        event: "*",
+        schema: "public",
+        table: "emergency_contacts",
+        filter: `user_id=eq.${currentUser.id}`,
+      }, () => {
+        loadAllData()
+      })
+      .subscribe()
+  
+    // ── Listen for shared-contact changes ──────────────────────────────────
+    // When someone adds me to their contacts, a row appears with email = my email.
+    // We can't filter realtime on email natively, so we listen broadly on the
+    // table and let loadAllData dedupe. To keep it cheap, this channel only
+    // listens to INSERTs.
+    const sharedChannel = supabase
+      .channel(`shared-contacts-pg-${currentUser.id}`)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "emergency_contacts",
+      }, (payload: any) => {
+        if (payload.new?.email === currentUser.email) {
+          refreshSharedContacts()
+        }
+      })
+      .on("postgres_changes", {
+        event: "DELETE",
+        schema: "public",
+        table: "emergency_contacts",
+      }, () => {
+        // Can't reliably filter deletes; just refresh.
+        refreshSharedContacts()
+      })
+      .subscribe()
+  
+    // ── Same broadcast channel the connections hook uses ───────────────────
+    // Fires when a connection is accepted/removed/blocked so we can refresh
+    // both contacts and shared contacts in lockstep with the connection UI.
+    const broadcastChannel = supabase
+      .channel(`connections-broadcast-${currentUser.id}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on("broadcast", { event: "connection-changed" }, () => {
+        loadAllData()
+      })
+      .subscribe()
+  
+    return () => {
+      supabase.removeChannel(contactsChannel)
+      supabase.removeChannel(sharedChannel)
+      supabase.removeChannel(broadcastChannel)
+    }
+  }, [currentUser?.id, currentUser?.email, loadAllData, refreshSharedContacts])
 
   // ============================================
   // CONTACT OPERATIONS
@@ -1908,54 +2020,6 @@ function useCommunicationHubInternal() {
     },
     [addContact]
   )
-
-  const refreshSharedContacts = useCallback(async () => {
-    if (!isAuthenticated) return
-
-    try {
-      const supabase = createClient()
-
-      if (currentUser) {
-        const { data: sharedData, error: sharedError } = await supabase
-          .from("emergency_contacts")
-          .select(`*, profile:profiles(display_name, email, id, phone)`)
-          .eq("email", currentUser.email)
-          .order("updated_at", { ascending: true })
-
-        if (!sharedError && sharedData) {
-          // Load local edits from localStorage
-          const localEdits = JSON.parse(localStorage.getItem(SHARED_CONTACTS_KEY) || "{}")
-          const localShared: SharedContact[] = sharedData.map((s: any) => ({
-            id: s.id,
-            ownerId: s.profile.id,
-            ownerDisplayName: s.profile.display_name || undefined,
-            ownerEmail: s.profile.email,
-            ownerPhone: s.profile.phone,
-            contactName: s.name,
-            relationship: s.relationship || undefined,
-            phone: s.phone || undefined,
-            contactEmail: s.email || undefined,
-            address: s.address || undefined,
-            role: s.role || undefined,
-            hasPoa: s.has_poa || false,
-            poaType: s.poa_type || undefined,
-            notes: s.notes || undefined,
-            priority: s.priority || 0,
-            createdAt: s.created_at,
-            updatedAt: s.updated_at,
-            // Apply local edits if any
-            localDisplayName: localEdits[s.id]?.localDisplayName,
-            localRelationship: localEdits[s.id]?.localRelationship,
-            addedToContacts: localEdits[s.id]?.addedToContacts || false,
-          }))
-
-          setSharedContacts(localShared)
-        }
-      }
-    } catch (error) {
-      console.error("Error refreshing shared contacts:", error)
-    }
-  }, [isAuthenticated, currentUser])
 
   // ============================================
   // PRIORITY MANAGEMENT FOR EMERGENCY CONTACTS

@@ -9,6 +9,7 @@ import {
   PrivacyLevel,
   DEFAULT_PRIVACY_SETTINGS,
 } from "@/lib/types"
+import { sendNotification } from "@/lib/notifications"
 
 interface ConnectionsContextValue {
   privacySettings: ProfilePrivacySettings
@@ -17,6 +18,7 @@ interface ConnectionsContextValue {
 
   getConnectionStatus: (otherUserId: string) => ConnectionStatus
   isConnected: (otherUserId: string) => boolean
+  isBlockedByMe: (otherUserId: string) => boolean
   getRequestForUser: (otherUserId: string) => { requestId: string; direction: "incoming" | "outgoing" } | null
 
   sendConnectionRequest: (recipientId: string, message?: string) => Promise<void>
@@ -87,27 +89,27 @@ function useConnectionsInternal(): ConnectionsContextValue {
     setCurrentUserId(user.id)
 
     try {
-      // Privacy settings
       const { data: prof } = await supabase
         .from("profiles")
         .select("privacy")
         .eq("id", user.id)
         .single()
 
-      if (prof) {
-        const parsed = JSON.parse(prof.privacy)
-        setPrivacySettings({
-          privacyLevel: parsed.privacy_level || "public",
-          showEmail: parsed.privacy_show_email ?? true,
-          showPhone: parsed.privacy_show_phone ?? false,
-          showDutyStation: parsed.privacy_show_duty_station ?? true,
-          showBio: parsed.privacy_show_bio ?? true,
-          showInSearch: parsed.privacy_show_in_search ?? true,
-          showMos: parsed.privacy_show_mos ?? true,
-        })
+      if (prof?.privacy) {
+        try {
+          const parsed = typeof prof.privacy === "string" ? JSON.parse(prof.privacy) : prof.privacy
+          setPrivacySettings({
+            privacyLevel: parsed.privacy_level || "public",
+            showEmail: parsed.privacy_show_email ?? true,
+            showPhone: parsed.privacy_show_phone ?? false,
+            showDutyStation: parsed.privacy_show_duty_station ?? true,
+            showBio: parsed.privacy_show_bio ?? true,
+            showInSearch: parsed.privacy_show_in_search ?? true,
+            showMos: parsed.privacy_show_mos ?? true,
+          })
+        } catch {}
       }
 
-      // Accepted connections
       const { data: connData } = await supabase
         .from("connections")
         .select("user_id, connected_user_id")
@@ -120,8 +122,7 @@ function useConnectionsInternal(): ConnectionsContextValue {
         )
       )
 
-      // Incoming pending — join sender profile via FK name
-      const { data: incData, error: incError } = await supabase
+      const { data: incData } = await supabase
         .from("connections")
         .select(`
           id, user_id, message, status, created_at,
@@ -132,10 +133,6 @@ function useConnectionsInternal(): ConnectionsContextValue {
         .eq("connected_user_id", user.id)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-
-      if (incError) {
-        console.error("Error loading incoming requests:", incError)
-      }
 
       setIncomingRequests(
         (incData || []).map((r: any) => ({
@@ -153,8 +150,7 @@ function useConnectionsInternal(): ConnectionsContextValue {
         }))
       )
 
-      // Outgoing pending — join recipient profile via FK name
-      const { data: outData, error: outError } = await supabase
+      const { data: outData } = await supabase
         .from("connections")
         .select(`
           id, connected_user_id, message, status, created_at,
@@ -165,10 +161,6 @@ function useConnectionsInternal(): ConnectionsContextValue {
         .eq("user_id", user.id)
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-
-      if (outError) {
-        console.error("Error loading outgoing requests:", outError)
-      }
 
       setOutgoingRequests(
         (outData || []).map((r: any) => ({
@@ -185,7 +177,6 @@ function useConnectionsInternal(): ConnectionsContextValue {
         }))
       )
 
-      // Blocked
       const { data: blkData } = await supabase
         .from("connections")
         .select("connected_user_id")
@@ -209,17 +200,66 @@ function useConnectionsInternal(): ConnectionsContextValue {
     return () => subscription.unsubscribe()
   }, [loadAll])
 
-  // Realtime
+  // ── Realtime ──────────────────────────────────────────────
+  // Two channels:
+  // 1. postgres_changes — picks up direct DB changes when RLS allows SELECT
+  // 2. broadcast — actors actively poke the other side to force a refresh.
+  //    Needed because SECURITY DEFINER RPC writes can bypass the realtime
+  //    replication filter, and also guarantees instant UI updates without
+  //    waiting for DB replication latency.
+
   useEffect(() => {
     if (!currentUserId) return
     const supabase = createClient()
-    const ch = supabase
-      .channel("connections-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "connections", filter: `connected_user_id=eq.${currentUserId}` }, () => loadAll())
-      .on("postgres_changes", { event: "*", schema: "public", table: "connections", filter: `user_id=eq.${currentUserId}` }, () => loadAll())
+
+    const pgChannel = supabase
+      .channel(`connections-pg-${currentUserId}`)
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "connections",
+        filter: `connected_user_id=eq.${currentUserId}`,
+      }, () => loadAll())
+      .on("postgres_changes", {
+        event: "*", schema: "public", table: "connections",
+        filter: `user_id=eq.${currentUserId}`,
+      }, () => loadAll())
       .subscribe()
-    return () => { supabase.removeChannel(ch) }
+
+    const broadcastChannel = supabase
+      .channel(`connections-broadcast-${currentUserId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on("broadcast", { event: "connection-changed" }, () => {
+        loadAll()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(pgChannel)
+      supabase.removeChannel(broadcastChannel)
+    }
   }, [currentUserId, loadAll])
+
+  // Broadcast a connection-changed event to another user's channel.
+  const notifyConnectionChange = useCallback(async (otherUserId: string) => {
+    try {
+      const supabase = createClient()
+      const channel = supabase.channel(`connections-broadcast-${otherUserId}`)
+      await new Promise<void>((resolve) => {
+        channel.subscribe((status) => {
+          if (status === "SUBSCRIBED") resolve()
+        })
+        setTimeout(resolve, 1000) // fallback so we don't hang forever
+      })
+      await channel.send({
+        type: "broadcast",
+        event: "connection-changed",
+        payload: { from: currentUserId },
+      })
+      setTimeout(() => supabase.removeChannel(channel), 500)
+    } catch (err) {
+      console.error("Failed to broadcast connection change:", err)
+    }
+  }, [currentUserId])
 
   // ── Privacy ────────────────────────────────────────────────
 
@@ -231,8 +271,6 @@ function useConnectionsInternal(): ConnectionsContextValue {
     setSavingPrivacy(true)
     try {
       const supabase = createClient()
-
-      // Write the full merged state so unchanged fields are preserved
       const privacy = JSON.stringify({
         privacy_level: merged.privacyLevel,
         privacy_show_email: merged.showEmail,
@@ -242,7 +280,6 @@ function useConnectionsInternal(): ConnectionsContextValue {
         privacy_show_in_search: merged.showInSearch,
         privacy_show_mos: merged.showMos,
       })
-
       const { error } = await supabase.from("profiles").update({ privacy }).eq("id", currentUserId)
       if (error) throw error
     } catch {
@@ -252,20 +289,21 @@ function useConnectionsInternal(): ConnectionsContextValue {
     }
   }, [currentUserId, privacySettings])
 
-  // ── Status (synchronous) ───────────────────────────────────
+  // ── Status ─────────────────────────────────────────────────
 
   const getConnectionStatus = useCallback((otherUserId: string): ConnectionStatus => {
     if (!currentUserId) return "none"
     if (!otherUserId) return "none"
     if (currentUserId === otherUserId) return "connected"
-    if (connections.includes(otherUserId)) return "connected"
     if (blockedUsers.includes(otherUserId)) return "blocked"
+    if (connections.includes(otherUserId)) return "connected"
     if (outgoingRequests.some((r) => r.recipientId === otherUserId)) return "pending_sent"
     if (incomingRequests.some((r) => r.senderId === otherUserId)) return "pending_received"
     return "none"
   }, [currentUserId, connections, blockedUsers, outgoingRequests, incomingRequests])
 
   const isConnected = useCallback((id: string) => connections.includes(id), [connections])
+  const isBlockedByMe = useCallback((id: string) => blockedUsers.includes(id), [blockedUsers])
 
   const getRequestForUser = useCallback((id: string) => {
     const o = outgoingRequests.find((r) => r.recipientId === id)
@@ -275,15 +313,35 @@ function useConnectionsInternal(): ConnectionsContextValue {
     return null
   }, [outgoingRequests, incomingRequests])
 
+  const checkEitherSideBlocked = useCallback(async (otherUserId: string): Promise<boolean> => {
+    if (!currentUserId) return false
+    const supabase = createClient()
+    const { data } = await supabase
+      .from("connections")
+      .select("id")
+      .or(
+        `and(user_id.eq.${currentUserId},connected_user_id.eq.${otherUserId}),` +
+        `and(user_id.eq.${otherUserId},connected_user_id.eq.${currentUserId})`
+      )
+      .eq("status", "blocked")
+      .limit(1)
+    return !!(data && data.length > 0)
+  }, [currentUserId])
+
   // ── Send connection request ────────────────────────────────
 
   const sendConnectionRequest = useCallback(async (recipientId: string, message?: string) => {
     if (!currentUserId) return
+    if (currentUserId === recipientId) return
     if (getConnectionStatus(recipientId) !== "none") return
 
     setIsSyncing(true)
     try {
       const supabase = createClient()
+
+      const isBlocked = await checkEitherSideBlocked(recipientId)
+      if (isBlocked) return
+
       const { data, error } = await supabase
         .from("connections")
         .insert({ user_id: currentUserId, connected_user_id: recipientId, status: "pending", message: message || null })
@@ -298,17 +356,29 @@ function useConnectionsInternal(): ConnectionsContextValue {
         recipientId, recipientName: rp?.display_name, recipientEmail: rp?.email,
         message, status: "pending" as const, createdAt: data.created_at,
       }, ...prev])
+
+      const { data: myProfile } = await supabase.from("profiles").select("display_name").eq("id", currentUserId).single()
+
+      sendNotification({
+        userId: recipientId,
+        type: "connections",
+        priority: "high",
+        title: `Connection Request From ${myProfile?.display_name || "A user"}`,
+        message: message ?? `You have a new connection request from ${myProfile?.display_name || "a user"}.`,
+        actionUrl: "/services/command-center/contacts",
+        actionLabel: "View Request",
+      }).catch((err) => console.error("Request notification failed:", err))
+
+      notifyConnectionChange(recipientId)
     } catch (err) {
       console.error("Error sending connection request:", err)
       throw err
     } finally {
       setIsSyncing(false)
     }
-  }, [currentUserId, getConnectionStatus])
+  }, [currentUserId, getConnectionStatus, checkEitherSideBlocked, notifyConnectionChange])
 
   // ── Accept ─────────────────────────────────────────────────
-  // 1. Marks connection accepted
-  // 2. Auto-creates emergency_contacts row linked to sender
 
   const acceptConnectionRequest = useCallback(async (requestId: string) => {
     if (!currentUserId) return
@@ -319,70 +389,76 @@ function useConnectionsInternal(): ConnectionsContextValue {
     try {
       const supabase = createClient()
 
-      const { error } = await supabase
-        .from("connections")
-        .update({ status: "accepted", responded_at: new Date().toISOString() })
-        .eq("id", requestId)
+      const { error } = await supabase.rpc("accept_connection_request", {
+        p_request_id: requestId,
+      })
       if (error) throw error
 
-      // Auto-add to emergency_contacts if not already linked
-      const { data: existing } = await supabase
-        .from("emergency_contacts")
-        .select("id")
-        .eq("user_id", currentUserId)
-        .eq("linked_profile_id", request.senderId)
-        .maybeSingle()
+      const { data: myProfile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", currentUserId)
+        .single()
 
-      if (!existing) {
-        await supabase.from("emergency_contacts").insert({
-          user_id: currentUserId,
-          name: request.senderName,
-          email: request.senderEmail || null,
-          linked_profile_id: request.senderId,
-          role: "other",
-          has_poa: false,
-          can_access_accounts: false,
-          priority: 0,
-          relationship: "Connection",
-        })
-      }
+      sendNotification({
+        userId: request.senderId,
+        type: "connections",
+        priority: "medium",
+        title: `New Connection With ${myProfile?.display_name || "a user"}`,
+        message: `${myProfile?.display_name || "A user"} accepted your connection request. You are now mutual contacts.`,
+        actionUrl: `/profile/${currentUserId}`,
+        actionLabel: "View Profile",
+      }).catch((err) => console.error("Accepted request notification failed:", err))
 
-      setConnections((prev) => [...prev, request.senderId])
+      // Optimistic local update
+      setConnections((prev) =>
+        prev.includes(request.senderId) ? prev : [...prev, request.senderId]
+      )
       setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId))
+
+      // Poke the other user to refresh — this is what makes the sender see
+      // "Connected" without reloading the page.
+      notifyConnectionChange(request.senderId)
     } catch (err) {
       console.error("Error accepting request:", err)
     } finally {
       setIsSyncing(false)
     }
-  }, [currentUserId, incomingRequests])
+  }, [currentUserId, incomingRequests, notifyConnectionChange])
 
   // ── Decline ────────────────────────────────────────────────
 
   const declineConnectionRequest = useCallback(async (requestId: string) => {
     if (!currentUserId) return
+    const request = incomingRequests.find((r) => r.id === requestId)
+
     setIsSyncing(true)
     try {
       const supabase = createClient()
-      await supabase.from("connections")
-        .update({ status: "declined", responded_at: new Date().toISOString() })
-        .eq("id", requestId)
+      await supabase.from("connections").delete().eq("id", requestId).eq("connected_user_id", currentUserId)
       setIncomingRequests((prev) => prev.filter((r) => r.id !== requestId))
+
+      if (request) notifyConnectionChange(request.senderId)
     } catch (err) { console.error(err) }
     finally { setIsSyncing(false) }
-  }, [currentUserId])
+  }, [currentUserId, incomingRequests, notifyConnectionChange])
 
   // ── Cancel outgoing ────────────────────────────────────────
 
   const cancelConnectionRequest = useCallback(async (requestId: string) => {
     if (!currentUserId) return
+    const request = outgoingRequests.find((r) => r.id === requestId)
+
     setIsSyncing(true)
     try {
       const supabase = createClient()
       await supabase.from("connections").delete().eq("id", requestId).eq("user_id", currentUserId)
       setOutgoingRequests((prev) => prev.filter((r) => r.id !== requestId))
+
+      if (request) notifyConnectionChange(request.recipientId)
     } catch (err) { console.error(err) }
     finally { setIsSyncing(false) }
-  }, [currentUserId])
+  }, [currentUserId, outgoingRequests, notifyConnectionChange])
 
   // ── Remove connection ──────────────────────────────────────
 
@@ -391,31 +467,45 @@ function useConnectionsInternal(): ConnectionsContextValue {
     setIsSyncing(true)
     try {
       const supabase = createClient()
-      await supabase.from("connections").delete()
-        .or(`and(user_id.eq.${currentUserId},connected_user_id.eq.${otherUserId}),and(user_id.eq.${otherUserId},connected_user_id.eq.${currentUserId})`)
-        .eq("status", "accepted")
+      const { error } = await supabase.rpc("remove_connection", {
+        p_other_user_id: otherUserId,
+      })
+      if (error) throw error
+
       setConnections((prev) => prev.filter((id) => id !== otherUserId))
-    } catch (err) { console.error(err) }
-    finally { setIsSyncing(false) }
-  }, [currentUserId])
+      notifyConnectionChange(otherUserId)
+    } catch (err) {
+      console.error("Error removing connection:", err)
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [currentUserId, notifyConnectionChange])
 
   // ── Block / Unblock ────────────────────────────────────────
 
   const blockUser = useCallback(async (otherUserId: string) => {
     if (!currentUserId) return
+    if (currentUserId === otherUserId) return
     setIsSyncing(true)
     try {
       const supabase = createClient()
-      await supabase.from("connections").delete()
-        .or(`and(user_id.eq.${currentUserId},connected_user_id.eq.${otherUserId}),and(user_id.eq.${otherUserId},connected_user_id.eq.${currentUserId})`)
-      await supabase.from("connections").insert({ user_id: currentUserId, connected_user_id: otherUserId, status: "blocked" })
+      const { error } = await supabase.rpc("block_user", {
+        p_other_user_id: otherUserId,
+      })
+      if (error) throw error
+
       setConnections((prev) => prev.filter((id) => id !== otherUserId))
       setIncomingRequests((prev) => prev.filter((r) => r.senderId !== otherUserId))
       setOutgoingRequests((prev) => prev.filter((r) => r.recipientId !== otherUserId))
-      setBlockedUsers((prev) => [...prev, otherUserId])
-    } catch (err) { console.error(err) }
-    finally { setIsSyncing(false) }
-  }, [currentUserId])
+      setBlockedUsers((prev) => (prev.includes(otherUserId) ? prev : [...prev, otherUserId]))
+
+      notifyConnectionChange(otherUserId)
+    } catch (err) {
+      console.error("Error blocking user:", err)
+    } finally {
+      setIsSyncing(false)
+    }
+  }, [currentUserId, notifyConnectionChange])
 
   const unblockUser = useCallback(async (otherUserId: string) => {
     if (!currentUserId) return
@@ -434,21 +524,30 @@ function useConnectionsInternal(): ConnectionsContextValue {
   const canMessageUser = useCallback(async (recipientId: string): Promise<{ allowed: boolean; reason?: string }> => {
     if (!currentUserId) return { allowed: false, reason: "Not logged in" }
     if (currentUserId === recipientId) return { allowed: false, reason: "Cannot message yourself" }
-    if (blockedUsers.includes(recipientId)) return { allowed: false, reason: "User is blocked" }
+    if (blockedUsers.includes(recipientId)) return { allowed: false, reason: "You have blocked this user. Unblock them to send a message." }
+
+    const eitherBlocked = await checkEitherSideBlocked(recipientId)
+    if (eitherBlocked) return { allowed: false, reason: "You cannot send a message to this user." }
+
     if (connections.includes(recipientId)) return { allowed: true }
 
     const supabase = createClient()
-    const { data } = await supabase.from("profiles").select("privacy_level").eq("id", recipientId).single()
-    const privacy = data?.privacy_level || "public"
+    const { data } = await supabase.from("profiles").select("privacy").eq("id", recipientId).single()
+
+    let privacy: PrivacyLevel = "public"
+    if (data?.privacy) {
+      try {
+        const parsed = typeof data.privacy === "string" ? JSON.parse(data.privacy) : data.privacy
+        privacy = parsed.privacy_level || "public"
+      } catch {}
+    }
+
     if (privacy === "public") return { allowed: true }
     return {
       allowed: false,
-      reason: `This user's profile is ${privacy === "private" ? "private" : "connections-only"}. Connect with them first to send a message.`,
+      reason: "This user's profile is limited to connections. Connect with them first to send a message.",
     }
-  }, [currentUserId, connections, blockedUsers])
-
-  // ── Resolve profile from email ─────────────────────────────
-  // Returns null silently for non-platform emails — this is NOT an error.
+  }, [currentUserId, connections, blockedUsers, checkEitherSideBlocked])
 
   const resolveProfileIdFromEmail = useCallback(async (email: string): Promise<string | null> => {
     if (!email) return null
@@ -465,15 +564,13 @@ function useConnectionsInternal(): ConnectionsContextValue {
     }
   }, [])
 
-  // ── Synchronous permission helpers ─────────────────────────
-
   const canViewProfile = useCallback((ownerId: string, privacy: PrivacyLevel): boolean => {
     if (!currentUserId) return privacy === "public"
     if (currentUserId === ownerId) return true
+    if (blockedUsers.includes(ownerId)) return false
     if (privacy === "public") return true
-    if (privacy === "connections_only") return connections.includes(ownerId)
-    return false
-  }, [currentUserId, connections])
+    return connections.includes(ownerId)
+  }, [currentUserId, connections, blockedUsers])
 
   const canSendMessage = useCallback((ownerId: string, privacy: PrivacyLevel): boolean => {
     if (!currentUserId || currentUserId === ownerId) return false
@@ -484,7 +581,7 @@ function useConnectionsInternal(): ConnectionsContextValue {
 
   return {
     privacySettings, updatePrivacySettings, savingPrivacy,
-    getConnectionStatus, isConnected, getRequestForUser,
+    getConnectionStatus, isConnected, isBlockedByMe, getRequestForUser,
     sendConnectionRequest, acceptConnectionRequest, declineConnectionRequest,
     cancelConnectionRequest, removeConnection, blockUser, unblockUser,
     canMessageUser, resolveProfileIdFromEmail,
