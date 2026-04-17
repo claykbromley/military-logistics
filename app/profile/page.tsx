@@ -569,6 +569,7 @@ function ProfilePageContent() {
                 {[
                   { label: "Account Settings", url: "/settings" },
                   { label: "Notifications", url: "/notifications" },
+                  { label: "View Contacts", url: "/services/command-center/contacts" },
                 ].map((link) => (
                   <a
                     key={link.url}

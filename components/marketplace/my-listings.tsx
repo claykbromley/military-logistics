@@ -120,36 +120,36 @@ export function MyListings({ listings: initialListings }: MyListingsProps) {
               <h3 className="font-semibold line-clamp-1">{listing.title}</h3>
               <p className="mt-1 text-xl font-bold text-primary">{formatPrice(listing.price)}</p>
             </CardContent>
-            <CardFooter className="border-t p-4">
+            <CardFooter className="border-t dark:border-slate-500 p-4">
               <div className="flex w-full items-center justify-between">
                 <span className="text-sm text-muted-foreground">{listing.location}</span>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" className="cursor-pointer">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem asChild>
+                    <DropdownMenuItem asChild className="cursor-pointer">
                       <Link href={`/community/marketplace/listings/${listing.id}`}>
-                        <Eye className="mr-2 h-4 w-4" />
+                        <Eye className="mr-2 h-4 w-4 hover:text-white" />
                         View
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
+                    <DropdownMenuItem asChild className="cursor-pointer">
                       <Link href={`/community/marketplace/dashboard/listings/${listing.id}/edit`}>
-                        <Pencil className="mr-2 h-4 w-4" />
+                        <Pencil className="mr-2 h-4 w-4 hover:text-white" />
                         Edit
                       </Link>
                     </DropdownMenuItem>
                     {listing.status === "active" && (
-                      <DropdownMenuItem onClick={() => handleMarkSold(listing.id)}>
-                        <CheckCircle className="mr-2 h-4 w-4" />
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => handleMarkSold(listing.id)}>
+                        <CheckCircle className="mr-2 h-4 w-4 hover:text-white" />
                         Mark as Sold
                       </DropdownMenuItem>
                     )}
-                    <DropdownMenuItem className="text-destructive" onClick={() => setDeleteId(listing.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
+                    <DropdownMenuItem className="text-destructive cursor-pointer" onClick={() => setDeleteId(listing.id)}>
+                      <Trash2 className="mr-2 h-4 w-4 hover:text-white" />
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>

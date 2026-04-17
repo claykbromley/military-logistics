@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/client"
 import type React from "react"
 import { MILITARY_BRANCHES, MILITARY_STATUS, PAYGRADES } from "@/lib/types"
 import { useState } from "react"
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -96,14 +96,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
     <Dialog open={open} onOpenChange={onClose}> 
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto bg-card border-2 border-border">
         <DialogTitle className="sr-only">Sign Up</DialogTitle>
-        <div
-          className="absolute inset-0 -z-10 opacity-5"
-          style={{
-            backgroundImage: "url(/placeholder.svg?height=800&width=600&query=american+flag+stars+stripes+pattern)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-          }}
-        />
+        <DialogDescription />
         {success? 
         <div className="flex flex-col items-center pt-4 pb-4">
           <div className="text-sm text-muted-foreground">

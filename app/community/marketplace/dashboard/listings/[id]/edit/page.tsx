@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Header } from "@/components/header"
 import { MARKETPLACECATEGORIES, MARKETPLACECONDITIONS, MilitaryBase } from "@/lib/types"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, ImagePlus, X, MapPin, Building } from "lucide-react"
+import { ArrowLeft, ImagePlus, X, MapPin, Building, Hash } from "lucide-react"
 import Link from "next/link"
 
 interface EditListingPageProps {
@@ -28,13 +28,15 @@ export default function EditListingPage({ params }: EditListingPageProps) {
   const [error, setError] = useState<string | null>(null)
   const [images, setImages] = useState<string[]>([])
   const [isGettingLocation, setIsGettingLocation] = useState(false)
-  const [locationType, setLocationType] = useState<"current" | "base">("current")
+  const [locationType, setLocationType] = useState<"current" | "base" | "zip">("current")
   const [militaryBases, setMilitaryBases] = useState<MilitaryBase[]>([])
   const [uniqueStates, setUniqueStates] = useState<string[]>([])
   const [basesLoading, setBasesLoading] = useState(true)
   const [stateSelected, setStateSelected] = useState<string>("")
   const [baseSelectedId, setBaseSelectedId] = useState<number | null>(null)
-  const [initialLocationLoaded, setInitialLocationLoaded] = useState(false)
+  const [zipCode, setZipCode] = useState("")
+  const [zipError, setZipError] = useState<string | null>(null)
+  const [isLookingUpZip, setIsLookingUpZip] = useState(false)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -47,6 +49,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
     latitude: null as number | null,
     longitude: null as number | null,
     nearbyBase: "",
+    zipCode: "",
     status: "",
   })
 
@@ -122,10 +125,15 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       }
 
       // Detect location type based on existing data
-      const isBaseLocation = listing.state?.length === 2 && 
+      const hasZipCode = !!listing.zip_code
+      const isBaseLocation = !hasZipCode &&
+                            listing.state?.length === 2 && 
                             militaryBases.some(base => base.name === listing.city)
       
-      if (isBaseLocation) {
+      if (hasZipCode) {
+        setLocationType("zip")
+        setZipCode(listing.zip_code)
+      } else if (isBaseLocation) {
         setLocationType("base")
         setStateSelected(listing.state.toUpperCase())
         
@@ -153,11 +161,11 @@ export default function EditListingPage({ params }: EditListingPageProps) {
         latitude: listing.latitude,
         longitude: listing.longitude,
         nearbyBase: listing.nearby_base || "",
+        zipCode: listing.zip_code || "",
         status: listing.status,
       })
       
       setImages(listing.images || [])
-      setInitialLocationLoaded(true)
       setIsLoading(false)
     }
 
@@ -178,6 +186,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       latitude: base.latitude,
       longitude: base.longitude,
       nearbyBase: `${base.name}, ${base.state.toUpperCase()}`,
+      zipCode: "",
     }))
   }, [baseSelectedId, militaryBases])
 
@@ -250,6 +259,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
             data.address?.municipality ||
             "Unknown City"
           const state = data.address?.state || "Unknown State"
+          const postcode = data.address?.postcode || ""
 
           const { base: nearestBase, distance } = findNearestBase(latitude, longitude)
           
@@ -262,6 +272,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
             nearbyBase: nearestBase && distance < 50 
               ? `${nearestBase.name}, ${nearestBase.state.toUpperCase()}`
               : "",
+            zipCode: postcode,
           }))
         } catch {
           const { base: nearestBase } = findNearestBase(latitude, longitude)
@@ -275,6 +286,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
             nearbyBase: nearestBase 
               ? `${nearestBase.name}, ${nearestBase.state.toUpperCase()}`
               : "",
+            zipCode: "",
           }))
         }
 
@@ -282,24 +294,78 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       },
       (error) => {
         console.error("Geolocation error:", error)
-        setError("Unable to get your location. Please select a base instead.")
+        setError("Unable to get your location. Please select a base or enter a ZIP code instead.")
         setIsGettingLocation(false)
       },
       { enableHighAccuracy: true, timeout: 10000 },
     )
   }
 
-  const handleLocationTypeChange = (type: "current" | "base") => {
+  const handleZipLookup = async () => {
+    const trimmed = zipCode.trim()
+    if (!/^\d{5}$/.test(trimmed)) {
+      setZipError("Please enter a valid 5-digit ZIP code")
+      return
+    }
+
+    setIsLookingUpZip(true)
+    setZipError(null)
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&postalcode=${trimmed}&country=US&addressdetails=1&limit=1`
+      )
+      const data = await response.json()
+
+      if (!data || data.length === 0) {
+        setZipError("Could not find that ZIP code. Please try another.")
+        setIsLookingUpZip(false)
+        return
+      }
+
+      const result = data[0]
+      const lat = parseFloat(result.lat)
+      const lng = parseFloat(result.lon)
+
+      const city =
+        result.address?.city ||
+        result.address?.town ||
+        result.address?.village ||
+        result.address?.municipality ||
+        "Unknown City"
+      const state = result.address?.state || "Unknown State"
+
+      const { base: nearestBase, distance } = findNearestBase(lat, lng)
+
+      setFormData((prev) => ({
+        ...prev,
+        city,
+        state,
+        latitude: lat,
+        longitude: lng,
+        nearbyBase: nearestBase && distance < 50
+          ? `${nearestBase.name}, ${nearestBase.state.toUpperCase()}`
+          : "",
+        zipCode: trimmed,
+      }))
+
+      setIsLookingUpZip(false)
+    } catch {
+      setZipError("Failed to look up ZIP code. Please try again.")
+      setIsLookingUpZip(false)
+    }
+  }
+
+  const handleLocationTypeChange = (type: "current" | "base" | "zip") => {
     setLocationType(type)
+    setZipCode("")
+    setZipError(null)
     
     if (type === "current") {
-      // Clear base selection
       setStateSelected("")
       setBaseSelectedId(null)
-      // Get current location
       getCurrentLocation()
     } else {
-      // Clear current location data when switching to base
       setFormData((prev) => ({
         ...prev,
         city: "",
@@ -307,7 +373,13 @@ export default function EditListingPage({ params }: EditListingPageProps) {
         latitude: null,
         longitude: null,
         nearbyBase: "",
+        zipCode: "",
       }))
+    }
+
+    if (type !== "base") {
+      setStateSelected("")
+      setBaseSelectedId(null)
     }
   }
 
@@ -324,15 +396,27 @@ export default function EditListingPage({ params }: EditListingPageProps) {
       return
     }
 
+    if (locationType === 'zip' && (!formData.latitude || !formData.longitude)) {
+      setError("Please enter and look up a valid ZIP code")
+      return
+    }
+
     setIsSubmitting(true)
     setError(null)
 
     const supabase = createClient()
     
     // Determine location string based on location type
-    const locationString = locationType === 'base' 
-      ? formData.nearbyBase  // For base: use base name
-      : `${formData.city}, ${formData.state}`  // For current: use actual city/state
+    let locationString: string
+    if (locationType === 'base') {
+      locationString = formData.nearbyBase
+    } else if (locationType === 'zip') {
+      locationString = formData.zipCode
+        ? `${formData.city}, ${formData.state} (${formData.zipCode})`
+        : `${formData.city}, ${formData.state}`
+    } else {
+      locationString = `${formData.city}, ${formData.state}`
+    }
     
     const { error: updateError } = await supabase
       .from("marketplace_listings")
@@ -348,6 +432,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
         latitude: formData.latitude,
         longitude: formData.longitude,
         nearby_base: formData.nearbyBase || null,
+        zip_code: formData.zipCode || null,
         images: images,
         status: formData.status,
         updated_at: new Date().toISOString(),
@@ -408,14 +493,14 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                           type="button"
                           variant="destructive"
                           size="icon"
-                          className="absolute right-1 top-1 h-6 w-6"
+                          className="absolute right-1 top-1 h-6 w-6 cursor-pointer"
                           onClick={() => removeImage(index)}
                         >
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
                     ))}
-                    <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed hover:border-primary">
+                    <label className="flex h-24 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed dark:border-slate-500 hover:border-primary dark:hover:border-primary">
                       <ImagePlus className="h-6 w-6 text-muted-foreground" />
                       <span className="mt-1 text-xs text-muted-foreground">Add photo</span>
                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
@@ -429,6 +514,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                   <Input
                     id="title"
                     value={formData.title}
+                    className="dark:border-slate-500"
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                     required
                   />
@@ -439,6 +525,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                   <Label htmlFor="description">Description</Label>
                   <Textarea
                     id="description"
+                    className="dark:border-slate-500"
                     rows={4}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -454,6 +541,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                     min="0"
                     step="0.01"
                     value={formData.price}
+                    className="dark:border-slate-500"
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     required
                   />
@@ -466,7 +554,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                     value={formData.category}
                     onValueChange={(value) => setFormData({ ...formData, category: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:border-slate-500 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -486,7 +574,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                     value={formData.condition}
                     onValueChange={(value) => setFormData({ ...formData, condition: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="dark:border-slate-500 cursor-pointer">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -508,16 +596,25 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                       variant={locationType === "current" ? "default" : "outline"}
                       onClick={() => handleLocationTypeChange("current")}
                       disabled={isGettingLocation}
-                      className="flex-1"
+                      className="flex-1 cursor-pointer"
                     >
                       <MapPin className="mr-2 h-4 w-4" />
-                      {isGettingLocation ? "Getting location..." : "Use My Location"}
+                      {isGettingLocation ? "Getting..." : "My Location"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={locationType === "zip" ? "default" : "outline"}
+                      onClick={() => handleLocationTypeChange("zip")}
+                      className="flex-1 cursor-pointer"
+                    >
+                      <Hash className="mr-2 h-4 w-4" />
+                      ZIP Code
                     </Button>
                     <Button
                       type="button"
                       variant={locationType === "base" ? "default" : "outline"}
                       onClick={() => handleLocationTypeChange("base")}
-                      className="flex-1"
+                      className="flex-1 cursor-pointer"
                     >
                       <Building className="mr-2 h-4 w-4" />
                       Select Base
@@ -527,7 +624,47 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                   {locationType === "current" && (
                     <div className="space-y-3">
                       {formData.city && formData.state && (
-                        <div className="rounded-lg border bg-muted/50 p-3">
+                        <div className="rounded-lg border bg-primary/20 p-3">
+                          <p className="text-sm font-medium">
+                            {formData.city}, {formData.state}
+                          </p>
+                          {formData.nearbyBase && (
+                            <p className="text-xs text-muted-foreground">Near {formData.nearbyBase}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {locationType === "zip" && (
+                    <div className="flex flex-col gap-3 rounded-lg border bg-primary/20 p-3">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter 5-digit ZIP code"
+                          className="bg-card dark:border-slate-500"
+                          value={zipCode}
+                          onChange={(e) => {
+                            setZipCode(e.target.value.replace(/\D/g, "").slice(0, 5))
+                            setZipError(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && zipCode.length === 5 && !isLookingUpZip) {handleZipLookup()}
+                          }}
+                          maxLength={5}
+                          inputMode="numeric"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleZipLookup}
+                          className="cursor-pointer"
+                          disabled={isLookingUpZip || zipCode.length < 5}
+                        >
+                          {isLookingUpZip ? "Looking up..." : "Look Up"}
+                        </Button>
+                      </div>
+                      {zipError && <p className="text-sm text-destructive">{zipError}</p>}
+                      {formData.city && formData.state && locationType === "zip" && (
+                        <div className="rounded-lg border bg-background p-3">
                           <p className="text-sm font-medium">
                             {formData.city}, {formData.state}
                           </p>
@@ -540,14 +677,14 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                   )}
 
                   {locationType === "base" && (
-                    <div className="flex gap-4 rounded-lg border bg-muted/50 p-3">
+                    <div className="flex gap-4 rounded-lg border bg-primary/20 p-3">
                       {/* State Select */}
                       <Select
                         value={stateSelected}
                         onValueChange={handleSelectState}
                         disabled={basesLoading}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="bg-card cursor-pointer dark:border-slate-500">
                           <SelectValue placeholder="Select a state" />
                         </SelectTrigger>
                         <SelectContent>
@@ -566,7 +703,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                           onValueChange={(value) => setBaseSelectedId(Number(value))}
                           disabled={basesLoading}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-card cursor-pointer dark:border-slate-500">
                             <SelectValue placeholder="Select a military base" />
                           </SelectTrigger>
                           <SelectContent>
@@ -589,7 +726,7 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                     value={formData.status}
                     onValueChange={(value) => setFormData({ ...formData, status: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="cursor-pointer dark:border-slate-500">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -604,10 +741,14 @@ export default function EditListingPage({ params }: EditListingPageProps) {
                 {error && <p className="text-sm text-destructive">{error}</p>}
 
                 <div className="flex gap-4">
-                  <Button type="submit" disabled={isSubmitting} className="flex-1">
+                  <Button type="button"
+                    disabled={isSubmitting || !formData.title || !formData.price || !(formData.zipCode || formData.city || formData.nearbyBase)}
+                    onClick={handleSubmit}
+                    className="flex-1 cursor-pointer"
+                  >
                     {isSubmitting ? "Saving..." : "Save Changes"}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => router.back()}>
+                  <Button type="button" variant="outline" className="cursor-pointer" onClick={() => router.back()}>
                     Cancel
                   </Button>
                 </div>

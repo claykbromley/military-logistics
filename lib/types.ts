@@ -21,6 +21,7 @@ export interface Profile {
   display_name: string | null
   location: string | null
   military_branch: string | null
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }
@@ -222,6 +223,7 @@ export interface MarketplaceProfile {
   longitude: number | null
   nearby_base: string | null
   military_branch: string | null
+  avatar_url: string | null
   created_at: string
   updated_at: string
 }
@@ -307,6 +309,7 @@ export interface Contact {
   email?: string
   address?: string
   timezone?: string
+  avatar_url?: string
   role: ContactRole
   linked_profile_id?: string
   isEmergencyContact: boolean
@@ -417,6 +420,7 @@ export interface SharedContact {
   phone?: string
   contactEmail?: string
   address?: string
+  avatar_url?: string
   role?: string
   hasPoa: boolean
   poaType?: string
@@ -583,7 +587,7 @@ export interface AlpacaAccount {
 
 // ─── Privacy & Connection Types ──────────────────────────────────────────────
 
-export type PrivacyLevel = "public" | "connections_only" | "private"
+export type PrivacyLevel = "public" | "connections_only"
  
 export type ConnectionStatus =
   | "none"

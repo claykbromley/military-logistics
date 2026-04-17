@@ -48,7 +48,7 @@ export function ConversationsList({ conversations, userId }: ConversationsListPr
 
         return (
           <Link key={conversation.id} href={`/community/marketplace/dashboard/messages/${conversation.id}`}>
-            <Card className="transition-colors hover:bg-muted/50">
+            <Card className="transition-colors hover:bg-muted/50 p-0">
               <CardContent className="flex items-start gap-4 p-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted">
                   {conversation.listings?.images?.[0] ? (

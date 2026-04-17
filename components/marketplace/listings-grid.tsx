@@ -166,7 +166,7 @@ export function ListingsGrid({ initialListings, savedListingIds, userId }: Listi
               className="pl-10"
             />
           </div>
-          <Button type="submit">Search</Button>
+          <Button type="submit" className="cursor-pointer">Search</Button>
         </form>
 
         <div className="flex items-center justify-between w-full">

@@ -25,9 +25,9 @@ export default async function ConversationPage({ params }: PageProps) {
 	.from("marketplace_conversations")
 	.select(`
 		*,
-		marketplace_listings(id, title, images, price, status),
-		buyer:profiles!marketplace_conversations_buyer_id_fkey(id, display_name, military_branch),
-		seller:profiles!marketplace_conversations_seller_id_fkey(id, display_name, military_branch)
+		listings:marketplace_listings(id, title, images, price, status),
+		buyer:profiles!marketplace_conversations_buyer_id_fkey(id, display_name, military_branch, avatar_url),
+		seller:profiles!marketplace_conversations_seller_id_fkey(id, display_name, military_branch, avatar_url)
 	`)
 	.eq("id", id)
 	.or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)

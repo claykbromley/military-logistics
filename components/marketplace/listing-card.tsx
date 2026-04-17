@@ -81,7 +81,7 @@ export function ListingCard({ listing, isSaved: initialSaved = false, userId }: 
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-2 bg-background/80 backdrop-blur-sm hover:bg-background"
+              className="absolute right-2 top-2 bg-background/80 backdrop-blur-sm hover:bg-background hover:text-red-500 cursor-pointer"
               onClick={toggleSave}
               disabled={isLoading}
             >
@@ -99,7 +99,7 @@ export function ListingCard({ listing, isSaved: initialSaved = false, userId }: 
           </div>
           <p className="mt-2 text-2xl font-bold text-primary">{formatPrice(listing.price)}</p>
         </CardContent>
-        <CardFooter className="border-t px-4 py-3">
+        <CardFooter className="border-t dark:border-slate-500 px-4 py-3">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <MapPin className="h-4 w-4" />
             <span className="line-clamp-1">{listing.location}</span>

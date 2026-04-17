@@ -102,12 +102,6 @@ const PRIVACY_LEVELS: {
     description: "Only your connections can view your full profile and message you",
     icon: Users,
   },
-  {
-    value: "private",
-    label: "Private",
-    description: "Nobody can view your profile. People must request a connection first",
-    icon: Lock,
-  },
 ]
  
 export function PrivacySettingsPanel() {
@@ -262,16 +256,6 @@ export function PrivacySettingsPanel() {
                 </div>
               ))}
             </TooltipProvider>
-          </div>
-        )}
- 
-        {/* Private mode note */}
-        {privacySettings.privacyLevel === "private" && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-xs text-amber-800 dark:text-amber-200">
-            <strong>Private mode:</strong> Other members will only see your
-            display name and a prompt to request a connection. No profile details,
-            contact info, or service details will be visible. You must accept
-            connection requests before others can message you or view your profile.
           </div>
         )}
       </div>

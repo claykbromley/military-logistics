@@ -5,10 +5,10 @@ import { SupabaseClient } from "@supabase/supabase-js"
 
 export type NotificationType =
   | "system"
+  | "connections"
   | "appointment"
   | "communication"
   | "community"
-  | "transition"
   | "discount"
   | "reminder"
 
@@ -43,10 +43,10 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   push_enabled: true,
   types: {
     system: { enabled: true, email: true },
+    connections: { enabled: true, email: true },
     appointment: { enabled: true, email: true },
     communication: { enabled: true, email: true },
     community: { enabled: true, email: false },
-    transition: { enabled: true, email: true },
     discount: { enabled: true, email: false },
     reminder: { enabled: true, email: true },
   },
@@ -63,6 +63,11 @@ export const NOTIFICATION_TYPE_LABELS: Record<
     description: "Platform updates, maintenance, and announcements",
     color: "text-blue-600",
   },
+  connections: {
+    label: "Connections",
+    description: "Connection requests and contact status changes",
+    color: "text-indigo-600",
+  },
   appointment: {
     label: "Appointments",
     description: "Upcoming appointments and schedule changes",
@@ -77,11 +82,6 @@ export const NOTIFICATION_TYPE_LABELS: Record<
     label: "Community",
     description: "Forum replies, marketplace updates, and messages",
     color: "text-orange-600",
-  },
-  transition: {
-    label: "Transition Updates",
-    description: "PCS, deployment, retirement, and separation milestones",
-    color: "text-indigo-600",
   },
   discount: {
     label: "Discounts & Deals",

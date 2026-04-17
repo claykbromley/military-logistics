@@ -17,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { useCommunicationHub, CommunicationHubProvider } from "@/hooks/use-communication-hub"
 import { ConnectionsProvider } from "@/hooks/use-connections"
@@ -109,19 +108,18 @@ function EmergencyContactCard({
                 </span>
               </div>
             )}
-            <Avatar className="w-12 h-12 cursor-pointer" onClick={onViewProfile}>
-              <AvatarFallback
-                className={`text-sm font-medium ${
-                  contact.isEmergencyContact
-                    ? "bg-gradient-to-br from-red-500 to-orange-500 text-white"
-                    : contact.isPoaHolder
-                    ? "bg-gradient-to-br from-indigo-500 to-purple-500 text-white"
-                    : "bg-gradient-to-br from-slate-400 to-slate-500 text-white"
-                }`}
-              >
-                {getInitials(contact.contactName)}
-              </AvatarFallback>
-            </Avatar>
+            <Button onClick={onViewProfile} className="relative h-12 w-12 rounded-full ml-1 cursor-pointer overflow-hidden p-0">
+              {contact.avatar_url ? (
+                <img
+                  src={contact.avatar_url}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                  {getInitials(contact.contactName)}
+                </div>
+              )}
+            </Button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-foreground">{contact.contactName}</h3>
@@ -338,11 +336,18 @@ function SharedContactCard({
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 flex-1">
-            <Avatar className="w-12 h-12 cursor-pointer" onClick={onViewProfile}>
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white text-sm font-medium">
-                {getInitials(displayName)}
-              </AvatarFallback>
-            </Avatar>
+            <Button onClick={onViewProfile} className="relative h-12 w-12 rounded-full ml-1 cursor-pointer overflow-hidden p-0">
+              {sharedContact.avatar_url ? (
+                <img
+                  src={sharedContact.avatar_url}
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-full flex items-center justify-center text-primary-foreground text-xs font-semibold">
+                  {getInitials(sharedContact.contactName)}
+                </div>
+              )}
+            </Button>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <h3
