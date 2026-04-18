@@ -99,7 +99,7 @@ export const sitePages: SearchablePage[] = [
     description: "Retirement planning, separation checklist, TAP, and veteran benefits",
     section: "Transitions",
     icon: FileText,
-    url: "/transitions/retirement-separation",
+    url: "/transitions/separation",
     keywords: ["retire", "separate", "ets", "tap", "taps", "sfltap", "dd214", "veteran", "discharge"],
   },
   {
@@ -107,7 +107,7 @@ export const sitePages: SearchablePage[] = [
     description: "DEERS enrollment, marriage, birth, divorce, and dependent updates",
     section: "Transitions",
     icon: Users,
-    url: "/transitions/changing-dependents",
+    url: "/transitions/family",
     keywords: ["deers", "dependent", "spouse", "child", "marriage", "divorce", "birth", "family"],
   },
 

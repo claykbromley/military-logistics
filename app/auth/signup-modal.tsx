@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sparkles, Eye, EyeClosed } from "lucide-react"
+import Link from "next/link"
 
 interface SignupModalProps {
   open: boolean
@@ -334,6 +335,17 @@ export function SignupModal({ open, onClose, onSwitchToLogin }: SignupModalProps
             </Button>
           </form>
         </div>}
+
+        <p className="text-center text-xs text-muted-foreground">
+          By creating an account, you agree to our{' '}
+          <Link href="/terms" className="underline hover:text-foreground">
+            Terms of Service
+          </Link>{' '}
+          and{' '}
+          <Link href="/privacy" className="underline hover:text-foreground">
+            Privacy Policy
+          </Link>
+        </p>
       </DialogContent>
     </Dialog>
   )

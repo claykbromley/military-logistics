@@ -364,7 +364,7 @@ function useConnectionsInternal(): ConnectionsContextValue {
         type: "connections",
         priority: "high",
         title: `Connection Request From ${myProfile?.display_name || "A user"}`,
-        message: message ?? `You have a new connection request from ${myProfile?.display_name || "a user"}.`,
+        message: message ? 'Message: "' + message + '"' : `You have a new connection request from ${myProfile?.display_name || "a user"}.`,
         actionUrl: "/services/command-center/contacts",
         actionLabel: "View Request",
       }).catch((err) => console.error("Request notification failed:", err))

@@ -52,7 +52,7 @@ const navItems = [
   {
     name: "Transitions",
     icon: ArrowRight,
-    items: ["Enlistment", "Deployment", "PCS", "Retirement/Separation", "Changing Dependents"],
+    items: ["Enlistment", "Deployment", "PCS", "Separation", "Family"],
   },
   {
     name: "Discounts/Benefits",
